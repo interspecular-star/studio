@@ -228,16 +228,31 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
             const btnW = pctToPx(button.layout.width, width);
             const btnH = pctToPx(button.layout.height, height);
 
-            const accentColor = isSelected ? '#E8D4A0' : '#C5A46E';
-            const bgColor = isSelected ? 'rgba(62, 52, 37, 0.94)' : 'rgba(55, 45, 32, 0.9)';
+            // Проверяем enabledWhen для визуального состояния
+            const isEnabled = !button.enabledWhen || evaluateCondition(
+              button.enabledWhen,
+              useStudioStore.getState().variables,
+              useStudioStore.getState().items,
+              (variableId) => {
+                const v = useStudioStore.getState().variables.find(v => v.id === variableId);
+                return v?.defaultValue;
+              }
+            );
+
+            const accentColor = isSelected ? '#E8D4A0' : (isEnabled ? '#C5A46E' : '#6B6255');
+            const bgColor = isSelected 
+              ? 'rgba(62, 52, 37, 0.94)' 
+              : (isEnabled ? 'rgba(55, 45, 32, 0.9)' : 'rgba(45, 38, 28, 0.6)');
 
             return (
               <Group
                 key={button.id}
                 x={btnX}
                 y={btnY}
-                draggable
+                opacity={isEnabled ? 1 : 0.55}
+                draggable={isEnabled}
                 onDragMove={(e) => {
+                  if (!isEnabled) return; // Блокируем движение disabled кнопок
                   const node = e.target;
                   const currentXPercent = (node.x() / width) * 100;
                   const currentYPercent = (node.y() / height) * 100;
@@ -275,9 +290,18 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                     useStudioStore.getState().setSnappingGuide(null);
                   }
                 }}
-                onDragEnd={(e) => handleButtonDragEnd(button.id, e)}
-                onClick={(e) => handleButtonClick(button.id, e)}
-                onTap={(e) => handleButtonClick(button.id, e)}
+                onDragEnd={(e) => {
+                  if (!isEnabled) return;
+                  handleButtonDragEnd(button.id, e);
+                }}
+                onClick={(e) => {
+                  if (!isEnabled) return;
+                  handleButtonClick(button.id, e);
+                }}
+                onTap={(e) => {
+                  if (!isEnabled) return;
+                  handleButtonClick(button.id, e);
+                }}
               >
                 <Rect
                   width={btnW}
