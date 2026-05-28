@@ -12,6 +12,36 @@ export type Item = {
   // В будущем можно будет добавить: icon, weight, rarity и т.д.
 };
 
+// === Variables System ===
+export type VariableType = 'number' | 'boolean' | 'string';
+
+export type VariableCategory = 
+  | 'player' 
+  | 'resources' 
+  | 'reputation' 
+  | 'relationships' 
+  | 'inventory' 
+  | 'custom';
+
+export type Variable = {
+  id: string;
+  name: string;                    // internal key, e.g. "player_level"
+  displayName: LocalizedString;    // human readable
+  type: VariableType;
+  defaultValue: number | boolean | string;
+  category: VariableCategory;
+};
+
+// === Conditions System (extensible from the start) ===
+export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
+
+export type Condition =
+  | { type: 'variable'; variableId: string; operator: ComparisonOperator; value: number | boolean | string }
+  | { type: 'item'; itemId: string; operator: 'has' | '>=' | '<='; value?: number }
+  | { type: 'and'; conditions: Condition[] }
+  | { type: 'or'; conditions: Condition[] }
+  | { type: 'not'; condition: Condition };
+
 export type ButtonAction = 
   | { type: 'goToPage'; pageId: string }
   | { type: 'startQuest'; questId: string }
@@ -31,7 +61,8 @@ export type StudioButton = {
     style: 'default' | 'important' | 'danger' | 'subtle';
   };
   action: ButtonAction;
-  visibleWhen?: any; // later: Condition system
+  visibleWhen?: Condition;
+  enabledWhen?: Condition;
 };
 
 export type StudioPage = {
@@ -79,6 +110,9 @@ type StudioState = {
   // Реестр предметов (простая версия на первом этапе)
   items: Item[];
 
+  // Variables (гибкая система состояния проекта)
+  variables: Variable[];
+
   // Actions
   setPages: (pages: StudioPage[]) => void;
   selectPage: (id: string) => void;
@@ -108,6 +142,12 @@ type StudioState = {
   updateItem: (id: string, updates: Partial<Omit<Item, 'id'>>) => void;
   deleteItem: (id: string) => void;
   getItem: (id: string) => Item | undefined;
+
+  // === Variables (Гибкая система состояния) ===
+  addVariable: (variable: Omit<Variable, 'id'>) => void;
+  updateVariable: (id: string, updates: Partial<Omit<Variable, 'id'>>) => void;
+  deleteVariable: (id: string) => void;
+  getVariable: (id: string) => Variable | undefined;
 
   addPage: () => void;
   deletePage: (id: string) => void;
@@ -188,6 +228,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   // Items registry (Вариант Б — сразу делаем реестр предметов)
   items: [],
+  variables: [],
 
   setPages: (pages) => set({ pages }),
 
@@ -441,6 +482,38 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     return get().items.find((item) => item.id === id);
   },
 
+  // === Variables Management ===
+  addVariable: (variableData) => {
+    const newVariable: Variable = {
+      ...variableData,
+      id: `var_${Date.now().toString(36)}`,
+    };
+    set((state) => ({
+      variables: [...state.variables, newVariable],
+    }));
+    get().saveToLocalStorage();
+  },
+
+  updateVariable: (id, updates) => {
+    set((state) => ({
+      variables: state.variables.map((v) =>
+        v.id === id ? { ...v, ...updates } : v
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  deleteVariable: (id) => {
+    set((state) => ({
+      variables: state.variables.filter((v) => v.id !== id),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  getVariable: (id) => {
+    return get().variables.find((v) => v.id === id);
+  },
+
   // === Project Persistence ===
   saveToLocalStorage: () => {
     const state = get();
@@ -449,6 +522,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pages: state.pages,
       selectedPageId: state.selectedPageId,
       items: state.items,
+      variables: state.variables,
     };
     try {
       localStorage.setItem('slay-studio-project', JSON.stringify(dataToSave));
@@ -477,6 +551,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snappingGuide: null,
         snapEnabled: parsed.snapEnabled ?? true,
         items: parsed.items || [],
+        variables: parsed.variables || [],
       });
       return true;
     } catch (e) {
@@ -495,7 +570,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       },
       pages: state.pages,
       guides: state.guides,
-      items: state.items, // экспортируем реестр предметов
+      items: state.items,
+      variables: state.variables,
     };
 
     const json = JSON.stringify(exportData, null, 2);
@@ -532,6 +608,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snappingGuide: null,
         snapEnabled: data.snapEnabled ?? true,
         items: data.items || [],
+        variables: data.variables || [],
       });
 
       // Auto-save after import
@@ -559,7 +636,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       guides: { horizontal: [], vertical: [] },
       snappingGuide: null,
       snapEnabled: true,
-      items: [], // Новый проект — без предметов
+      items: [],
+      variables: [],
     });
     get().saveToLocalStorage();
   },
