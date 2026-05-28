@@ -951,6 +951,35 @@ export default function SlayStudio() {
                 </div>
               )}
 
+              {/* === УСЛОВИЯ (Простой редактор) === */}
+              {selectedButton && (
+                <div className="space-y-4 pt-4 border-t border-[var(--studio-border)]">
+                  <div className="text-xs font-medium text-[var(--studio-accent)]">УСЛОВИЯ</div>
+
+                  {/* visibleWhen */}
+                  <ConditionEditor
+                    label="Видимость кнопки"
+                    condition={selectedButton.visibleWhen}
+                    onChange={(newCondition) =>
+                      updateSelectedButton({ visibleWhen: newCondition })
+                    }
+                    variables={variables}
+                    items={items}
+                  />
+
+                  {/* enabledWhen */}
+                  <ConditionEditor
+                    label="Доступность кнопки"
+                    condition={selectedButton.enabledWhen}
+                    onChange={(newCondition) =>
+                      updateSelectedButton({ enabledWhen: newCondition })
+                    }
+                    variables={variables}
+                    items={items}
+                  />
+                </div>
+              )}
+
               {!selectedButton && currentPage && currentPage.buttons.length > 0 && (
                 <div className="text-center text-xs text-[var(--studio-text-muted)] py-3">
                   Выбери кнопку на холсте или в списке
@@ -1096,6 +1125,162 @@ export default function SlayStudio() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// === Простой редактор одного условия ===
+function ConditionEditor({
+  label,
+  condition,
+  onChange,
+  variables,
+  items,
+}: {
+  label: string;
+  condition?: any;
+  onChange: (condition?: any) => void;
+  variables: any[];
+  items: any[];
+}) {
+  const hasCondition = !!condition;
+
+  const toggleCondition = () => {
+    if (hasCondition) {
+      onChange(undefined);
+    } else {
+      const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
+      if (firstVar) {
+        onChange({
+          type: 'variable',
+          variableId: firstVar.id,
+          operator: '>=',
+          value: firstVar.type === 'number' ? 1 : true,
+        });
+      } else {
+        onChange({
+          type: 'variable',
+          variableId: '',
+          operator: '>=',
+          value: 0,
+        });
+      }
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] font-medium text-[var(--studio-text-secondary)]">{label}</label>
+        <button
+          onClick={toggleCondition}
+          className={`text-[10px] px-2 py-0.5 rounded transition ${
+            hasCondition
+              ? 'bg-[var(--studio-accent)] text-[#1C1814]'
+              : 'border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]'
+          }`}
+        >
+          {hasCondition ? 'Есть условие' : 'Всегда'}
+        </button>
+      </div>
+
+      {hasCondition && (
+        <div className="space-y-2 rounded border border-[var(--studio-border)] bg-[#1C1814] p-2">
+          <select
+            value={condition.type}
+            onChange={(e) => {
+              const newType = e.target.value;
+              if (newType === 'variable') {
+                const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
+                onChange({
+                  type: 'variable',
+                  variableId: firstVar?.id || '',
+                  operator: '>=',
+                  value: firstVar?.type === 'number' ? 1 : true,
+                });
+              } else if (newType === 'itemQuantity') {
+                onChange({
+                  type: 'itemQuantity',
+                  itemId: items[0]?.id || '',
+                  operator: '>=',
+                  value: 1,
+                });
+              }
+            }}
+            className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+          >
+            <option value="variable">Переменная</option>
+            <option value="itemQuantity">Количество предмета</option>
+          </select>
+
+          {condition.type === 'variable' && (
+            <div className="grid grid-cols-3 gap-1">
+              <select
+                value={condition.variableId}
+                onChange={(e) => onChange({ ...condition, variableId: e.target.value })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+              >
+                {variables.length === 0 && <option value="">Нет переменных</option>}
+                {variables.map((v: any) => (
+                  <option key={v.id} value={v.id}>{v.displayName.ru}</option>
+                ))}
+              </select>
+              <select
+                value={condition.operator}
+                onChange={(e) => onChange({ ...condition, operator: e.target.value })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+              >
+                <option value=">=">&gt;=</option>
+                <option value="<=">&lt;=</option>
+                <option value="==">=</option>
+                <option value=">">&gt;</option>
+                <option value="<">&lt;</option>
+                <option value="!=">≠</option>
+              </select>
+              <input
+                type={variables.find((v: any) => v.id === condition.variableId)?.type === 'number' ? 'number' : 'text'}
+                value={condition.value}
+                onChange={(e) => {
+                  const varType = variables.find((v: any) => v.id === condition.variableId)?.type;
+                  const val = varType === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+                  onChange({ ...condition, value: val });
+                }}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+              />
+            </div>
+          )}
+
+          {condition.type === 'itemQuantity' && (
+            <div className="grid grid-cols-3 gap-1">
+              <select
+                value={condition.itemId}
+                onChange={(e) => onChange({ ...condition, itemId: e.target.value })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+              >
+                {items.length === 0 && <option value="">Нет предметов</option>}
+                {items.map((i: any) => (
+                  <option key={i.id} value={i.id}>{i.name.ru}</option>
+                ))}
+              </select>
+              <select
+                value={condition.operator}
+                onChange={(e) => onChange({ ...condition, operator: e.target.value })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+              >
+                <option value=">=">&gt;=</option>
+                <option value="<=">&lt;=</option>
+                <option value="==">=</option>
+              </select>
+              <input
+                type="number"
+                value={condition.value}
+                onChange={(e) => onChange({ ...condition, value: parseInt(e.target.value) || 0 })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
