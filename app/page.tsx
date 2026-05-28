@@ -47,6 +47,8 @@ export default function SlayStudio() {
     addVariable,
     updateVariable,
     deleteVariable,
+    playtestState,
+    resetPlaytestState,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -457,21 +459,30 @@ export default function SlayStudio() {
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--studio-text-secondary)]">ПЕРЕМЕННЫЕ</span>
-                <button
-                  onClick={() => {
-                    const newVar: Omit<Variable, 'id'> = {
-                      name: `custom_var_${Date.now().toString(36)}`,
-                      displayName: { ru: 'Новая переменная', en: 'New Variable' },
-                      type: 'number',
-                      defaultValue: 0,
-                      category: 'custom',
-                    };
-                    addVariable(newVar);
-                  }}
-                  className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
-                >
-                  + Добавить
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => resetPlaytestState()}
+                    className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                    title="Сбросить все значения превью к дефолтным"
+                  >
+                    Сбросить
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newVar: Omit<Variable, 'id'> = {
+                        name: `custom_var_${Date.now().toString(36)}`,
+                        displayName: { ru: 'Новая переменная', en: 'New Variable' },
+                        type: 'number',
+                        defaultValue: 0,
+                        category: 'custom',
+                      };
+                      addVariable(newVar);
+                    }}
+                    className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
+                  >
+                    + Добавить
+                  </button>
+                </div>
               </div>
 
               {variables.length === 0 && (
@@ -496,9 +507,12 @@ export default function SlayStudio() {
                           className="w-full bg-transparent font-medium focus:outline-none"
                           placeholder="Название (RU)"
                         />
-                        {/* Internal Name */}
-                        <div className="text-[10px] text-[var(--studio-text-muted)] font-mono mt-0.5">
-                          {variable.name}
+                        {/* Internal Name + Live Value */}
+                        <div className="flex justify-between text-[10px] text-[var(--studio-text-muted)] font-mono mt-0.5">
+                          <span>{variable.name}</span>
+                          <span className="text-[var(--studio-accent)]">
+                            {playtestState.variableValues[variable.id] ?? variable.defaultValue}
+                          </span>
                         </div>
                       </div>
                       <button

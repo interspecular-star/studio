@@ -147,6 +147,13 @@ type StudioState = {
   // Variables (гибкая система состояния проекта)
   variables: Variable[];
 
+  // === Playtest / Preview State ===
+  // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
+  playtestState: {
+    variableValues: Record<string, number | boolean | string>; // текущие значения переменных
+    // В будущем сюда добавим: relationships, reputation, inventory и т.д.
+  };
+
   // Actions
   setPages: (pages: StudioPage[]) => void;
   selectPage: (id: string) => void;
@@ -182,6 +189,10 @@ type StudioState = {
   updateVariable: (id: string, updates: Partial<Omit<Variable, 'id'>>) => void;
   deleteVariable: (id: string) => void;
   getVariable: (id: string) => Variable | undefined;
+
+  // === Playtest State Management ===
+  resetPlaytestState: () => void;
+  executeAction: (action: ButtonAction) => void; // Главная функция выполнения действий
 
   addPage: () => void;
   deletePage: (id: string) => void;
@@ -263,6 +274,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Items registry (Вариант Б — сразу делаем реестр предметов)
   items: [],
   variables: [],
+
+  playtestState: {
+    variableValues: {},
+  },
 
   setPages: (pages) => set({ pages }),
 
@@ -546,6 +561,61 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   getVariable: (id) => {
     return get().variables.find((v) => v.id === id);
+  },
+
+  // === Playtest State ===
+  resetPlaytestState: () => {
+    set({
+      playtestState: { variableValues: {} },
+      snappingGuide: null,
+    });
+  },
+
+  executeAction: (action) => {
+    const state = get();
+    const currentValues = { ...state.playtestState.variableValues };
+
+    switch (action.type) {
+      case 'setVariable': {
+        currentValues[action.variableId] = action.value;
+        break;
+      }
+      case 'addToVariable':
+      case 'subtractFromVariable': {
+        const current = Number(currentValues[action.variableId] ?? 0);
+        const delta = action.type === 'addToVariable' ? action.amount : -action.amount;
+        currentValues[action.variableId] = current + delta;
+        break;
+      }
+      case 'giveItem':
+      case 'removeItem': {
+        const item = state.items.find(i => i.id === action.itemId);
+        if (item?.quantityVariableId) {
+          const current = Number(currentValues[item.quantityVariableId] ?? 0);
+          const delta = action.type === 'giveItem' ? action.amount : -action.amount;
+          currentValues[item.quantityVariableId] = Math.max(0, current + delta);
+        }
+        break;
+      }
+      case 'changeRelationship':
+      case 'changeReputation':
+      case 'changePlayerStat':
+      case 'giveResource':
+      case 'removeResource': {
+        // Для простоты на первом этапе все эти значения тоже живём через переменные
+        // (пользователь может создать переменные типа "relationship_mila", "reputation", "strength" и т.д.)
+        // Здесь можно добавить более специальную логику позже.
+        console.log('Action executed (preview):', action);
+        break;
+      }
+      default:
+        // goToPage и startQuest пока ничего не делают в превью
+        break;
+    }
+
+    set({
+      playtestState: { variableValues: currentValues },
+    });
   },
 
   // === Project Persistence ===

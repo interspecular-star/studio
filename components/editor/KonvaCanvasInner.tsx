@@ -297,6 +297,10 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                 onClick={(e) => {
                   if (!isEnabled) return;
                   handleButtonClick(button.id, e);
+
+                  // Выполняем действие кнопки (для превью)
+                  const freshState = useStudioStore.getState();
+                  freshState.executeAction(button.action);
                 }}
                 onTap={(e) => {
                   if (!isEnabled) return;
