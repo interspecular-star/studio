@@ -49,6 +49,9 @@ export default function SlayStudio() {
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
+
+  // Helper: only number variables (for item quantity linking)
+  const numberVariables = variables.filter(v => v.type === 'number');
   const [mode, setMode] = useState<'editor' | 'playtest'>('editor');
   const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'restored'>('saved');
@@ -652,6 +655,55 @@ export default function SlayStudio() {
                       className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
                       rows={2}
                     />
+
+                    {/* Quantity Variable Linking */}
+                    <div className="mt-3 pt-2 border-t border-[var(--studio-border)]">
+                      <label className="text-[10px] text-[var(--studio-text-muted)] block mb-1">
+                        Количество хранится в переменной
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={item.quantityVariableId || ''}
+                          onChange={(e) => {
+                            updateItem(item.id, {
+                              quantityVariableId: e.target.value || undefined,
+                            });
+                          }}
+                          className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                        >
+                          <option value="">— Не отслеживать количество —</option>
+                          {numberVariables.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.displayName.ru} ({v.name})
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          onClick={() => {
+                            const suggestedName = `item_${item.name.ru.toLowerCase().replace(/\s+/g, '_')}`;
+                            const newVar: Omit<Variable, 'id'> = {
+                              name: suggestedName,
+                              displayName: { ru: `Кол-во: ${item.name.ru}`, en: `Qty: ${item.name.en}` },
+                              type: 'number',
+                              defaultValue: 0,
+                              category: 'inventory',
+                            };
+                            addVariable(newVar);
+                            // Link it immediately
+                            const createdVar = variables.find(v => v.name === suggestedName) || 
+                                              useStudioStore.getState().variables.find(v => v.name === suggestedName);
+                            if (createdVar) {
+                              updateItem(item.id, { quantityVariableId: createdVar.id });
+                            }
+                          }}
+                          className="text-[10px] px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] whitespace-nowrap"
+                          title="Создать новую переменную для количества этого предмета"
+                        >
+                          + Переменная
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

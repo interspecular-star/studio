@@ -9,6 +9,7 @@ export type Item = {
   id: string;
   name: LocalizedString;
   description: LocalizedString;
+  quantityVariableId?: string; // ID переменной, которая хранит количество этого предмета
   // В будущем можно будет добавить: icon, weight, rarity и т.д.
 };
 
