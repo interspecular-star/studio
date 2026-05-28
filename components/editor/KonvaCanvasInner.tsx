@@ -6,6 +6,7 @@ import type { Stage as StageType } from 'konva/lib/Stage';
 
 import { useStudioStore } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
+import { evaluateCondition } from '@/lib/conditions';
 
 // Background themes for different locations (warm, atmospheric)
 const backgroundThemes: Record<string, { top: string; bottom: string; nameRu: string; nameEn: string }> = {
@@ -207,7 +208,20 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
           </Group>
 
           {/* Draggable Buttons */}
-          {currentPage.buttons.map((button) => {
+          {currentPage.buttons
+            .filter((button) => {
+              if (!button.visibleWhen) return true;
+              return evaluateCondition(
+                button.visibleWhen,
+                useStudioStore.getState().variables,
+                useStudioStore.getState().items,
+                (variableId) => {
+                  const v = useStudioStore.getState().variables.find(v => v.id === variableId);
+                  return v?.defaultValue;
+                }
+              );
+            })
+            .map((button) => {
             const isSelected = button.id === selectedButtonId;
             const btnX = pctToPx(button.layout.x, width);
             const btnY = pctToPx(button.layout.y, height);

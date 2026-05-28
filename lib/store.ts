@@ -37,8 +37,13 @@ export type Variable = {
 export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
 
 export type Condition =
+  // Проверка переменной
   | { type: 'variable'; variableId: string; operator: ComparisonOperator; value: number | boolean | string }
-  | { type: 'item'; itemId: string; operator: 'has' | '>=' | '<='; value?: number }
+
+  // Проверка количества предмета (через привязанную переменную)
+  | { type: 'itemQuantity'; itemId: string; operator: ComparisonOperator; value: number }
+
+  // Логические операторы
   | { type: 'and'; conditions: Condition[] }
   | { type: 'or'; conditions: Condition[] }
   | { type: 'not'; condition: Condition };
