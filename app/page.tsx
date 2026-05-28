@@ -1189,94 +1189,90 @@ function ConditionEditor({
           <select
             value={condition.type}
             onChange={(e) => {
-              const newType = e.target.value;
+              const newType = e.target.value as any;
               if (newType === 'variable') {
                 const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
-                onChange({
-                  type: 'variable',
-                  variableId: firstVar?.id || '',
-                  operator: '>=',
-                  value: firstVar?.type === 'number' ? 1 : true,
-                });
+                onChange({ type: 'variable', variableId: firstVar?.id || '', operator: '>=', value: firstVar?.type === 'number' ? 1 : true });
               } else if (newType === 'itemQuantity') {
-                onChange({
-                  type: 'itemQuantity',
-                  itemId: items[0]?.id || '',
-                  operator: '>=',
-                  value: 1,
-                });
+                onChange({ type: 'itemQuantity', itemId: items[0]?.id || '', operator: '>=', value: 1 });
+              } else if (newType === 'relationship') {
+                onChange({ type: 'relationship', characterId: 'mila', operator: '>=', value: 0 });
+              } else if (newType === 'reputation') {
+                onChange({ type: 'reputation', operator: '>=', value: 0 });
+              } else if (newType === 'playerStat') {
+                onChange({ type: 'playerStat', stat: 'level', operator: '>=', value: 1 });
+              } else if (newType === 'resource') {
+                onChange({ type: 'resource', resource: 'coins', operator: '>=', value: 0 });
               }
             }}
             className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
           >
             <option value="variable">Переменная</option>
             <option value="itemQuantity">Количество предмета</option>
+            <option value="relationship">Отношения с персонажем</option>
+            <option value="reputation">Репутация в городе</option>
+            <option value="playerStat">Характеристика игрока</option>
+            <option value="resource">Ресурс</option>
           </select>
 
+          {/* Variable */}
           {condition.type === 'variable' && (
             <div className="grid grid-cols-3 gap-1">
-              <select
-                value={condition.variableId}
-                onChange={(e) => onChange({ ...condition, variableId: e.target.value })}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
-              >
+              <select value={condition.variableId} onChange={(e) => onChange({ ...condition, variableId: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
                 {variables.length === 0 && <option value="">Нет переменных</option>}
-                {variables.map((v: any) => (
-                  <option key={v.id} value={v.id}>{v.displayName.ru}</option>
-                ))}
+                {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
               </select>
-              <select
-                value={condition.operator}
-                onChange={(e) => onChange({ ...condition, operator: e.target.value })}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
-              >
-                <option value=">=">&gt;=</option>
-                <option value="<=">&lt;=</option>
-                <option value="==">=</option>
-                <option value=">">&gt;</option>
-                <option value="<">&lt;</option>
-                <option value="!=">≠</option>
+              <select value={condition.operator} onChange={(e) => onChange({ ...condition, operator: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">≠</option>
               </select>
-              <input
-                type={variables.find((v: any) => v.id === condition.variableId)?.type === 'number' ? 'number' : 'text'}
-                value={condition.value}
-                onChange={(e) => {
-                  const varType = variables.find((v: any) => v.id === condition.variableId)?.type;
-                  const val = varType === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
-                  onChange({ ...condition, value: val });
-                }}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-              />
+              <input type={variables.find((v:any)=>v.id===condition.variableId)?.type==='number'?'number':'text'} value={condition.value} onChange={(e) => { const vt = variables.find((v:any)=>v.id===condition.variableId)?.type; onChange({...condition, value: vt==='number' ? parseFloat(e.target.value)||0 : e.target.value}); }} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
             </div>
           )}
 
+          {/* Item Quantity */}
           {condition.type === 'itemQuantity' && (
             <div className="grid grid-cols-3 gap-1">
-              <select
-                value={condition.itemId}
-                onChange={(e) => onChange({ ...condition, itemId: e.target.value })}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
-              >
-                {items.length === 0 && <option value="">Нет предметов</option>}
-                {items.map((i: any) => (
-                  <option key={i.id} value={i.id}>{i.name.ru}</option>
-                ))}
+              <select value={condition.itemId} onChange={(e)=>onChange({...condition, itemId:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                {items.length===0 && <option value="">Нет предметов</option>}
+                {items.map((i:any)=><option key={i.id} value={i.id}>{i.name.ru}</option>)}
               </select>
-              <select
-                value={condition.operator}
-                onChange={(e) => onChange({ ...condition, operator: e.target.value })}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
-              >
-                <option value=">=">&gt;=</option>
-                <option value="<=">&lt;=</option>
-                <option value="==">=</option>
+              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
               </select>
-              <input
-                type="number"
-                value={condition.value}
-                onChange={(e) => onChange({ ...condition, value: parseInt(e.target.value) || 0 })}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-              />
+              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+            </div>
+          )}
+
+          {/* Relationship */}
+          {condition.type === 'relationship' && (
+            <div className="grid grid-cols-3 gap-1">
+              <input value={condition.characterId} onChange={(e)=>onChange({...condition, characterId:e.target.value})} placeholder="mila / zyrk / ..." className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
+              </select>
+              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+            </div>
+          )}
+
+          {/* Reputation / PlayerStat / Resource */}
+          {(['reputation','playerStat','resource'] as const).includes(condition.type) && (
+            <div className="grid grid-cols-3 gap-1">
+              {condition.type === 'playerStat' && (
+                <select value={condition.stat} onChange={(e)=>onChange({...condition, stat:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                  <option value="level">Уровень</option><option value="strength">Сила</option>
+                </select>
+              )}
+              {condition.type === 'resource' && (
+                <select value={condition.resource} onChange={(e)=>onChange({...condition, resource:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                  <option value="coins">Монеты</option><option value="gasoline">Бензин</option><option value="gems">Драгоценности</option>
+                </select>
+              )}
+              {condition.type === 'reputation' && <div className="text-xs text-[var(--studio-text-muted)] self-center">Репутация</div>}
+
+              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
+              </select>
+              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
             </div>
           )}
         </div>

@@ -1,23 +1,24 @@
 import type { Condition, Variable, Item } from './store';
 
 /**
- * Оценивает условие на основе текущего состояния переменных и предметов.
- * Это сердце будущей системы условий.
+ * Оценивает условие.
+ * Для превью используем defaultValue переменных + простой mock state.
  */
 export function evaluateCondition(
   condition: Condition | undefined,
   variables: Variable[],
   items: Item[],
-  // Пока что quantities живут в переменных. В будущем здесь может быть отдельный inventory state.
-  getVariableValue: (variableId: string) => number | boolean | string | undefined
+  // Для превью: возвращает значение переменной (обычно defaultValue)
+  getVariableValue: (variableId: string) => number | boolean | string | undefined,
+  // Опциональный mock state для превью (уровень, репутация и т.д.)
+  previewState: Record<string, number> = {}
 ): boolean {
-  if (!condition) return true; // Нет условия = всегда выполняется
+  if (!condition) return true;
 
   switch (condition.type) {
     case 'variable': {
       const currentValue = getVariableValue(condition.variableId);
       if (currentValue === undefined) return false;
-
       return compareValues(currentValue, condition.operator, condition.value);
     }
 
@@ -31,18 +32,38 @@ export function evaluateCondition(
       return compareValues(currentValue, condition.operator, condition.value);
     }
 
+    case 'relationship': {
+      const current = previewState[`relationship_${condition.characterId}`] ?? 0;
+      return compareValues(current, condition.operator, condition.value);
+    }
+
+    case 'reputation': {
+      const current = previewState.reputation ?? 0;
+      return compareValues(current, condition.operator, condition.value);
+    }
+
+    case 'playerStat': {
+      const current = previewState[condition.stat] ?? 0;
+      return compareValues(current, condition.operator, condition.value);
+    }
+
+    case 'resource': {
+      const current = previewState[condition.resource] ?? 0;
+      return compareValues(current, condition.operator, condition.value);
+    }
+
     case 'and':
       return condition.conditions.every(c =>
-        evaluateCondition(c, variables, items, getVariableValue)
+        evaluateCondition(c, variables, items, getVariableValue, previewState)
       );
 
     case 'or':
       return condition.conditions.some(c =>
-        evaluateCondition(c, variables, items, getVariableValue)
+        evaluateCondition(c, variables, items, getVariableValue, previewState)
       );
 
     case 'not':
-      return !evaluateCondition(condition.condition, variables, items, getVariableValue);
+      return !evaluateCondition(condition.condition, variables, items, getVariableValue, previewState);
 
     default:
       return true;

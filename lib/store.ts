@@ -37,11 +37,23 @@ export type Variable = {
 export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
 
 export type Condition =
-  // Проверка переменной
+  // Проверка переменной (самый гибкий тип)
   | { type: 'variable'; variableId: string; operator: ComparisonOperator; value: number | boolean | string }
 
-  // Проверка количества предмета (через привязанную переменную)
+  // Проверка количества предмета
   | { type: 'itemQuantity'; itemId: string; operator: ComparisonOperator; value: number }
+
+  // Проверка отношений с персонажем
+  | { type: 'relationship'; characterId: string; operator: ComparisonOperator; value: number }
+
+  // Общая репутация в городе
+  | { type: 'reputation'; operator: ComparisonOperator; value: number }
+
+  // Характеристики игрока (уровень, сила и т.д.)
+  | { type: 'playerStat'; stat: 'level' | 'strength'; operator: ComparisonOperator; value: number }
+
+  // Ресурсы (монеты, бензин, драгоценности)
+  | { type: 'resource'; resource: 'coins' | 'gasoline' | 'gems'; operator: ComparisonOperator; value: number }
 
   // Логические операторы
   | { type: 'and'; conditions: Condition[] }
