@@ -60,13 +60,29 @@ export type Condition =
   | { type: 'or'; conditions: Condition[] }
   | { type: 'not'; condition: Condition };
 
-export type ButtonAction = 
+export type ButtonAction =
   | { type: 'goToPage'; pageId: string }
   | { type: 'startQuest'; questId: string }
-  | { type: 'changeVariable'; variable: string; value: number | boolean | string }
-  // Будущие действия с предметами (пока задел)
+
+  // Переменные
+  | { type: 'setVariable'; variableId: string; value: number | boolean | string }
+  | { type: 'addToVariable'; variableId: string; amount: number }
+  | { type: 'subtractFromVariable'; variableId: string; amount: number }
+
+  // Предметы
   | { type: 'giveItem'; itemId: string; amount: number }
-  | { type: 'removeItem'; itemId: string; amount: number };
+  | { type: 'removeItem'; itemId: string; amount: number }
+
+  // Отношения и репутация
+  | { type: 'changeRelationship'; characterId: string; delta: number }
+  | { type: 'changeReputation'; delta: number }
+
+  // Характеристики игрока
+  | { type: 'changePlayerStat'; stat: 'level' | 'strength'; delta: number }
+
+  // Ресурсы
+  | { type: 'giveResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number }
+  | { type: 'removeResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number };
 
 export type StudioButton = {
   id: string;

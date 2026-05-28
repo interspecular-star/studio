@@ -7,6 +7,7 @@ import { Toaster, toast } from 'sonner';
 import { useStudioStore, useCurrentPage, type Item, type Variable } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
+import ActionEditor from '@/components/editor/ActionEditor';
 
 export default function SlayStudio() {
   const {
@@ -923,30 +924,16 @@ export default function SlayStudio() {
                     </select>
                   </div>
 
-                  {/* Action */}
+                  {/* Action - Advanced */}
                   <div>
                     <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Что делает кнопка</label>
-                    <select
-                      value={selectedButton.action.type}
-                      onChange={(e) => {
-                        const type = e.target.value as any;
-                        updateSelectedButton({ action: { type, pageId: '' } });
-                      }}
-                      className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm"
-                    >
-                      <option value="goToPage">Перейти на другую страницу</option>
-                      <option value="startQuest">Начать квест</option>
-                      <option value="changeVariable">Изменить переменную</option>
-                    </select>
-
-                    {selectedButton.action.type === 'goToPage' && (
-                      <input
-                        className="mt-2 w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm font-mono"
-                        placeholder="ID страницы (например: tavern_01)"
-                        value={(selectedButton.action as any).pageId || ''}
-                        onChange={(e) => updateSelectedButton({ action: { ...selectedButton.action, pageId: e.target.value } })}
-                      />
-                    )}
+                    
+                    <ActionEditor
+                      action={selectedButton.action}
+                      onChange={(newAction) => updateSelectedButton({ action: newAction })}
+                      variables={variables}
+                      items={items}
+                    />
                   </div>
                 </div>
               )}
