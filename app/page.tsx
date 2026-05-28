@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item } from '@/lib/store';
+import { useStudioStore, useCurrentPage, type Item, type Variable } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 
@@ -42,6 +42,10 @@ export default function SlayStudio() {
     addItem,
     updateItem,
     deleteItem,
+    variables,
+    addVariable,
+    updateVariable,
+    deleteVariable,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
