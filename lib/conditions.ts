@@ -1,4 +1,4 @@
-import type { Condition, Variable, Item } from './store';
+import type { Condition, Variable, Item, ComparisonOperator } from './store';
 
 /**
  * Оценивает условие.

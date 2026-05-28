@@ -74,22 +74,6 @@ export default function SlayStudio() {
     }
   }, [loadFromLocalStorage]);
 
-  // Auto-save + status updates
-  useEffect(() => {
-    const unsubscribe = useStudioStore.subscribe(
-      (state) => ({ pages: state.pages, meta: state.meta }),
-      (current, previous) => {
-        // If lastSaved just got updated, it means auto-save happened
-        if (current.meta.lastSaved !== previous.meta.lastSaved) {
-          setSaveStatus('saved');
-        } else {
-          setSaveStatus('unsaved');
-        }
-      }
-    );
-    return unsubscribe;
-  }, []);
-
   // Project name editing handlers
   const startEditingName = () => {
     setEditingName(meta.name);

@@ -170,6 +170,14 @@ type StudioState = {
   pasteButtonCoordinates: (pageId: string, buttonId: string) => void;
   clearCoordinateClipboard: () => void;
 
+  // === Guides & Snapping (visual alignment) ===
+  addGuide: (axis: 'horizontal' | 'vertical', position: number) => void;
+  removeGuide: (axis: 'horizontal' | 'vertical', position: number) => void;
+  clearGuides: (axis?: 'horizontal' | 'vertical') => void;
+  moveGuide: (axis: 'horizontal' | 'vertical', oldPosition: number, newPosition: number) => void;
+  setSnappingGuide: (snap: { vertical?: number; horizontal?: number } | null) => void;
+  setSnapEnabled: (enabled: boolean) => void;
+
   // === Project Persistence ===
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => boolean; // returns true if something was loaded
