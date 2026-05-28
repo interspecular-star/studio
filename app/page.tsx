@@ -445,7 +445,139 @@ export default function SlayStudio() {
               </p>
             </div>
 
-            {/* === ITEMS / ПРЕДМЕТЫ (Вариант Б) === */}
+            {/* === VARIABLES / ПЕРЕМЕННЫЕ === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">ПЕРЕМЕННЫЕ</span>
+                <button
+                  onClick={() => {
+                    const newVar: Omit<Variable, 'id'> = {
+                      name: `custom_var_${Date.now().toString(36)}`,
+                      displayName: { ru: 'Новая переменная', en: 'New Variable' },
+                      type: 'number',
+                      defaultValue: 0,
+                      category: 'custom',
+                    };
+                    addVariable(newVar);
+                  }}
+                  className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
+                >
+                  + Добавить
+                </button>
+              </div>
+
+              {variables.length === 0 && (
+                <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                  Нет переменных. Создайте первую, чтобы использовать в условиях.
+                </p>
+              )}
+
+              <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                {variables.map((variable) => (
+                  <div key={variable.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        {/* Display Name RU */}
+                        <input
+                          value={variable.displayName.ru}
+                          onChange={(e) =>
+                            updateVariable(variable.id, {
+                              displayName: { ...variable.displayName, ru: e.target.value },
+                            })
+                          }
+                          className="w-full bg-transparent font-medium focus:outline-none"
+                          placeholder="Название (RU)"
+                        />
+                        {/* Internal Name */}
+                        <div className="text-[10px] text-[var(--studio-text-muted)] font-mono mt-0.5">
+                          {variable.name}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (confirm('Удалить эту переменную?')) {
+                            deleteVariable(variable.id);
+                          }
+                        }}
+                        className="text-[var(--studio-danger)] hover:text-red-400 text-sm leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      {/* Type */}
+                      <select
+                        value={variable.type}
+                        onChange={(e) =>
+                          updateVariable(variable.id, {
+                            type: e.target.value as Variable['type'],
+                            defaultValue: e.target.value === 'boolean' ? false : e.target.value === 'string' ? '' : 0,
+                          })
+                        }
+                        className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1"
+                      >
+                        <option value="number">Число</option>
+                        <option value="boolean">Да/Нет</option>
+                        <option value="string">Текст</option>
+                      </select>
+
+                      {/* Category */}
+                      <select
+                        value={variable.category}
+                        onChange={(e) =>
+                          updateVariable(variable.id, {
+                            category: e.target.value as Variable['category'],
+                          })
+                        }
+                        className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1"
+                      >
+                        <option value="custom">Кастомная</option>
+                        <option value="player">Игрок</option>
+                        <option value="resources">Ресурсы</option>
+                        <option value="reputation">Репутация</option>
+                        <option value="relationships">Отношения</option>
+                        <option value="inventory">Инвентарь</option>
+                      </select>
+                    </div>
+
+                    {/* Default Value */}
+                    <div className="mt-2">
+                      <label className="text-[10px] text-[var(--studio-text-muted)]">Значение по умолчанию</label>
+                      {variable.type === 'boolean' ? (
+                        <select
+                          value={String(variable.defaultValue)}
+                          onChange={(e) =>
+                            updateVariable(variable.id, {
+                              defaultValue: e.target.value === 'true',
+                            })
+                          }
+                          className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-sm"
+                        >
+                          <option value="true">Да</option>
+                          <option value="false">Нет</option>
+                        </select>
+                      ) : (
+                        <input
+                          type={variable.type === 'number' ? 'number' : 'text'}
+                          value={variable.defaultValue as any}
+                          onChange={(e) => {
+                            let val: any = e.target.value;
+                            if (variable.type === 'number') {
+                              val = parseFloat(e.target.value) || 0;
+                            }
+                            updateVariable(variable.id, { defaultValue: val });
+                          }}
+                          className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-sm"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Page Properties */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--studio-text-secondary)]">ПРЕДМЕТЫ</span>
