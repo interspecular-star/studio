@@ -9,6 +9,7 @@ import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
 import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
+import InventoryModal from '@/components/editor/InventoryModal';
 
 export default function SlayStudio() {
   const {
@@ -74,6 +75,12 @@ export default function SlayStudio() {
     collapsedItemIds,
     toggleItemCollapsed,
     addCriticalStats,
+    startingInventory,
+    addToStartingInventory,
+    removeFromStartingInventory,
+    setStartingInventoryQuantity,
+    inventoryCollapsed,
+    toggleInventoryCollapsed,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -504,10 +511,15 @@ export default function SlayStudio() {
             <div className="text-[var(--studio-text-muted)]">960 × 600</div>
           </div>
 
-          <div className="flex flex-1 items-center justify-center bg-[#161310] p-6 overflow-auto">
+          <div className="flex flex-1 items-center justify-center bg-[#161310] p-6 overflow-auto relative">
             <CanvasWithRulers width={960} height={600}>
               <KonvaCanvas width={960} height={600} />
             </CanvasWithRulers>
+
+            {/* Модальное окно инвентаря (поверх холста в Playtest) */}
+            {mode === 'playtest' && playtestState.isInventoryOpen && (
+              <InventoryModal onClose={() => {}} />
+            )}
           </div>
         </div>
 
@@ -824,6 +836,63 @@ export default function SlayStudio() {
                           </div>
                         );
                       })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* === ИНВЕНТАРЬ (новый блок между ресурсами и переменными) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <button
+                onClick={toggleInventoryCollapsed}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
+              >
+                <span>ИНВЕНТАРЬ</span>
+                <span className="text-xs">{inventoryCollapsed ? '▶' : '▼'}</span>
+              </button>
+
+              {!inventoryCollapsed && (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  {Object.keys(startingInventory).length === 0 ? (
+                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                      Здесь будут предметы, с которыми игрок начинает игру.
+                      Добавляйте их кнопкой «В инвентарь» в списке предметов ниже.
+                    </p>
+                  ) : (
+                    Object.entries(startingInventory).map(([itemId, qty]) => {
+                      const item = items.find(i => i.id === itemId);
+                      if (!item) return null;
+
+                      return (
+                        <div key={itemId} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                          <span className="truncate text-[var(--studio-text-secondary)]">{item.name.ru}</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={qty}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setStartingInventoryQuantity(itemId, val);
+
+                                // Синхронизируем с привязанной переменной количества (чтобы стартовое значение сразу работало в Playtest)
+                                const linkedItem = items.find(i => i.id === itemId);
+                                if (linkedItem?.quantityVariableId) {
+                                  updateVariable(linkedItem.quantityVariableId, { defaultValue: val });
+                                }
+                              }}
+                              className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
+                            />
+                            <button
+                              onClick={() => removeFromStartingInventory(itemId)}
+                              className="text-[var(--studio-danger)] hover:text-red-400 text-xs"
+                              title="Убрать из стартового инвентаря"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -1192,14 +1261,22 @@ export default function SlayStudio() {
                                   <select
                                     value={item.slot || ''}
                                     onChange={(e) => updateItem(item.id, { 
-                                      slot: (e.target.value || null) as 'weapon' | 'armor' | 'accessory' | null 
+                                      slot: (e.target.value || null) as any 
                                     })}
                                     className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                   >
                                     <option value="">— Слот —</option>
                                     <option value="weapon">Оружие</option>
-                                    <option value="armor">Броня</option>
-                                    <option value="accessory">Аксессуар</option>
+                                    <option value="helmet">Шлем</option>
+                                    <option value="gloves">Перчатки</option>
+                                    <option value="chest">Тело</option>
+                                    <option value="legs">Ноги</option>
+                                    <option value="boots">Ботинки</option>
+                                    <option value="belt">Пояс</option>
+                                    <option value="cloak">Плащ</option>
+                                    <option value="amulet">Амулет</option>
+                                    <option value="ring">Кольцо</option>
+                                    <option value="minion">Миньон</option>
                                   </select>
                                 )}
                               </div>
@@ -1252,10 +1329,14 @@ export default function SlayStudio() {
 
                                           <input
                                             type="number"
+                                            step="0.1"
                                             value={mod.value}
                                             onChange={(e) => {
                                               const newMods = [...(item.modifiers || [])];
-                                              newMods[index] = { ...mod, value: parseInt(e.target.value) || 0 };
+                                              // Поддержка дробных значений (0.5, 0,5) + русские запятые
+                                              const raw = e.target.value.replace(',', '.');
+                                              const parsed = parseFloat(raw);
+                                              newMods[index] = { ...mod, value: isNaN(parsed) ? 0 : parsed };
                                               updateItem(item.id, { modifiers: newMods });
                                             }}
                                             className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs text-right"
@@ -1286,6 +1367,13 @@ export default function SlayStudio() {
                           )}
                         </div>
 
+                        <button
+                          onClick={() => addToStartingInventory(item.id, 1)}
+                          className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] text-[var(--studio-text-muted)] mr-1"
+                          title="Добавить в стартовый инвентарь"
+                        >
+                          В инвентарь
+                        </button>
                         <button
                           onClick={() => {
                             if (confirm('Удалить этот предмет?')) deleteItem(item.id);

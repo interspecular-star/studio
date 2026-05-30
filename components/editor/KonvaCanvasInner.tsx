@@ -50,7 +50,8 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
     moveButton, 
     guides,
     snapEnabled,
-    mode
+    mode,
+    playtestState,
   } = useStudioStore();
   const stageRef = useRef<StageType>(null);
 
@@ -220,14 +221,20 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
           {currentPage.buttons
             .filter((button) => {
               if (!button.visibleWhen) return true;
+
+              // Live values in playtest, fallback to defaults in editor
+              const getVarValue = (variableId: string) => {
+                const live = playtestState.variableValues[variableId];
+                if (live !== undefined) return live;
+                const v = useStudioStore.getState().variables.find(vv => vv.id === variableId);
+                return v?.defaultValue;
+              };
+
               return evaluateCondition(
                 button.visibleWhen,
                 useStudioStore.getState().variables,
                 useStudioStore.getState().items,
-                (variableId) => {
-                  const v = useStudioStore.getState().variables.find(v => v.id === variableId);
-                  return v?.defaultValue;
-                }
+                getVarValue
               );
             })
             .map((button) => {
@@ -238,14 +245,18 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
             const btnH = pctToPx(button.layout.height, height);
 
             // Проверяем enabledWhen для визуального состояния
+            const getVarValueForEnabled = (variableId: string) => {
+              const live = playtestState.variableValues[variableId];
+              if (live !== undefined) return live;
+              const v = useStudioStore.getState().variables.find(vv => vv.id === variableId);
+              return v?.defaultValue;
+            };
+
             const isEnabled = !button.enabledWhen || evaluateCondition(
               button.enabledWhen,
               useStudioStore.getState().variables,
               useStudioStore.getState().items,
-              (variableId) => {
-                const v = useStudioStore.getState().variables.find(v => v.id === variableId);
-                return v?.defaultValue;
-              }
+              getVarValueForEnabled
             );
 
             const buttonStyle = button.layout.style || 'default';

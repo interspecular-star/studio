@@ -42,6 +42,25 @@ export const ItemRarityLabels: Record<ItemRarity, string> = {
   overpowered: 'Имбовый+',
 };
 
+// Порядок для фильтров в инвентаре (как просил пользователь: "Все" первым, потом все 8 в ряд)
+export const RarityFilterOrder: (ItemRarity | 'all')[] = [
+  'all',
+  'trash',
+  'junk',
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+  'overpowered',
+];
+
+export const RarityFilterLabels: Record<ItemRarity | 'all', string> = {
+  all: 'Все',
+  ...ItemRarityLabels,
+};
+
 export const ItemTypeLabels: Record<ItemType, string> = {
   weapon: 'Оружие',
   armor: 'Броня',
@@ -64,7 +83,7 @@ export type Item = {
   maxDurability: number;
   durability: number;
   isEquippable: boolean;
-  slot?: 'weapon' | 'armor' | 'accessory' | null;
+  slot?: EquipmentSlot | null;
   price: number;
 
   // Stat modifiers (bonuses from equipment)
@@ -73,6 +92,99 @@ export type Item = {
   // Базовый урон оружия (только для оружия, отдельно от модификаторов)
   weaponDamage?: number;
 };
+
+/**
+ * Все возможные слоты экипировки.
+ * Используем отдельные значения (Вариант А) — это надёжнее и расширяемее в долгосрочной перспективе.
+ */
+export type EquipmentSlot =
+  | 'weapon'
+  | 'helmet'
+  | 'gloves'
+  | 'chest'
+  | 'legs'
+  | 'boots'
+  | 'belt'
+  | 'cloak'
+  | 'amulet'
+  | 'ring'
+  | 'minion';
+
+// Отображаемые названия слотов (для UI)
+export const EquipmentSlotLabels: Record<EquipmentSlot, string> = {
+  weapon: 'Оружие',
+  helmet: 'Шлем',
+  gloves: 'Перчатки',
+  chest: 'Тело',
+  legs: 'Ноги',
+  boots: 'Ботинки',
+  belt: 'Пояс',
+  cloak: 'Плащ',
+  amulet: 'Амулет',
+  ring: 'Кольцо',
+  minion: 'Миньон',
+};
+
+// Группировка для компактного отображения аксессуаров (как просил пользователь)
+export const AccessorySlots: EquipmentSlot[] = ['amulet', 'ring', 'cloak', 'minion'];
+
+// Основные слоты брони/одежды (для основного манекена)
+export const MainEquipmentSlots: EquipmentSlot[] = [
+  'helmet',
+  'chest',
+  'gloves',
+  'legs',
+  'boots',
+  'belt',
+];
+
+// Порядок слотов в нижней горизонтальной полосе аксессуаров
+// (по решению пользователя: Амулет → 4 Кольца → Плащ → Миньон)
+export const AccessoryRowSlots: EquipmentSlot[] = [
+  'amulet',
+  'ring',
+  'ring',
+  'ring',
+  'ring',
+  'cloak',
+  'minion',
+];
+
+// Оставляем для обратной совместимости и общих проверок
+export const CompactAccessorySlots: EquipmentSlot[] = [
+  'amulet',
+  'ring',
+  'cloak',
+  'minion',
+];
+
+// Проверка, является ли слот "аксессуарным" (для группировки в UI)
+export function isAccessorySlot(slot: EquipmentSlot | null | undefined): boolean {
+  if (!slot) return false;
+  return CompactAccessorySlots.includes(slot);
+}
+
+// Стиль для "заблокированного" / специального слота (пока используется для Миньона)
+export const BlockedSlotStyle = {
+  borderColor: 'border-amber-900/50',
+  bgColor: 'bg-[#161310]',
+  textColor: 'text-amber-900/60',
+  label: 'Миньон (недоступно)',
+};
+
+/**
+ * Данные для диалога подтверждения замены предмета при Drag & Drop.
+ * Показывается всегда, даже если изменения статов нулевые.
+ */
+export interface ItemReplacementInfo {
+  currentItem: Item;
+  newItem: Item;
+  statChanges: Array<{
+    statId: string;
+    statName: string;
+    delta: number;
+  }>;
+}
 
 // === Variables System ===
 export type VariableType = 'number' | 'boolean' | 'string';
@@ -143,7 +255,10 @@ export type ButtonAction =
 
   // Ресурсы
   | { type: 'giveResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number }
-  | { type: 'removeResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number };
+  | { type: 'removeResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number }
+
+  // Инвентарь (модальное окно)
+  | { type: 'openInventory' };
 
 export type StudioButton = {
   id: string;
@@ -212,7 +327,9 @@ type StudioState = {
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
   playtestState: {
     variableValues: Record<string, number | boolean | string>; // текущие значения переменных
-    // В будущем сюда добавим: relationships, reputation, inventory и т.д.
+    equippedItemIds: string[]; // IDs предметов, которые "одеты" только в рамках этой сессии Playtest
+    isInventoryOpen: boolean; // открыт ли модальный инвентарь
+    // В будущем: carriedItemIds: string[] — предметы, которые игрок носит с собой (не в ячейках, а просто в инвентаре)
   };
 
   // Actions
@@ -263,6 +380,15 @@ type StudioState = {
   resetPlaytestState: () => void;
   executeAction: (action: ButtonAction) => void; // Главная функция выполнения действий
 
+  // === Playtest Equipment (только для визуального фидбэка в Playtest) ===
+  equipItem: (itemId: string) => void;
+  unequipItem: (itemId: string) => void;
+  isItemEquipped: (itemId: string) => boolean;
+
+  // Инвентарь
+  openInventory: () => void;
+  closeInventory: () => void;
+
   // === Editor / Playtest Mode ===
   mode: 'editor' | 'playtest';
   setMode: (mode: 'editor' | 'playtest') => void;
@@ -303,9 +429,19 @@ type StudioState = {
   resourcesCollapsed: boolean;
   toggleResourcesCollapsed: () => void;
 
+  // Inventory block (new dedicated starting inventory management, between resources and variables)
+  inventoryCollapsed: boolean;
+  toggleInventoryCollapsed: () => void;
+
   // Collapsed state for individual items (to reduce scrolling when many items)
   collapsedItemIds: string[];
   toggleItemCollapsed: (itemId: string) => void;
+
+  // === Starting Inventory (explicit management of items player begins with) ===
+  startingInventory: Record<string, number>; // itemId -> starting quantity
+  addToStartingInventory: (itemId: string, quantity?: number) => void;
+  removeFromStartingInventory: (itemId: string) => void;
+  setStartingInventoryQuantity: (itemId: string, quantity: number) => void;
 
   addPage: () => void;
   deletePage: (id: string) => void;
@@ -390,6 +526,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   playtestState: {
     variableValues: {},
+    equippedItemIds: [],
+    isInventoryOpen: false,
   },
 
   // Canvas-only history (for button dragging on the canvas)
@@ -409,8 +547,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Resources panel starts collapsed by default (like player stats)
   resourcesCollapsed: true,
 
+  // Inventory block starts collapsed by default
+  inventoryCollapsed: true,
+
   // No items collapsed by default
   collapsedItemIds: [],
+
+  // Starting inventory (empty by default)
+  startingInventory: {},
 
   setPages: (pages) => set({ pages }),
 
@@ -425,7 +569,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
-  updateButton: (pageId, buttonId, updates) =>
+  updateButton: (pageId, buttonId, updates) => {
     set((state) => ({
       pages: state.pages.map((page) =>
         page.id === pageId
@@ -437,7 +581,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             }
           : page
       ),
-    })),
+    }));
+    get().saveToLocalStorage();
+  },
 
   addButton: (pageId) => {
     const newButton: StudioButton = {
@@ -850,16 +996,82 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   // === Playtest State ===
   resetPlaytestState: () => {
+    const state = get();
+
+    // Start with all variables at their default values
+    const newVariableValues: Record<string, number | boolean | string> = {};
+    state.variables.forEach((v) => {
+      newVariableValues[v.id] = v.defaultValue;
+    });
+
+    // Override with starting inventory quantities (only for items that have a linked quantity variable)
+    Object.entries(state.startingInventory).forEach(([itemId, qty]) => {
+      const item = state.items.find((i) => i.id === itemId);
+      if (item?.quantityVariableId) {
+        newVariableValues[item.quantityVariableId] = qty;
+      }
+    });
+
     set({
-      playtestState: { variableValues: {} },
+      playtestState: {
+        variableValues: newVariableValues,
+        equippedItemIds: [],
+        isInventoryOpen: false,
+      },
       snappingGuide: null,
     });
+  },
+
+  // === Playtest Equipment (live only during playtest session) ===
+  equipItem: (itemId) => {
+    set((state) => {
+      const current = state.playtestState.equippedItemIds;
+      if (current.includes(itemId)) return state;
+      return {
+        playtestState: {
+          ...state.playtestState,
+          equippedItemIds: [...current, itemId],
+        },
+      };
+    });
+  },
+
+  unequipItem: (itemId) => {
+    set((state) => ({
+      playtestState: {
+        ...state.playtestState,
+        equippedItemIds: state.playtestState.equippedItemIds.filter(id => id !== itemId),
+      },
+    }));
+  },
+
+  isItemEquipped: (itemId) => {
+    return get().playtestState.equippedItemIds.includes(itemId);
+  },
+
+  openInventory: () => {
+    set((s) => ({
+      playtestState: { ...s.playtestState, isInventoryOpen: true },
+    }));
+  },
+
+  closeInventory: () => {
+    set((s) => ({
+      playtestState: { ...s.playtestState, isInventoryOpen: false },
+    }));
   },
 
   // === Mode Management (Editor / Playtest) ===
   setMode: (newMode) => set({ mode: newMode }),
 
   enterPlaytest: () => {
+    const currentPlaytest = get().playtestState;
+
+    // If this is a fresh Playtest session (no values yet), seed from starting inventory
+    if (Object.keys(currentPlaytest.variableValues).length === 0) {
+      get().resetPlaytestState();
+    }
+
     set({
       mode: 'playtest',
       // Automatically collapse sidebars when entering Playtest (user can still expand manually)
@@ -885,6 +1097,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   toggleResourcesCollapsed: () => set((state) => ({ resourcesCollapsed: !state.resourcesCollapsed })),
 
+  toggleInventoryCollapsed: () => set((state) => ({ inventoryCollapsed: !state.inventoryCollapsed })),
+
   toggleItemCollapsed: (itemId) => set((state) => {
     const isCollapsed = state.collapsedItemIds.includes(itemId);
     return {
@@ -893,6 +1107,91 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         : [...state.collapsedItemIds, itemId]
     };
   }),
+
+  // === Starting Inventory Management ===
+  addToStartingInventory: (itemId, quantity = 1) => {
+    const state = get();
+    const item = state.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Если у предмета ещё нет привязки к переменной количества — создаём её автоматически
+    let targetQuantityVarId = item.quantityVariableId;
+
+    if (!targetQuantityVarId) {
+      const suggestedName = `item_${item.name.ru.toLowerCase().replace(/\s+/g, '_')}_qty`;
+      const newVar: Omit<Variable, 'id'> = {
+        name: suggestedName,
+        displayName: { ru: `Кол-во: ${item.name.ru}`, en: `Qty: ${item.name.en}` },
+        type: 'number',
+        defaultValue: 0,
+        category: 'inventory',
+      };
+
+      // Создаём переменную
+      const varId = `var_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const createdVar: Variable = { ...newVar, id: varId };
+
+      set((s) => ({
+        variables: [...s.variables, createdVar],
+      }));
+
+      // Привязываем к предмету
+      set((s) => ({
+        items: s.items.map(i =>
+          i.id === itemId ? { ...i, quantityVariableId: varId } : i
+        ),
+      }));
+
+      targetQuantityVarId = varId;
+
+      // Сразу ставим defaultValue новой переменной на текущее количество
+      set((s) => ({
+        variables: s.variables.map(v =>
+          v.id === varId ? { ...v, defaultValue: quantity } : v
+        ),
+      }));
+    }
+
+    // Добавляем/увеличиваем в startingInventory
+    const newQty = Math.max(0, (state.startingInventory[itemId] ?? 0) + quantity);
+
+    set((s) => ({
+      startingInventory: {
+        ...s.startingInventory,
+        [itemId]: newQty,
+      },
+    }));
+
+    // Если уже есть quantityVariableId — обновляем её defaultValue (чтобы старт был правильным)
+    if (targetQuantityVarId) {
+      set((s) => ({
+        variables: s.variables.map(v =>
+          v.id === targetQuantityVarId ? { ...v, defaultValue: newQty } : v
+        ),
+      }));
+    }
+
+    get().saveToLocalStorage();
+  },
+
+  removeFromStartingInventory: (itemId) => {
+    set((state) => {
+      const newInv = { ...state.startingInventory };
+      delete newInv[itemId];
+      return { startingInventory: newInv };
+    });
+    get().saveToLocalStorage();
+  },
+
+  setStartingInventoryQuantity: (itemId, quantity) => {
+    set((state) => ({
+      startingInventory: {
+        ...state.startingInventory,
+        [itemId]: Math.max(0, Math.floor(quantity)),
+      },
+    }));
+    get().saveToLocalStorage();
+  },
 
   setSidebarsForPlaytest: (collapsed) => set({
     leftSidebarCollapsed: collapsed,
@@ -1024,14 +1323,27 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         get().selectButton(null);
         break;
       }
+      case 'openInventory': {
+        set((s) => ({
+          playtestState: {
+            ...s.playtestState,
+            isInventoryOpen: true,
+          },
+        }));
+        break;
+      }
       default:
         // startQuest и другие неизвестные действия пока игнорируем
         break;
     }
 
-    set({
-      playtestState: { variableValues: currentValues },
-    });
+    set((s) => ({
+      playtestState: {
+        variableValues: currentValues,
+        equippedItemIds: s.playtestState.equippedItemIds,
+        isInventoryOpen: s.playtestState.isInventoryOpen,
+      },
+    }));
   },
 
   // === Project Persistence ===
@@ -1043,6 +1355,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       selectedPageId: state.selectedPageId,
       items: state.items,
       variables: state.variables,
+      startingInventory: state.startingInventory,
     };
     try {
       localStorage.setItem('slay-studio-project', JSON.stringify(dataToSave));
@@ -1072,6 +1385,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snapEnabled: parsed.snapEnabled ?? true,
         items: parsed.items || [],
         variables: parsed.variables || [],
+        startingInventory: parsed.startingInventory || {},
       });
       return true;
     } catch (e) {
@@ -1092,6 +1406,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       guides: state.guides,
       items: state.items,
       variables: state.variables,
+      startingInventory: state.startingInventory,
     };
 
     const json = JSON.stringify(exportData, null, 2);
@@ -1129,6 +1444,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snapEnabled: data.snapEnabled ?? true,
         items: data.items || [],
         variables: data.variables || [],
+        startingInventory: data.startingInventory || {},
       });
 
       // Auto-save after import
@@ -1158,6 +1474,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       snapEnabled: true,
       items: [],
       variables: [],
+      startingInventory: {},
     });
     get().saveToLocalStorage();
   },
@@ -1290,3 +1607,147 @@ export const useCurrentPage = () => {
   const { pages, selectedPageId } = useStudioStore();
   return pages.find((p) => p.id === selectedPageId) ?? null;
 };
+
+// ============================================================
+// Combat / Playtest calculation helpers (pure, for visual feedback)
+// These power the "В БОЮ" preview block and can be used in conditions later.
+// ============================================================
+
+export type PlaytestSnapshot = {
+  variableValues: Record<string, number | boolean | string>;
+  equippedItemIds: string[];
+};
+
+/**
+ * Returns the live (or default) numeric value of a player stat during playtest.
+ */
+export function getPlaytestStatValue(
+  statIdOrName: string,
+  variables: Variable[],
+  playtestState: PlaytestSnapshot
+): number {
+  // Try by ID first
+  const byId = variables.find(v => v.id === statIdOrName);
+  if (byId) {
+    const live = playtestState.variableValues[byId.id];
+    return typeof live === 'number' ? live : (byId.defaultValue as number) ?? 0;
+  }
+  // Fallback: treat as internal name (e.g. "strength")
+  const byName = variables.find(v => v.name === statIdOrName && v.category === 'player');
+  if (byName) {
+    const live = playtestState.variableValues[byName.id];
+    return typeof live === 'number' ? live : (byName.defaultValue as number) ?? 0;
+  }
+  return 0;
+}
+
+/**
+ * Returns list of currently equipped items (only those that still exist).
+ */
+export function getEquippedItems(items: Item[], equippedIds: string[]): Item[] {
+  return equippedIds
+    .map(id => items.find(i => i.id === id))
+    .filter((i): i is Item => !!i);
+}
+
+/**
+ * Resolves a player stat by either its ID or its internal name.
+ * Returns the Variable or undefined.
+ */
+function resolvePlayerVariable(statIdOrName: string, variables: Variable[]): Variable | undefined {
+  // Direct ID match
+  const byId = variables.find(v => v.id === statIdOrName);
+  if (byId) return byId;
+
+  // Name match (most common when calling from combat helpers)
+  return variables.find(v => v.name === statIdOrName && v.category === 'player');
+}
+
+/**
+ * Calculates effective value of a player stat = base value + sum of all modifiers
+ * from currently equipped items that target this stat.
+ *
+ * IMPORTANT: modifiers store the variable's .id (not name), so we must resolve first.
+ */
+export function getEffectivePlayerStat(
+  statIdOrName: string,
+  variables: Variable[],
+  items: Item[],
+  playtestState: PlaytestSnapshot
+): number {
+  const variable = resolvePlayerVariable(statIdOrName, variables);
+  if (!variable) {
+    return 0;
+  }
+
+  // Base value (live or default)
+  const live = playtestState.variableValues[variable.id];
+  const base = typeof live === 'number' ? live : (variable.defaultValue as number) ?? 0;
+
+  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+
+  const bonus = equipped.reduce((sum, item) => {
+    const mods = item.modifiers || [];
+    // Modifiers always store the real variable.id
+    const relevant = mods.filter(m => m.statId === variable.id);
+    return sum + relevant.reduce((s, m) => s + (m.value || 0), 0);
+  }, 0);
+
+  return base + bonus;
+}
+
+/**
+ * Finds the first equipped weapon (by slot or by presence of weaponDamage).
+ * For v1 we allow multiple and sum their weaponDamage.
+ */
+export function getEquippedWeaponDamage(items: Item[], playtestState: PlaytestSnapshot): number {
+  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+  return equipped.reduce((sum, item) => {
+    return sum + (item.weaponDamage ?? 0);
+  }, 0);
+}
+
+/**
+ * Итоговый урон = эффективная Сила + урон всех экипированных оружий
+ * (сила всегда база, даже без оружия)
+ */
+export function getTotalDamage(
+  variables: Variable[],
+  items: Item[],
+  playtestState: PlaytestSnapshot
+): number {
+  const effectiveStrength = getEffectivePlayerStat('strength', variables, items, playtestState);
+  const weaponDmg = getEquippedWeaponDamage(items, playtestState);
+  return Math.max(0, effectiveStrength + weaponDmg);
+}
+
+/**
+ * Эффективный шанс крита (в процентах)
+ */
+export function getEffectiveCritChance(
+  variables: Variable[],
+  items: Item[],
+  playtestState: PlaytestSnapshot
+): number {
+  return getEffectivePlayerStat('crit_chance', variables, items, playtestState);
+}
+
+/**
+ * Эффективная сила крита (множитель, напр. 1.5)
+ */
+export function getEffectiveCritDamage(
+  variables: Variable[],
+  items: Item[],
+  playtestState: PlaytestSnapshot
+): number {
+  return getEffectivePlayerStat('crit_damage', variables, items, playtestState);
+}
+
+/**
+ * Returns human-readable name of the main equipped weapon (if any).
+ */
+export function getEquippedWeaponName(items: Item[], playtestState: PlaytestSnapshot): string | null {
+  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+  const weapon = equipped.find(i => i.type === 'weapon' || (i.weaponDamage ?? 0) > 0);
+  return weapon ? weapon.name.ru : null;
+}

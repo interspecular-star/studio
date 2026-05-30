@@ -25,6 +25,7 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
     else if (newType === 'changePlayerStat') newAction = { type: 'changePlayerStat', stat: 'strength', delta: 1 };
     else if (newType === 'giveResource') newAction = { type: 'giveResource', resource: 'coins', amount: 10 };
     else if (newType === 'removeResource') newAction = { type: 'removeResource', resource: 'coins', amount: 10 };
+    else if (newType === 'openInventory') newAction = { type: 'openInventory' };
 
     onChange(newAction);
   };
@@ -53,6 +54,9 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
         </optgroup>
         <optgroup label="Игрок">
           <option value="changePlayerStat">Изменить стат игрока</option>
+        </optgroup>
+        <optgroup label="Интерфейс">
+          <option value="openInventory">Открыть инвентарь</option>
         </optgroup>
       </select>
 
@@ -89,6 +93,12 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
           {type === 'changePlayerStat' && <select value={action.stat || 'strength'} onChange={(e) => onChange({ ...action, stat: e.target.value })} className="rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1.5 text-sm"><option value="strength">Сила</option><option value="level">Уровень</option></select>}
           <input type="number" value={action.delta ?? 0} onChange={(e) => onChange({ ...action, delta: parseInt(e.target.value) || 0 })} className="rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm" />
         </div>
+      )}
+
+      {type === 'openInventory' && (
+        <p className="text-xs text-[var(--studio-text-muted)] italic">
+          Откроет модальное окно инвентаря с манекеном и ячейками.
+        </p>
       )}
     </div>
   );
