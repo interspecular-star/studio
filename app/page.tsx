@@ -1066,6 +1066,23 @@ export default function SlayStudio() {
                                 </div>
                               </div>
 
+                              {/* Урон оружия (только для оружия) */}
+                              {item.isEquippable && item.type === 'weapon' && (
+                                <div className="col-span-2">
+                                  <div className="text-[var(--studio-text-muted)] mb-0.5">Урон оружия (базовый)</div>
+                                  <input
+                                    type="number"
+                                    value={item.weaponDamage ?? 0}
+                                    onChange={(e) => updateItem(item.id, { weaponDamage: parseInt(e.target.value) || 0 })}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                    placeholder="Например: 8"
+                                  />
+                                  <p className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
+                                    Этот урон будет суммироваться с Силой ГГ
+                                  </p>
+                                </div>
+                              )}
+
                               {/* Цена */}
                               <div>
                                 <div className="text-[var(--studio-text-muted)] mb-0.5">Цена</div>

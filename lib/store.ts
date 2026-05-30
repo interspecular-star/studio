@@ -69,6 +69,9 @@ export type Item = {
 
   // Stat modifiers (bonuses from equipment)
   modifiers?: StatModifier[];
+
+  // Базовый урон оружия (только для оружия, отдельно от модификаторов)
+  weaponDamage?: number;
 };
 
 // === Variables System ===
@@ -782,6 +785,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       slot: itemData.slot ?? null,
       price: itemData.price ?? 0,
       modifiers: itemData.modifiers ?? [],
+      weaponDamage: itemData.weaponDamage ?? undefined,
     };
     set((state) => ({
       items: [...state.items, newItem],
