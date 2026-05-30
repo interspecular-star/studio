@@ -460,6 +460,17 @@ export default function SlayStudio() {
             </div>
           ) : (
             <>
+              {/* Small control bar when right sidebar is expanded */}
+              <div className="flex justify-end border-b border-[var(--studio-border)] px-2 py-1">
+                <button
+                  onClick={toggleRightSidebar}
+                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1"
+                  title="Свернуть правую панель"
+                >
+                  ▶
+                </button>
+              </div>
+
               {mode === 'playtest' ? (
                 <PlaytestStatePanel />
               ) : (
