@@ -67,6 +67,7 @@ export default function SlayStudio() {
     addDefaultPlayerStats,
     playerStatsCollapsed,
     togglePlayerStatsCollapsed,
+    addDefaultResources,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -645,6 +646,52 @@ export default function SlayStudio() {
               )}
             </div>
 
+            {/* === РЕСУРСЫ (постоянный блок, как характеристики) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">РЕСУРСЫ</span>
+                <button
+                  onClick={() => {
+                    if (confirm('Добавить стандартные расходники (монеты, бензин, драгоценности)?')) {
+                      addDefaultResources();
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded border border-[var(--studio-border)] px-2 py-0.5 text-xs hover:bg-[var(--studio-bg-panel)]"
+                  title="Добавить монеты, бензин и драгоценности"
+                >
+                  + Добавить
+                </button>
+              </div>
+
+              <div className="space-y-1.5 text-sm">
+                {variables.filter(v => v.category === 'resources').length === 0 ? (
+                  <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                    Нажмите «+ Добавить», чтобы создать монеты, бензин и драгоценности.
+                  </p>
+                ) : (
+                  variables
+                    .filter(v => v.category === 'resources')
+                    .map((resource) => {
+                      const value = playtestState.variableValues[resource.id] ?? resource.defaultValue;
+                      return (
+                        <div key={resource.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                          <span className="text-[var(--studio-text-secondary)]">{resource.displayName.ru}</span>
+                          <input
+                            type="number"
+                            value={value as number}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              updateVariable(resource.id, { defaultValue: val });
+                            }}
+                            className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
+                          />
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+
             {/* === VARIABLES / ПЕРЕМЕННЫЕ === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between mb-2">
@@ -917,39 +964,6 @@ export default function SlayStudio() {
                 ))}
               </div>
 
-              {/* === РЕСУРСЫ (свёрнутый блок внутри Предметов) === */}
-              <div className="mt-3 border-t border-[var(--studio-border)] pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-[var(--studio-text-secondary)]">РЕСУРСЫ</span>
-                </div>
-
-                <div className="space-y-1.5">
-                  {variables
-                    .filter(v => v.category === 'resources')
-                    .map((resource) => {
-                      const value = playtestState.variableValues[resource.id] ?? resource.defaultValue;
-                      return (
-                        <div key={resource.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1 text-sm">
-                          <span className="text-[var(--studio-text-secondary)]">{resource.displayName.ru}</span>
-                          <input
-                            type="number"
-                            value={value as number}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              updateVariable(resource.id, { defaultValue: val });
-                            }}
-                            className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                          />
-                        </div>
-                      );
-                    })}
-                  {variables.filter(v => v.category === 'resources').length === 0 && (
-                    <p className="text-[10px] text-[var(--studio-text-muted)] italic">
-                      Ресурсы появятся здесь (монеты, бензин, драгоценности).
-                    </p>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Page Properties */}

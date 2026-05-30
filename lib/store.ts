@@ -220,6 +220,9 @@ type StudioState = {
   // Добавление стандартных характеристик ГГ
   addDefaultPlayerStats: () => void;
 
+  // Добавление стандартных расходников (ресурсов)
+  addDefaultResources: () => void;
+
   // === Sidebar Collapse (especially useful in Playtest) ===
   leftSidebarCollapsed: boolean;
   rightSidebarCollapsed: boolean;
@@ -1004,7 +1007,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       { name: 'level', displayName: { ru: 'Уровень', en: 'Level' }, type: 'number', defaultValue: 1, category: 'player' },
       { name: 'exp', displayName: { ru: 'Опыт', en: 'Experience' }, type: 'number', defaultValue: 0, category: 'player' },
 
-      // Ресурсы
+      // Ресурсы (теперь как расходники)
       { name: 'coins', displayName: { ru: 'Монеты', en: 'Coins' }, type: 'number', defaultValue: 15, category: 'resources' },
       { name: 'gasoline', displayName: { ru: 'Бензин', en: 'Gasoline' }, type: 'number', defaultValue: 0, category: 'resources' },
       { name: 'gems', displayName: { ru: 'Драгоценности', en: 'Gems' }, type: 'number', defaultValue: 0, category: 'resources' },
@@ -1020,6 +1023,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (newVariables.length > 0) {
       set((s) => ({
         variables: [...s.variables, ...newVariables]
+      }));
+      get().saveToLocalStorage();
+    }
+  },
+
+  // Добавляет базовые расходники (ресурсы) отдельно
+  addDefaultResources: () => {
+    const state = get();
+    const existingNames = new Set(state.variables.map(v => v.name));
+
+    const resources: Omit<Variable, 'id'>[] = [
+      { name: 'coins', displayName: { ru: 'Монеты', en: 'Coins' }, type: 'number', defaultValue: 15, category: 'resources' },
+      { name: 'gasoline', displayName: { ru: 'Бензин', en: 'Gasoline' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gems', displayName: { ru: 'Драгоценности', en: 'Gems' }, type: 'number', defaultValue: 0, category: 'resources' },
+    ];
+
+    const newResources = resources
+      .filter(r => !existingNames.has(r.name))
+      .map(r => ({
+        ...r,
+        id: `var_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      }));
+
+    if (newResources.length > 0) {
+      set((s) => ({
+        variables: [...s.variables, ...newResources]
       }));
       get().saveToLocalStorage();
     }
