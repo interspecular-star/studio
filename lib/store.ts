@@ -285,6 +285,9 @@ type StudioState = {
   // Добавление стандартных расходников (ресурсов)
   addDefaultResources: () => void;
 
+  // Добавление только критических характеристик
+  addCriticalStats: () => void;
+
   // === Sidebar Collapse (especially useful in Playtest) ===
   leftSidebarCollapsed: boolean;
   rightSidebarCollapsed: boolean;
@@ -1230,6 +1233,30 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (newResources.length > 0) {
       set((s) => ({
         variables: [...s.variables, ...newResources]
+      }));
+      get().saveToLocalStorage();
+    }
+  },
+
+  addCriticalStats: () => {
+    const state = get();
+    const existingNames = new Set(state.variables.map(v => v.name));
+
+    const critStats: Omit<Variable, 'id'>[] = [
+      { name: 'crit_chance', displayName: { ru: 'Шанс крита', en: 'Critical Chance' }, type: 'number', defaultValue: 5, category: 'player' },
+      { name: 'crit_damage', displayName: { ru: 'Сила крита', en: 'Critical Damage' }, type: 'number', defaultValue: 1.5, category: 'player' },
+    ];
+
+    const newCrits = critStats
+      .filter(stat => !existingNames.has(stat.name))
+      .map(stat => ({
+        ...stat,
+        id: `var_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      }));
+
+    if (newCrits.length > 0) {
+      set((s) => ({
+        variables: [...s.variables, ...newCrits]
       }));
       get().saveToLocalStorage();
     }

@@ -73,6 +73,7 @@ export default function SlayStudio() {
     renameItem,
     collapsedItemIds,
     toggleItemCollapsed,
+    addCriticalStats,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -582,15 +583,45 @@ export default function SlayStudio() {
                 className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
               >
                 <span>ХАРАКТЕРИСТИКИ ГГ</span>
-                <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addCriticalStats();
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                    title="Добавить Шанс крита и Силу крита"
+                  >
+                    + Крит
+                  </button>
+                  <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
+                </div>
               </button>
 
               {!playerStatsCollapsed && (
                 <div className="mt-3 space-y-1.5 text-sm">
                   {variables.filter(v => v.category === 'player').length === 0 ? (
-                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                      Нажмите «+ Характеристики ГГ» выше, чтобы добавить.
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                        Нет характеристик ГГ.
+                      </p>
+                      <button
+                        onClick={() => {
+                          if (confirm('Добавить стандартные характеристики Главного Героя?')) {
+                            addDefaultPlayerStats();
+                          }
+                        }}
+                        className="text-xs px-3 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                      >
+                        + Стандартные характеристики
+                      </button>
+                      <button
+                        onClick={() => addCriticalStats()}
+                        className="text-xs px-3 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] ml-2"
+                      >
+                        + Шанс и Сила крита
+                      </button>
+                    </div>
                   ) : (
                     variables
                       .filter(v => v.category === 'player')
