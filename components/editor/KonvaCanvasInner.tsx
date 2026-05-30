@@ -49,7 +49,8 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
     selectButton, 
     moveButton, 
     guides,
-    snapEnabled 
+    snapEnabled,
+    mode
   } = useStudioStore();
   const stageRef = useRef<StageType>(null);
 
@@ -62,6 +63,7 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
     );
   }
 
+  const isPlaytest = mode === 'playtest';
   const theme = backgroundThemes[currentPage.background] || backgroundThemes.village_morning;
 
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
@@ -250,9 +252,9 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                 x={btnX}
                 y={btnY}
                 opacity={isEnabled ? 1 : 0.55}
-                draggable={isEnabled}
+                draggable={!isPlaytest && isEnabled}
                 onDragMove={(e) => {
-                  if (!isEnabled) return; // Блокируем движение disabled кнопок
+                  if (isPlaytest || !isEnabled) return; // Блокируем движение в Playtest и для disabled кнопок
                   const node = e.target;
                   const currentXPercent = (node.x() / width) * 100;
                   const currentYPercent = (node.y() / height) * 100;
@@ -291,20 +293,30 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                   }
                 }}
                 onDragEnd={(e) => {
-                  if (!isEnabled) return;
+                  if (isPlaytest || !isEnabled) return;
                   handleButtonDragEnd(button.id, e);
                 }}
                 onClick={(e) => {
                   if (!isEnabled) return;
-                  handleButtonClick(button.id, e);
 
-                  // Выполняем действие кнопки (для превью)
-                  const freshState = useStudioStore.getState();
-                  freshState.executeAction(button.action);
+                  if (isPlaytest) {
+                    // В Playtest режиме клик = выполнение действия
+                    const freshState = useStudioStore.getState();
+                    freshState.executeAction(button.action);
+                  } else {
+                    // В Editor режиме клик = выбор кнопки
+                    handleButtonClick(button.id, e);
+                  }
                 }}
                 onTap={(e) => {
                   if (!isEnabled) return;
-                  handleButtonClick(button.id, e);
+
+                  if (isPlaytest) {
+                    const freshState = useStudioStore.getState();
+                    freshState.executeAction(button.action);
+                  } else {
+                    handleButtonClick(button.id, e);
+                  }
                 }}
               >
                 <Rect

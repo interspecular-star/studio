@@ -14,7 +14,8 @@ interface CanvasWithRulersProps {
  * This is Phase 1 of the rulers + guides system.
  */
 export default function CanvasWithRulers({ width, height, children }: CanvasWithRulersProps) {
-  const { guides, addGuide, moveGuide, snappingGuide } = useStudioStore();
+  const { guides, addGuide, moveGuide, snappingGuide, mode } = useStudioStore();
+  const isPlaytest = mode === 'playtest';
   const [hoveredGuide, setHoveredGuide] = useState<{ axis: 'horizontal' | 'vertical'; pos: number } | null>(null);
   const [draggingGuide, setDraggingGuide] = useState<{ axis: 'horizontal' | 'vertical'; originalPos: number } | null>(null);
 
@@ -22,26 +23,28 @@ export default function CanvasWithRulers({ width, height, children }: CanvasWith
 
   // Click on top ruler → add vertical guide (affects X position of buttons)
   const handleTopRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isPlaytest) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const percent = (clickX / width) * 100;
-    addGuide('vertical', percent); // "vertical" guide means a vertical line (controls X)
+    addGuide('vertical', percent);
   };
 
   // Click on left ruler → add horizontal guide (affects Y position)
   const handleLeftRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isPlaytest) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickY = e.clientY - rect.top;
     const percent = (clickY / height) * 100;
-    addGuide('horizontal', percent); // "horizontal" guide means a horizontal line (controls Y)
+    addGuide('horizontal', percent);
   };
 
   // Start dragging a guide
   const startDraggingGuide = (axis: 'horizontal' | 'vertical', pos: number, e: React.MouseEvent) => {
+    if (isPlaytest) return;
     e.stopPropagation();
     setDraggingGuide({ axis, originalPos: pos });
     setHoveredGuide({ axis, pos });
-    // Clear any button snapping highlight when we start moving a guide manually
     useStudioStore.getState().setSnappingGuide(null);
   };
 
@@ -177,9 +180,9 @@ export default function CanvasWithRulers({ width, height, children }: CanvasWith
         <div
           className="relative"
           style={{ width, height }}
-          onMouseMove={draggingGuide ? handleGuideDragMove : undefined}
-          onMouseUp={draggingGuide ? finishDraggingGuide : undefined}
-          onMouseLeave={cancelDrag}
+          onMouseMove={isPlaytest ? undefined : (draggingGuide ? handleGuideDragMove : undefined)}
+          onMouseUp={isPlaytest ? undefined : (draggingGuide ? finishDraggingGuide : undefined)}
+          onMouseLeave={isPlaytest ? undefined : cancelDrag}
         >
           {children}
 
