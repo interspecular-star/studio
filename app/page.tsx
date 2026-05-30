@@ -877,7 +877,8 @@ export default function SlayStudio() {
                 {items.map((item) => (
                   <div key={item.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
                     <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {/* Название RU */}
                         <input
                           value={item.name.ru}
                           onChange={(e) =>
@@ -888,6 +889,13 @@ export default function SlayStudio() {
                           className="w-full bg-transparent font-medium focus:outline-none text-sm"
                           placeholder="Название (RU)"
                         />
+
+                        {/* ID (постоянно видимый) */}
+                        <div className="text-[10px] text-[var(--studio-text-muted)] font-mono">
+                          ID: {item.id}
+                        </div>
+
+                        {/* Название EN */}
                         <input
                           value={item.name.en}
                           onChange={(e) =>
@@ -909,6 +917,7 @@ export default function SlayStudio() {
                       </button>
                     </div>
 
+                    {/* Описание RU */}
                     <textarea
                       value={item.description.ru}
                       onChange={(e) =>
@@ -917,6 +926,19 @@ export default function SlayStudio() {
                         })
                       }
                       placeholder="Описание (RU)"
+                      className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
+                      rows={2}
+                    />
+
+                    {/* Описание EN */}
+                    <textarea
+                      value={item.description.en || ''}
+                      onChange={(e) =>
+                        updateItem(item.id, {
+                          description: { ...item.description, en: e.target.value },
+                        })
+                      }
+                      placeholder="Description (EN)"
                       className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
                       rows={2}
                     />
