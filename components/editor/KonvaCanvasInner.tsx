@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
 
@@ -53,6 +53,10 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
     mode
   } = useStudioStore();
   const stageRef = useRef<StageType>(null);
+
+  // Interactive states for buttons (hover / pressed)
+  const [hoveredButtonId, setHoveredButtonId] = useState<string | null>(null);
+  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
 
   const currentPage = pages.find((p) => p.id === selectedPageId);
   if (!currentPage) {
@@ -243,16 +247,22 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
 
             const buttonStyle = button.layout.style || 'default';
 
-            // Вычисляем визуальные стили кнопки в зависимости от style и состояния enabled
+            const isHovered = hoveredButtonId === button.id && isEnabled;
+            const isPressed = pressedButtonId === button.id && isEnabled;
+
+            // Вычисляем визуальные стили кнопки
             let accentColor: string;
             let bgColor: string;
             let strokeWidth: number;
             let textColor = '#F4EDE0';
             let buttonOpacity = 1;
+            let shadowBlur = isSelected ? 14 : 7;
+            let shadowOpacity = 1;
 
             if (isEnabled) {
               buttonOpacity = 1;
 
+              // Base colors by style
               switch (buttonStyle) {
                 case 'important':
                   accentColor = isSelected ? '#F4EDE0' : '#E8D4A0';
@@ -280,10 +290,45 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                   strokeWidth = isSelected ? 2.5 : 1.5;
                   break;
               }
+
+              // Hover effect (only when enabled)
+              if (isHovered && !isPressed) {
+                // Brighten on hover
+                if (buttonStyle === 'important') {
+                  accentColor = '#F8F0D8';
+                  bgColor = 'rgba(72, 62, 48, 0.95)';
+                } else if (buttonStyle === 'danger') {
+                  accentColor = '#E8B0A0';
+                  bgColor = 'rgba(62, 48, 46, 0.93)';
+                } else {
+                  accentColor = '#D8C89A';
+                  bgColor = 'rgba(62, 52, 37, 0.94)';
+                }
+                strokeWidth = Math.max(strokeWidth + 0.5, 2.5);
+                shadowBlur = isSelected ? 16 : 10;
+              }
+
+              // Pressed effect
+              if (isPressed) {
+                if (buttonStyle === 'important') {
+                  bgColor = 'rgba(52, 46, 38, 0.98)';
+                  accentColor = '#D8C89A';
+                } else if (buttonStyle === 'danger') {
+                  bgColor = 'rgba(48, 38, 37, 0.97)';
+                  accentColor = '#A85C4A';
+                } else {
+                  bgColor = 'rgba(48, 42, 35, 0.97)';
+                  accentColor = '#B89C6A';
+                }
+                strokeWidth = Math.max(1.2, strokeWidth - 0.3);
+                shadowBlur = isSelected ? 6 : 3;
+                shadowOpacity = 0.7;
+              }
             } else {
-              // Отключённое состояние (enabledWhen не прошло) — более "мёртвый" вид
+              // Disabled state (enabledWhen failed)
               buttonOpacity = 0.42;
               textColor = '#9A9080';
+              shadowOpacity = 0.35;
 
               switch (buttonStyle) {
                 case 'important':
@@ -320,6 +365,22 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                 y={btnY}
                 opacity={buttonOpacity}
                 draggable={!isPlaytest && isEnabled}
+
+                // Hover & Press states (only for enabled buttons)
+                onMouseEnter={() => {
+                  if (isEnabled) setHoveredButtonId(button.id);
+                }}
+                onMouseLeave={() => {
+                  setHoveredButtonId(null);
+                  setPressedButtonId(null);
+                }}
+                onMouseDown={() => {
+                  if (isEnabled) setPressedButtonId(button.id);
+                }}
+                onMouseUp={() => {
+                  setPressedButtonId(null);
+                }}
+
                 onDragMove={(e) => {
                   if (isPlaytest || !isEnabled) return; // Блокируем движение в Playtest и для disabled кнопок
                   const node = e.target;
@@ -394,9 +455,9 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                   stroke={accentColor}
                   strokeWidth={strokeWidth}
                   shadowColor="rgba(0,0,0,0.55)"
-                  shadowBlur={isSelected && isEnabled ? 14 : 4}
+                  shadowBlur={shadowBlur}
                   shadowOffsetY={3}
-                  shadowOpacity={isEnabled ? 1 : 0.4}
+                  shadowOpacity={shadowOpacity}
                 />
                 <Text
                   width={btnW}
