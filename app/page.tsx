@@ -247,7 +247,7 @@ export default function SlayStudio() {
           {/* Mode Switch */}
           <div className="flex rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] p-0.5">
             <button
-              onClick={() => setMode('editor')}
+              onClick={exitPlaytest}
               className={`rounded-md px-4 py-1.5 text-sm transition-all ${mode === 'editor'
                 ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
                 : 'hover:bg-[var(--studio-bg-elevated)]'
@@ -256,7 +256,7 @@ export default function SlayStudio() {
               Редактор
             </button>
             <button
-              onClick={() => setMode('playtest')}
+              onClick={enterPlaytest}
               className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm transition-all ${mode === 'playtest'
                 ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
                 : 'hover:bg-[var(--studio-bg-elevated)]'
