@@ -217,6 +217,9 @@ type StudioState = {
   undoCanvas: () => void;
   redoCanvas: () => void;
 
+  // Добавление стандартных характеристик ГГ
+  addDefaultPlayerStats: () => void;
+
   // === Sidebar Collapse (especially useful in Playtest) ===
   leftSidebarCollapsed: boolean;
   rightSidebarCollapsed: boolean;
@@ -965,6 +968,52 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       variables: [],
     });
     get().saveToLocalStorage();
+  },
+
+  // Добавляет стандартные характеристики Главного Героя
+  addDefaultPlayerStats: () => {
+    const state = get();
+    const existingNames = new Set(state.variables.map(v => v.name));
+
+    const defaultStats: Omit<Variable, 'id'>[] = [
+      // Здоровье
+      { name: 'health_max', displayName: { ru: 'Здоровье (макс)', en: 'Health (max)' }, type: 'number', defaultValue: 100, category: 'player' },
+      { name: 'health', displayName: { ru: 'Здоровье', en: 'Health' }, type: 'number', defaultValue: 100, category: 'player' },
+      
+      // Мана
+      { name: 'mana_max', displayName: { ru: 'Мана (макс)', en: 'Mana (max)' }, type: 'number', defaultValue: 50, category: 'player' },
+      { name: 'mana', displayName: { ru: 'Мана', en: 'Mana' }, type: 'number', defaultValue: 50, category: 'player' },
+
+      // Основные характеристики
+      { name: 'strength', displayName: { ru: 'Сила', en: 'Strength' }, type: 'number', defaultValue: 5, category: 'player' },
+      { name: 'agility', displayName: { ru: 'Ловкость', en: 'Agility' }, type: 'number', defaultValue: 5, category: 'player' },
+      { name: 'endurance', displayName: { ru: 'Выносливость', en: 'Endurance' }, type: 'number', defaultValue: 10, category: 'player' },
+      { name: 'defense', displayName: { ru: 'Защита', en: 'Defense' }, type: 'number', defaultValue: 2, category: 'player' },
+
+      // Специальные
+      { name: 'souls', displayName: { ru: 'Души', en: 'Souls' }, type: 'number', defaultValue: 0, category: 'player' },
+      { name: 'level', displayName: { ru: 'Уровень', en: 'Level' }, type: 'number', defaultValue: 1, category: 'player' },
+      { name: 'exp', displayName: { ru: 'Опыт', en: 'Experience' }, type: 'number', defaultValue: 0, category: 'player' },
+
+      // Ресурсы
+      { name: 'coins', displayName: { ru: 'Монеты', en: 'Coins' }, type: 'number', defaultValue: 15, category: 'resources' },
+      { name: 'gasoline', displayName: { ru: 'Бензин', en: 'Gasoline' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gems', displayName: { ru: 'Драгоценности', en: 'Gems' }, type: 'number', defaultValue: 0, category: 'resources' },
+    ];
+
+    const newVariables = defaultStats
+      .filter(stat => !existingNames.has(stat.name))
+      .map(stat => ({
+        ...stat,
+        id: `var_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      }));
+
+    if (newVariables.length > 0) {
+      set((s) => ({
+        variables: [...s.variables, ...newVariables]
+      }));
+      get().saveToLocalStorage();
+    }
   },
 
   addPage: () => {

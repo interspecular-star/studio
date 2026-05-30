@@ -64,6 +64,7 @@ export default function SlayStudio() {
     canvasHistory,
     canvasFuture,
     renamePage,
+    addDefaultPlayerStats,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -580,6 +581,17 @@ export default function SlayStudio() {
                     className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
                   >
                     + Добавить
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Добавить стандартные характеристики Главного Героя?')) {
+                        addDefaultPlayerStats();
+                      }
+                    }}
+                    className="flex items-center gap-1 rounded border border-[var(--studio-border)] px-2 py-0.5 text-xs hover:bg-[var(--studio-bg-panel)]"
+                    title="Добавить здоровье, ману, силу, ловкость и другие базовые характеристики"
+                  >
+                    + Характеристики ГГ
                   </button>
                 </div>
               </div>
