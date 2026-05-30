@@ -63,6 +63,7 @@ export default function SlayStudio() {
     redoCanvas,
     canvasHistory,
     canvasFuture,
+    renamePage,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -814,6 +815,64 @@ export default function SlayStudio() {
 
             {/* Page Properties */}
             <div className="space-y-4">
+              {/* Page Name + ID */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">НАЗВАНИЕ СТРАНИЦЫ</label>
+                <div className="space-y-1.5">
+                  <input
+                    value={currentPage?.title.ru || ''}
+                    onChange={(e) =>
+                      renamePage(currentPage!.id, currentPage!.id, {
+                        ...currentPage!.title,
+                        ru: e.target.value,
+                      })
+                    }
+                    placeholder="Название (РУ)"
+                    className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
+                  />
+                  <input
+                    value={currentPage?.title.en || ''}
+                    onChange={(e) =>
+                      renamePage(currentPage!.id, currentPage!.id, {
+                        ...currentPage!.title,
+                        en: e.target.value,
+                      })
+                    }
+                    placeholder="Title (EN)"
+                    className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">
+                  ID СТРАНИЦЫ <span className="text-[var(--studio-danger)]">(осторожно!)</span>
+                </label>
+                <input
+                  value={currentPage?.id || ''}
+                  onBlur={(e) => {
+                    const newId = e.target.value.trim();
+                    if (newId && newId !== currentPage!.id) {
+                      if (confirm(`Изменить ID страницы с "${currentPage!.id}" на "${newId}"?\nВсе ссылки на эту страницу будут обновлены.`)) {
+                        renamePage(currentPage!.id, newId);
+                      } else {
+                        // revert visually
+                        e.target.value = currentPage!.id;
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
+                />
+                <p className="mt-1 text-[10px] text-[var(--studio-text-muted)]">
+                  Используется в действиях "Перейти на страницу". Изменение обновит все ссылки.
+                </p>
+              </div>
+
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">ФОН СЦЕНЫ</label>
                 <select

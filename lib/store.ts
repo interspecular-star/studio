@@ -208,6 +208,8 @@ type StudioState = {
   enterPlaytest: () => void;
   exitPlaytest: () => void;
 
+  renamePage: (oldId: string, newId: string, newTitle?: LocalizedString) => void;
+
   // === Canvas-only Undo/Redo (for button positions on the canvas) ===
   canvasHistory: any[];
   canvasFuture: any[];
@@ -413,6 +415,68 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           : page
       ),
     }));
+    get().saveToLocalStorage();
+  },
+
+  renamePage: (oldId: string, newId: string, newTitle?: LocalizedString) => {
+    const state = get();
+    const trimmedNewId = newId.trim();
+
+    if (!trimmedNewId) {
+      alert('ID страницы не может быть пустым');
+      return;
+    }
+    if (trimmedNewId === oldId) {
+      // Only updating title
+      if (newTitle) {
+        set((s) => ({
+          pages: s.pages.map(p =>
+            p.id === oldId ? { ...p, title: newTitle } : p
+          )
+        }));
+        get().saveToLocalStorage();
+      }
+      return;
+    }
+    if (state.pages.some(p => p.id === trimmedNewId)) {
+      alert('Страница с таким ID уже существует');
+      return;
+    }
+
+    // Update page ID + title
+    set((s) => ({
+      pages: s.pages.map(page => {
+        if (page.id !== oldId) return page;
+
+        return {
+          ...page,
+          id: trimmedNewId,
+          title: newTitle || page.title,
+        };
+      })
+    }));
+
+    // Update all goToPage references
+    set((s) => ({
+      pages: s.pages.map(page => ({
+        ...page,
+        buttons: page.buttons.map(btn => {
+          if (btn.action.type === 'goToPage' && btn.action.pageId === oldId) {
+            return {
+              ...btn,
+              action: { ...btn.action, pageId: trimmedNewId }
+            };
+          }
+          return btn;
+        })
+      }))
+    }));
+
+    // If the renamed page was selected, update selection
+    if (state.selectedPageId === oldId) {
+      set({ selectedPageId: trimmedNewId });
+    }
+
     get().saveToLocalStorage();
   },
 
