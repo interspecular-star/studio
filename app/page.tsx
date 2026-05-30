@@ -70,6 +70,9 @@ export default function SlayStudio() {
     addDefaultResources,
     resourcesCollapsed,
     toggleResourcesCollapsed,
+    renameItem,
+    collapsedItemIds,
+    toggleItemCollapsed,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -874,125 +877,159 @@ export default function SlayStudio() {
               )}
 
               <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                {items.map((item) => (
-                  <div key={item.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        {/* Название RU */}
-                        <input
-                          value={item.name.ru}
-                          onChange={(e) =>
-                            updateItem(item.id, {
-                              name: { ...item.name, ru: e.target.value },
-                            })
-                          }
-                          className="w-full bg-transparent font-medium focus:outline-none text-sm"
-                          placeholder="Название (RU)"
-                        />
+                {items.map((item) => {
+                  const isCollapsed = collapsedItemIds.includes(item.id);
 
-                        {/* ID (постоянно видимый) */}
-                        <div className="text-[10px] text-[var(--studio-text-muted)] font-mono">
-                          ID: {item.id}
+                  return (
+                    <div key={item.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
+                      {/* Header: Name + ID + Collapse + Delete */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => toggleItemCollapsed(item.id)}
+                              className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] text-xs"
+                            >
+                              {isCollapsed ? '▶' : '▼'}
+                            </button>
+                            <input
+                              value={item.name.ru}
+                              onChange={(e) =>
+                                updateItem(item.id, {
+                                  name: { ...item.name, ru: e.target.value },
+                                })
+                              }
+                              className="flex-1 bg-transparent font-medium focus:outline-none text-sm"
+                              placeholder="Название (RU)"
+                            />
+                          </div>
+
+                          {/* ID - editable */}
+                          <div className="mt-0.5 flex items-center gap-1">
+                            <span className="text-[10px] text-[var(--studio-text-muted)]">ID:</span>
+                            <input
+                              value={item.id}
+                              onBlur={(e) => {
+                                const newId = e.target.value.trim();
+                                if (newId && newId !== item.id) {
+                                  if (confirm(`Изменить ID предмета с "${item.id}" на "${newId}"?\nВсе условия и действия, использующие этот предмет, будут обновлены.`)) {
+                                    renameItem(item.id, newId);
+                                  } else {
+                                    e.target.value = item.id;
+                                  }
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                                if (e.key === 'Escape') e.currentTarget.blur();
+                              }}
+                              className="font-mono text-[10px] bg-transparent border-b border-[var(--studio-border)] focus:outline-none w-auto"
+                            />
+                          </div>
                         </div>
-
-                        {/* Название EN */}
-                        <input
-                          value={item.name.en}
-                          onChange={(e) =>
-                            updateItem(item.id, {
-                              name: { ...item.name, en: e.target.value },
-                            })
-                          }
-                          className="w-full bg-transparent text-[10px] text-[var(--studio-text-muted)] focus:outline-none"
-                          placeholder="Name (EN)"
-                        />
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (confirm('Удалить этот предмет?')) deleteItem(item.id);
-                        }}
-                        className="text-[var(--studio-danger)] hover:text-red-400 ml-1 text-sm leading-none"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {/* Описание RU */}
-                    <textarea
-                      value={item.description.ru}
-                      onChange={(e) =>
-                        updateItem(item.id, {
-                          description: { ...item.description, ru: e.target.value },
-                        })
-                      }
-                      placeholder="Описание (RU)"
-                      className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
-                      rows={2}
-                    />
-
-                    {/* Описание EN */}
-                    <textarea
-                      value={item.description.en || ''}
-                      onChange={(e) =>
-                        updateItem(item.id, {
-                          description: { ...item.description, en: e.target.value },
-                        })
-                      }
-                      placeholder="Description (EN)"
-                      className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
-                      rows={2}
-                    />
-
-                    {/* Quantity Variable Linking */}
-                    <div className="mt-3 pt-2 border-t border-[var(--studio-border)]">
-                      <label className="text-[10px] text-[var(--studio-text-muted)] block mb-1">
-                        Количество хранится в переменной
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={item.quantityVariableId || ''}
-                          onChange={(e) => {
-                            updateItem(item.id, {
-                              quantityVariableId: e.target.value || undefined,
-                            });
-                          }}
-                          className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                        >
-                          <option value="">— Не отслеживать количество —</option>
-                          {numberVariables.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.displayName.ru} ({v.name})
-                            </option>
-                          ))}
-                        </select>
 
                         <button
                           onClick={() => {
-                            const suggestedName = `item_${item.name.ru.toLowerCase().replace(/\s+/g, '_')}`;
-                            const newVar: Omit<Variable, 'id'> = {
-                              name: suggestedName,
-                              displayName: { ru: `Кол-во: ${item.name.ru}`, en: `Qty: ${item.name.en}` },
-                              type: 'number',
-                              defaultValue: 0,
-                              category: 'inventory',
-                            };
-                            addVariable(newVar);
-                            // Link it immediately
-                            const createdVar = variables.find(v => v.name === suggestedName) || 
-                                              useStudioStore.getState().variables.find(v => v.name === suggestedName);
-                            if (createdVar) {
-                              updateItem(item.id, { quantityVariableId: createdVar.id });
-                            }
+                            if (confirm('Удалить этот предмет?')) deleteItem(item.id);
                           }}
-                          className="text-[10px] px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] whitespace-nowrap"
-                          title="Создать новую переменную для количества этого предмета"
+                          className="text-[var(--studio-danger)] hover:text-red-400 ml-1 text-sm leading-none"
                         >
-                          + Переменная
+                          ✕
                         </button>
                       </div>
+
+                      {!isCollapsed && (
+                        <>
+                          {/* Название EN */}
+                          <input
+                            value={item.name.en}
+                            onChange={(e) =>
+                              updateItem(item.id, {
+                                name: { ...item.name, en: e.target.value },
+                              })
+                            }
+                            className="mt-1 w-full bg-transparent text-[10px] text-[var(--studio-text-muted)] focus:outline-none"
+                            placeholder="Name (EN)"
+                          />
+
+                          {/* Описание RU */}
+                          <textarea
+                            value={item.description.ru}
+                            onChange={(e) =>
+                              updateItem(item.id, {
+                                description: { ...item.description, ru: e.target.value },
+                              })
+                            }
+                            placeholder="Описание (RU)"
+                            className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
+                            rows={2}
+                          />
+
+                          {/* Описание EN */}
+                          <textarea
+                            value={item.description.en || ''}
+                            onChange={(e) =>
+                              updateItem(item.id, {
+                                description: { ...item.description, en: e.target.value },
+                              })
+                            }
+                            placeholder="Description (EN)"
+                            className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
+                            rows={2}
+                          />
+
+                          {/* Quantity Variable Linking */}
+                          <div className="mt-3 pt-2 border-t border-[var(--studio-border)]">
+                            <label className="text-[10px] text-[var(--studio-text-muted)] block mb-1">
+                              Количество хранится в переменной
+                            </label>
+                            <div className="flex gap-2">
+                              <select
+                                value={item.quantityVariableId || ''}
+                                onChange={(e) => {
+                                  updateItem(item.id, {
+                                    quantityVariableId: e.target.value || undefined,
+                                  });
+                                }}
+                                className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                              >
+                                <option value="">— Не отслеживать количество —</option>
+                                {numberVariables.map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {v.displayName.ru} ({v.name})
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                onClick={() => {
+                                  const suggestedName = `item_${item.name.ru.toLowerCase().replace(/\s+/g, '_')}`;
+                                  const newVar: Omit<Variable, 'id'> = {
+                                    name: suggestedName,
+                                    displayName: { ru: `Кол-во: ${item.name.ru}`, en: `Qty: ${item.name.en}` },
+                                    type: 'number',
+                                    defaultValue: 0,
+                                    category: 'inventory',
+                                  };
+                                  addVariable(newVar);
+                                  const createdVar = variables.find(v => v.name === suggestedName) || 
+                                                    useStudioStore.getState().variables.find(v => v.name === suggestedName);
+                                  if (createdVar) {
+                                    updateItem(item.id, { quantityVariableId: createdVar.id });
+                                  }
+                                }}
+                                className="text-[10px] px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] whitespace-nowrap"
+                                title="Создать новую переменную для количества этого предмета"
+                              >
+                                + Переменная
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
             </div>

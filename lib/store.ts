@@ -209,6 +209,7 @@ type StudioState = {
   exitPlaytest: () => void;
 
   renamePage: (oldId: string, newId: string, newTitle?: LocalizedString) => void;
+  renameItem: (oldId: string, newId: string, newName?: LocalizedString) => void;
 
   // === Canvas-only Undo/Redo (for button positions on the canvas) ===
   canvasHistory: any[];
@@ -237,6 +238,10 @@ type StudioState = {
   // Resources panel (permanent collapsed block, like player stats)
   resourcesCollapsed: boolean;
   toggleResourcesCollapsed: () => void;
+
+  // Collapsed state for individual items (to reduce scrolling when many items)
+  collapsedItemIds: string[];
+  toggleItemCollapsed: (itemId: string) => void;
 
   addPage: () => void;
   deletePage: (id: string) => void;
@@ -339,6 +344,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   // Resources panel starts collapsed by default (like player stats)
   resourcesCollapsed: true,
+
+  // No items collapsed by default
+  collapsedItemIds: [],
 
   setPages: (pages) => set({ pages }),
 
@@ -496,6 +504,86 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (state.selectedPageId === oldId) {
       set({ selectedPageId: trimmedNewId });
     }
+
+    get().saveToLocalStorage();
+  },
+
+  renameItem: (oldId: string, newId: string, newName?: LocalizedString) => {
+    const state = get();
+    const trimmedNewId = newId.trim();
+
+    if (!trimmedNewId) {
+      alert('ID предмета не может быть пустым');
+      return;
+    }
+    if (trimmedNewId === oldId) {
+      if (newName) {
+        set((s) => ({
+          items: s.items.map(item =>
+            item.id === oldId ? { ...item, name: newName } : item
+          )
+        }));
+        get().saveToLocalStorage();
+      }
+      return;
+    }
+    if (state.items.some(i => i.id === trimmedNewId)) {
+      alert('Предмет с таким ID уже существует');
+      return;
+    }
+
+    // Update item ID + name
+    set((s) => ({
+      items: s.items.map(item => {
+        if (item.id !== oldId) return item;
+        return {
+          ...item,
+          id: trimmedNewId,
+          name: newName || item.name,
+        };
+      })
+    }));
+
+    // Update all references in conditions and actions
+    const updateCondition = (cond: any): any => {
+      if (!cond) return cond;
+      if (cond.type === 'itemQuantity' && cond.itemId === oldId) {
+        return { ...cond, itemId: trimmedNewId };
+      }
+      if (cond.type === 'and' || cond.type === 'or') {
+        return { ...cond, conditions: cond.conditions.map(updateCondition) };
+      }
+      if (cond.type === 'not') {
+        return { ...cond, condition: updateCondition(cond.condition) };
+      }
+      return cond;
+    };
+
+    set((s) => ({
+      pages: s.pages.map(page => ({
+        ...page,
+        buttons: page.buttons.map(btn => {
+          let newAction = btn.action;
+
+          if ((newAction.type === 'giveItem' || newAction.type === 'removeItem') && newAction.itemId === oldId) {
+            newAction = { ...newAction, itemId: trimmedNewId };
+          }
+
+          const newVisibleWhen = updateCondition(btn.visibleWhen);
+          const newEnabledWhen = updateCondition(btn.enabledWhen);
+
+          if (newAction !== btn.action || newVisibleWhen !== btn.visibleWhen || newEnabledWhen !== btn.enabledWhen) {
+            return {
+              ...btn,
+              action: newAction,
+              visibleWhen: newVisibleWhen,
+              enabledWhen: newEnabledWhen,
+            };
+          }
+          return btn;
+        })
+      }))
+    }));
 
     get().saveToLocalStorage();
   },
@@ -722,6 +810,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   togglePlayerStatsCollapsed: () => set((state) => ({ playerStatsCollapsed: !state.playerStatsCollapsed })),
 
   toggleResourcesCollapsed: () => set((state) => ({ resourcesCollapsed: !state.resourcesCollapsed })),
+
+  toggleItemCollapsed: (itemId) => set((state) => {
+    const isCollapsed = state.collapsedItemIds.includes(itemId);
+    return {
+      collapsedItemIds: isCollapsed
+        ? state.collapsedItemIds.filter(id => id !== itemId)
+        : [...state.collapsedItemIds, itemId]
+    };
+  }),
 
   setSidebarsForPlaytest: (collapsed) => set({
     leftSidebarCollapsed: collapsed,
