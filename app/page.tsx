@@ -389,6 +389,22 @@ export default function SlayStudio() {
 
         {/* CENTER: Canvas */}
         <div className="flex flex-1 flex-col">
+          {/* Playtest Mode Banner */}
+          {mode === 'playtest' && (
+            <div className="flex items-center justify-between bg-[#C25D3A] px-4 py-2 text-sm text-white shadow-inner">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">▶ PLAYTEST РЕЖИМ</span>
+                <span className="opacity-90">— Кнопки выполняют действия. Состояние не сохраняется.</span>
+              </div>
+              <button
+                onClick={exitPlaytest}
+                className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
+              >
+                Выйти в редактор
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-b border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-4 py-2 text-xs">
             <div className="flex items-center gap-3">
               <span className="font-medium">{currentPage?.title.ru}</span>
