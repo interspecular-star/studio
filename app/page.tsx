@@ -8,6 +8,7 @@ import { useStudioStore, useCurrentPage, type Item, type Variable } from '@/lib/
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
+import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
 
 export default function SlayStudio() {
   const {
@@ -407,11 +408,15 @@ export default function SlayStudio() {
 
         {/* RIGHT: Inspector — Balanced & Useful */}
         <div className="panel flex w-80 flex-shrink-0 flex-col border-l">
-          <div className="border-b border-[var(--studio-border)] px-4 py-3">
-            <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СВОЙСТВА</span>
-          </div>
+          {mode === 'playtest' ? (
+            <PlaytestStatePanel />
+          ) : (
+            <>
+              <div className="border-b border-[var(--studio-border)] px-4 py-3">
+                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СВОЙСТВА</span>
+              </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Snapping Toggle - always visible and independent */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between">
@@ -1110,6 +1115,8 @@ export default function SlayStudio() {
               Удалить все направляющие
             </button>
           </div>
+          )}
+            </>
           )}
         </div>
       </div>
