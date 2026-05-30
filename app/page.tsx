@@ -1360,19 +1360,29 @@ function ConditionEditor({
             value={condition.type}
             onChange={(e) => {
               const newType = e.target.value as any;
-              if (newType === 'variable') {
-                const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
-                onChange({ type: 'variable', variableId: firstVar?.id || '', operator: '>=', value: firstVar?.type === 'number' ? 1 : true });
-              } else if (newType === 'itemQuantity') {
-                onChange({ type: 'itemQuantity', itemId: items[0]?.id || '', operator: '>=', value: 1 });
-              } else if (newType === 'relationship') {
-                onChange({ type: 'relationship', characterId: 'mila', operator: '>=', value: 0 });
-              } else if (newType === 'reputation') {
-                onChange({ type: 'reputation', operator: '>=', value: 0 });
-              } else if (newType === 'playerStat') {
-                onChange({ type: 'playerStat', stat: 'level', operator: '>=', value: 1 });
-              } else if (newType === 'resource') {
-                onChange({ type: 'resource', resource: 'coins', operator: '>=', value: 0 });
+
+              if (['variable', 'itemQuantity', 'relationship', 'reputation', 'playerStat', 'resource'].includes(newType)) {
+                // Leaf types (existing logic)
+                if (newType === 'variable') {
+                  const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
+                  onChange({ type: 'variable', variableId: firstVar?.id || '', operator: '>=', value: firstVar?.type === 'number' ? 1 : true });
+                } else if (newType === 'itemQuantity') {
+                  onChange({ type: 'itemQuantity', itemId: items[0]?.id || '', operator: '>=', value: 1 });
+                } else if (newType === 'relationship') {
+                  onChange({ type: 'relationship', characterId: 'mila', operator: '>=', value: 0 });
+                } else if (newType === 'reputation') {
+                  onChange({ type: 'reputation', operator: '>=', value: 0 });
+                } else if (newType === 'playerStat') {
+                  onChange({ type: 'playerStat', stat: 'level', operator: '>=', value: 1 });
+                } else if (newType === 'resource') {
+                  onChange({ type: 'resource', resource: 'coins', operator: '>=', value: 0 });
+                }
+              } else if (newType === 'and' || newType === 'or') {
+                // Create logical group. If current condition exists, wrap it.
+                const children = condition ? [condition] : [];
+                onChange({ type: newType, conditions: children });
+              } else if (newType === 'not') {
+                onChange({ type: 'not', condition: condition || { type: 'variable', variableId: '', operator: '>=', value: 0 } });
               }
             }}
             className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
@@ -1383,6 +1393,9 @@ function ConditionEditor({
             <option value="reputation">Репутация в городе</option>
             <option value="playerStat">Характеристика игрока</option>
             <option value="resource">Ресурс</option>
+            <option value="and">Группа И (AND)</option>
+            <option value="or">Группа ИЛИ (OR)</option>
+            <option value="not">Отрицание (NOT)</option>
           </select>
 
           {/* Variable */}
@@ -1443,6 +1456,99 @@ function ConditionEditor({
                 <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
               </select>
               <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+            </div>
+          )}
+
+          {/* Logical Groups: AND / OR */}
+          {(condition.type === 'and' || condition.type === 'or') && (
+            <div className="space-y-2 border-l-2 border-[var(--studio-accent)] pl-3">
+              <div className="text-[10px] font-medium text-[var(--studio-accent)]">
+                {condition.type === 'and' ? 'И (все условия должны быть истинны)' : 'ИЛИ (хотя бы одно условие истинно)'}
+              </div>
+
+              {(condition.conditions || []).map((subCondition: any, index: number) => (
+                <div key={index} className="rounded border border-[var(--studio-border)] bg-[#161310] p-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-[var(--studio-text-muted)]">Условие #{index + 1}</span>
+                    <button
+                      onClick={() => {
+                        const newConditions = [...condition.conditions];
+                        newConditions.splice(index, 1);
+                        onChange({ ...condition, conditions: newConditions.length > 0 ? newConditions : undefined });
+                      }}
+                      className="text-[var(--studio-danger)] text-xs hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <ConditionEditor
+                    label=""
+                    condition={subCondition}
+                    onChange={(updatedSub) => {
+                      const newConditions = [...condition.conditions];
+                      newConditions[index] = updatedSub;
+                      onChange({ ...condition, conditions: newConditions });
+                    }}
+                    variables={variables}
+                    items={items}
+                  />
+                </div>
+              ))}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
+                    const newCond = firstVar
+                      ? { type: 'variable', variableId: firstVar.id, operator: '>=', value: firstVar.type === 'number' ? 0 : false }
+                      : { type: 'variable', variableId: '', operator: '>=', value: 0 };
+
+                    onChange({
+                      ...condition,
+                      conditions: [...(condition.conditions || []), newCond],
+                    });
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                >
+                  + Условие
+                </button>
+                <button
+                  onClick={() => {
+                    onChange({
+                      ...condition,
+                      conditions: [...(condition.conditions || []), { type: 'and', conditions: [] }],
+                    });
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                >
+                  + Группа И
+                </button>
+                <button
+                  onClick={() => {
+                    onChange({
+                      ...condition,
+                      conditions: [...(condition.conditions || []), { type: 'or', conditions: [] }],
+                    });
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                >
+                  + Группа ИЛИ
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* NOT */}
+          {condition.type === 'not' && (
+            <div className="border-l-2 border-[var(--studio-danger)] pl-3">
+              <div className="text-[10px] text-[var(--studio-danger)] mb-1">НЕ (отрицание)</div>
+              <ConditionEditor
+                label=""
+                condition={condition.condition}
+                onChange={(updated) => onChange({ ...condition, condition: updated })}
+                variables={variables}
+                items={items}
+              />
             </div>
           )}
         </div>
