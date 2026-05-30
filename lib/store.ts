@@ -208,6 +208,13 @@ type StudioState = {
   enterPlaytest: () => void;
   exitPlaytest: () => void;
 
+  // === Canvas-only Undo/Redo (for button positions on the canvas) ===
+  canvasHistory: any[];
+  canvasFuture: any[];
+  saveCanvasSnapshot: () => void;
+  undoCanvas: () => void;
+  redoCanvas: () => void;
+
   // === Sidebar Collapse (especially useful in Playtest) ===
   leftSidebarCollapsed: boolean;
   rightSidebarCollapsed: boolean;
@@ -299,6 +306,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   playtestState: {
     variableValues: {},
   },
+
+  // Canvas-only history (for button dragging on the canvas)
+  canvasHistory: [],
+  canvasFuture: [],
 
   // Editor / Playtest mode
   mode: 'editor',
@@ -628,6 +639,87 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     leftSidebarCollapsed: collapsed,
     rightSidebarCollapsed: collapsed,
   }),
+
+  // === Canvas Undo/Redo (only button layouts from canvas) ===
+  saveCanvasSnapshot: () => {
+    const state = get();
+    // Save a lightweight snapshot of all button layouts
+    const snapshot = state.pages.map(page => ({
+      id: page.id,
+      buttons: page.buttons.map(btn => ({
+        id: btn.id,
+        layout: { ...btn.layout }
+      }))
+    }));
+
+    set((s) => ({
+      canvasHistory: [...s.canvasHistory.slice(-49), snapshot], // keep max 50
+      canvasFuture: []
+    }));
+  },
+
+  undoCanvas: () => {
+    const state = get();
+    if (state.canvasHistory.length === 0) return;
+
+    const previous = state.canvasHistory[state.canvasHistory.length - 1];
+    const current = state.pages.map(page => ({
+      id: page.id,
+      buttons: page.buttons.map(btn => ({
+        id: btn.id,
+        layout: { ...btn.layout }
+      }))
+    }));
+
+    // Restore previous layouts
+    set((s) => ({
+      pages: s.pages.map(page => {
+        const snapPage = previous.find((p: any) => p.id === page.id);
+        if (!snapPage) return page;
+
+        return {
+          ...page,
+          buttons: page.buttons.map(btn => {
+            const snapBtn = snapPage.buttons.find((b: any) => b.id === btn.id);
+            return snapBtn ? { ...btn, layout: { ...btn.layout, ...snapBtn.layout } } : btn;
+          })
+        };
+      }),
+      canvasHistory: s.canvasHistory.slice(0, -1),
+      canvasFuture: [current, ...s.canvasFuture].slice(0, 50)
+    }));
+  },
+
+  redoCanvas: () => {
+    const state = get();
+    if (state.canvasFuture.length === 0) return;
+
+    const next = state.canvasFuture[0];
+    const current = state.pages.map(page => ({
+      id: page.id,
+      buttons: page.buttons.map(btn => ({
+        id: btn.id,
+        layout: { ...btn.layout }
+      }))
+    }));
+
+    set((s) => ({
+      pages: s.pages.map(page => {
+        const snapPage = next.find((p: any) => p.id === page.id);
+        if (!snapPage) return page;
+
+        return {
+          ...page,
+          buttons: page.buttons.map(btn => {
+            const snapBtn = snapPage.buttons.find((b: any) => b.id === btn.id);
+            return snapBtn ? { ...btn, layout: { ...btn.layout, ...snapBtn.layout } } : btn;
+          })
+        };
+      }),
+      canvasHistory: [...s.canvasHistory, current].slice(-50),
+      canvasFuture: s.canvasFuture.slice(1)
+    }));
+  },
 
   executeAction: (action) => {
     const state = get();

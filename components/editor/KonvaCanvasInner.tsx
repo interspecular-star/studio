@@ -73,6 +73,9 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
 
   const handleButtonDragEnd = (buttonId: string, e: any) => {
+    // Save snapshot before applying the change (only for canvas drags)
+    useStudioStore.getState().saveCanvasSnapshot();
+
     const node = e.target;
     const currentXPercent = (node.x() / width) * 100;
     const currentYPercent = (node.y() / height) * 100;

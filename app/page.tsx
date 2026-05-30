@@ -58,6 +58,11 @@ export default function SlayStudio() {
     rightSidebarCollapsed,
     toggleLeftSidebar,
     toggleRightSidebar,
+    saveCanvasSnapshot,
+    undoCanvas,
+    redoCanvas,
+    canvasHistory,
+    canvasFuture,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -264,6 +269,26 @@ export default function SlayStudio() {
             >
               <Play className="h-3.5 w-3.5" />
               Playtest
+            </button>
+          </div>
+
+          {/* Canvas Undo / Redo - only for canvas button positions */}
+          <div className="flex items-center gap-1 ml-2">
+            <button
+              onClick={undoCanvas}
+              disabled={canvasHistory.length === 0}
+              className="studio-btn flex items-center gap-1.5 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-2 text-sm hover:border-[var(--studio-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Отменить последнее изменение на холсте (Ctrl+Z)"
+            >
+              ↩ Отменить
+            </button>
+            <button
+              onClick={redoCanvas}
+              disabled={canvasFuture.length === 0}
+              className="studio-btn flex items-center gap-1.5 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-2 text-sm hover:border-[var(--studio-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Повторить (Ctrl+Shift+Z)"
+            >
+              Redo ↪
             </button>
           </div>
 
