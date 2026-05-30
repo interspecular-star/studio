@@ -68,6 +68,13 @@ export default function SlayStudio() {
 
   const currentPage = useCurrentPage();
 
+  // Keep editingPageId in sync when switching pages
+  useEffect(() => {
+    if (currentPage) {
+      setEditingPageId(currentPage.id);
+    }
+  }, [currentPage?.id]);
+
   // Helper: only number variables (for item quantity linking)
   const numberVariables = variables.filter(v => v.type === 'number');
   const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
@@ -76,6 +83,9 @@ export default function SlayStudio() {
   // Project name editing
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
+
+  // Page ID editing (local state for controlled input + confirmation flow)
+  const [editingPageId, setEditingPageId] = useState('');
 
   // Load project from localStorage on first mount
   useEffect(() => {
@@ -849,20 +859,28 @@ export default function SlayStudio() {
                   ID СТРАНИЦЫ <span className="text-[var(--studio-danger)]">(осторожно!)</span>
                 </label>
                 <input
-                  value={currentPage?.id || ''}
-                  onBlur={(e) => {
-                    const newId = e.target.value.trim();
-                    if (newId && newId !== currentPage!.id) {
-                      if (confirm(`Изменить ID страницы с "${currentPage!.id}" на "${newId}"?\nВсе ссылки на эту страницу будут обновлены.`)) {
-                        renamePage(currentPage!.id, newId);
+                  value={editingPageId}
+                  onChange={(e) => setEditingPageId(e.target.value)}
+                  onBlur={() => {
+                    const newId = editingPageId.trim();
+                    if (newId && currentPage && newId !== currentPage.id) {
+                      if (confirm(`Изменить ID страницы с "${currentPage.id}" на "${newId}"?\nВсе ссылки (goToPage) на эту страницу будут автоматически обновлены.`)) {
+                        renamePage(currentPage.id, newId);
                       } else {
-                        // revert visually
-                        e.target.value = currentPage!.id;
+                        // revert to original ID
+                        setEditingPageId(currentPage.id);
                       }
+                    } else if (currentPage) {
+                      // If no change or empty, reset to current
+                      setEditingPageId(currentPage.id);
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === 'Escape' && currentPage) {
+                      setEditingPageId(currentPage.id);
                       e.currentTarget.blur();
                     }
                   }}
