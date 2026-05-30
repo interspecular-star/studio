@@ -241,17 +241,84 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
               }
             );
 
-            const accentColor = isSelected ? '#E8D4A0' : (isEnabled ? '#C5A46E' : '#6B6255');
-            const bgColor = isSelected 
-              ? 'rgba(62, 52, 37, 0.94)' 
-              : (isEnabled ? 'rgba(55, 45, 32, 0.9)' : 'rgba(45, 38, 28, 0.6)');
+            const buttonStyle = button.layout.style || 'default';
+
+            // Вычисляем визуальные стили кнопки в зависимости от style и состояния enabled
+            let accentColor: string;
+            let bgColor: string;
+            let strokeWidth: number;
+            let textColor = '#F4EDE0';
+            let buttonOpacity = 1;
+
+            if (isEnabled) {
+              buttonOpacity = 1;
+
+              switch (buttonStyle) {
+                case 'important':
+                  accentColor = isSelected ? '#F4EDE0' : '#E8D4A0';
+                  bgColor = isSelected ? 'rgba(68, 57, 42, 0.96)' : 'rgba(60, 50, 37, 0.92)';
+                  strokeWidth = isSelected ? 3 : 2.2;
+                  break;
+
+                case 'danger':
+                  accentColor = isSelected ? '#E8A090' : '#C25D3A';
+                  bgColor = isSelected ? 'rgba(65, 48, 44, 0.95)' : 'rgba(55, 42, 40, 0.9)';
+                  strokeWidth = isSelected ? 2.5 : 2;
+                  break;
+
+                case 'subtle':
+                  accentColor = isSelected ? '#C5B8A0' : '#8A7F6A';
+                  bgColor = isSelected ? 'rgba(52, 47, 42, 0.9)' : 'rgba(48, 43, 39, 0.85)';
+                  strokeWidth = isSelected ? 2 : 1.2;
+                  textColor = '#D4C9B5';
+                  break;
+
+                case 'default':
+                default:
+                  accentColor = isSelected ? '#E8D4A0' : '#C5A46E';
+                  bgColor = isSelected ? 'rgba(62, 52, 37, 0.94)' : 'rgba(55, 45, 32, 0.9)';
+                  strokeWidth = isSelected ? 2.5 : 1.5;
+                  break;
+              }
+            } else {
+              // Отключённое состояние (enabledWhen не прошло) — более "мёртвый" вид
+              buttonOpacity = 0.42;
+              textColor = '#9A9080';
+
+              switch (buttonStyle) {
+                case 'important':
+                  accentColor = '#5C5549';
+                  bgColor = 'rgba(40, 36, 32, 0.75)';
+                  strokeWidth = 1.8;
+                  break;
+
+                case 'danger':
+                  accentColor = '#6B4F4A';
+                  bgColor = 'rgba(42, 36, 35, 0.75)';
+                  strokeWidth = 1.6;
+                  break;
+
+                case 'subtle':
+                  accentColor = '#4A463D';
+                  bgColor = 'rgba(38, 35, 32, 0.7)';
+                  strokeWidth = 1;
+                  break;
+
+                case 'default':
+                default:
+                  accentColor = '#5C5549';
+                  bgColor = 'rgba(40, 36, 32, 0.72)';
+                  strokeWidth = 1.3;
+                  break;
+              }
+            }
 
             return (
               <Group
                 key={button.id}
                 x={btnX}
                 y={btnY}
-                opacity={isEnabled ? 1 : 0.55}
+                opacity={buttonOpacity}
                 draggable={!isPlaytest && isEnabled}
                 onDragMove={(e) => {
                   if (isPlaytest || !isEnabled) return; // Блокируем движение в Playtest и для disabled кнопок
@@ -325,20 +392,22 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
                   cornerRadius={6}
                   fill={bgColor}
                   stroke={accentColor}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  strokeWidth={strokeWidth}
                   shadowColor="rgba(0,0,0,0.55)"
-                  shadowBlur={isSelected ? 14 : 7}
+                  shadowBlur={isSelected && isEnabled ? 14 : 4}
                   shadowOffsetY={3}
+                  shadowOpacity={isEnabled ? 1 : 0.4}
                 />
                 <Text
                   width={btnW}
                   height={btnH}
                   text={button.text.ru}
                   fontSize={14}
-                  fill="#F4EDE0"
+                  fill={textColor}
                   align="center"
                   verticalAlign="middle"
                   fontStyle="500"
+                  opacity={isEnabled ? 1 : 0.85}
                 />
               </Group>
             );
