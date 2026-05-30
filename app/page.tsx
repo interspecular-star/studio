@@ -96,6 +96,9 @@ export default function SlayStudio() {
   // Page ID editing (local state for controlled input + confirmation flow)
   const [editingPageId, setEditingPageId] = useState('');
 
+  // Item ID editing - per item (for controlled inputs + confirmation)
+  const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
+
   // Load project from localStorage on first mount
   useEffect(() => {
     const wasRestored = loadFromLocalStorage();
@@ -904,24 +907,44 @@ export default function SlayStudio() {
                             />
                           </div>
 
-                          {/* ID - editable */}
+                          {/* ID - editable with local state */}
                           <div className="mt-0.5 flex items-center gap-1">
                             <span className="text-[10px] text-[var(--studio-text-muted)]">ID:</span>
                             <input
-                              value={item.id}
-                              onBlur={(e) => {
-                                const newId = e.target.value.trim();
+                              value={editingItemIds[item.id] ?? item.id}
+                              onChange={(e) => {
+                                setEditingItemIds(prev => ({
+                                  ...prev,
+                                  [item.id]: e.target.value
+                                }));
+                              }}
+                              onBlur={() => {
+                                const current = editingItemIds[item.id] ?? item.id;
+                                const newId = current.trim();
                                 if (newId && newId !== item.id) {
                                   if (confirm(`Изменить ID предмета с "${item.id}" на "${newId}"?\nВсе условия и действия, использующие этот предмет, будут обновлены.`)) {
                                     renameItem(item.id, newId);
-                                  } else {
-                                    e.target.value = item.id;
                                   }
                                 }
+                                // Always clean up local editing state
+                                setEditingItemIds(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[item.id];
+                                  return copy;
+                                });
                               }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') e.currentTarget.blur();
-                                if (e.key === 'Escape') e.currentTarget.blur();
+                                if (e.key === 'Enter') {
+                                  e.currentTarget.blur();
+                                }
+                                if (e.key === 'Escape') {
+                                  setEditingItemIds(prev => {
+                                    const copy = { ...prev };
+                                    delete copy[item.id];
+                                    return copy;
+                                  });
+                                  e.currentTarget.blur();
+                                }
                               }}
                               className="font-mono text-[10px] bg-transparent border-b border-[var(--studio-border)] focus:outline-none w-auto"
                             />
