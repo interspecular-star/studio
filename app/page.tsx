@@ -363,6 +363,17 @@ export default function SlayStudio() {
           ) : (
             // Expanded state
             <>
+              {/* Small control bar when left sidebar is expanded */}
+              <div className="flex justify-start border-b border-[var(--studio-border)] px-2 py-1">
+                <button
+                  onClick={toggleLeftSidebar}
+                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1"
+                  title="Свернуть панель страниц"
+                >
+                  ◀
+                </button>
+              </div>
+
               <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
                 <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СТРАНИЦЫ</span>
                 <button
@@ -400,11 +411,8 @@ export default function SlayStudio() {
                 ))}
               </div>
 
-              <div className="border-t border-[var(--studio-border)] p-3 text-[10px] text-[var(--studio-text-muted)] flex items-center justify-between">
+              <div className="border-t border-[var(--studio-border)] p-3 text-[10px] text-[var(--studio-text-muted)]">
                 <span>{pages.length} страниц</span>
-                <button onClick={toggleLeftSidebar} className="hover:text-[var(--studio-text-primary)]" title="Свернуть панель">
-                  ◀
-                </button>
               </div>
             </>
           )}
