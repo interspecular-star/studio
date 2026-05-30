@@ -636,8 +636,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         console.log('Action executed (preview):', action);
         break;
       }
+      case 'goToPage': {
+        // Переход на другую страницу в режиме Playtest
+        get().selectPage(action.pageId);
+        // Снимаем выделение с кнопки при переходе
+        get().selectButton(null);
+        break;
+      }
       default:
-        // goToPage и startQuest пока ничего не делают в превью
+        // startQuest и другие неизвестные действия пока игнорируем
         break;
     }
 
