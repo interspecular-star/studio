@@ -964,7 +964,7 @@ export default function SlayStudio() {
                               <div>
                                 <div className="text-[var(--studio-text-muted)] mb-0.5">Тип</div>
                                 <select
-                                  value={item.type}
+                                  value={item.type ?? 'misc'}
                                   onChange={(e) => updateItem(item.id, { type: e.target.value as any })}
                                   className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                 >
@@ -986,7 +986,7 @@ export default function SlayStudio() {
                               <div>
                                 <div className="text-[var(--studio-text-muted)] mb-0.5">Редкость</div>
                                 <select
-                                  value={item.rarity}
+                                  value={item.rarity ?? 'common'}
                                   onChange={(e) => updateItem(item.id, { rarity: e.target.value as any })}
                                   className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                 >
@@ -1012,14 +1012,14 @@ export default function SlayStudio() {
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"
-                                    value={item.durability}
+                                    value={item.durability ?? 100}
                                     onChange={(e) => updateItem(item.id, { durability: parseInt(e.target.value) || 0 })}
                                     className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                   />
                                   <span>/</span>
                                   <input
                                     type="number"
-                                    value={item.maxDurability}
+                                    value={item.maxDurability ?? 100}
                                     onChange={(e) => updateItem(item.id, { maxDurability: parseInt(e.target.value) || 1 })}
                                     className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                   />
@@ -1031,7 +1031,7 @@ export default function SlayStudio() {
                                 <div className="text-[var(--studio-text-muted)] mb-0.5">Цена</div>
                                 <input
                                   type="number"
-                                  value={item.price}
+                                  value={item.price ?? 0}
                                   onChange={(e) => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
                                   className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                 />
@@ -1043,7 +1043,7 @@ export default function SlayStudio() {
                                   <label className="flex items-center gap-1 text-[10px]">
                                     <input
                                       type="checkbox"
-                                      checked={item.isEquippable}
+                                      checked={item.isEquippable ?? false}
                                       onChange={(e) => updateItem(item.id, { isEquippable: e.target.checked })}
                                     />
                                     Одеваемый
