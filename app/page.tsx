@@ -577,7 +577,6 @@ export default function SlayStudio() {
                     variables
                       .filter(v => v.category === 'player')
                       .sort((a, b) => {
-                        // Nice ordering: health/mana first, then main stats, then progress
                         const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'level', 'exp'];
                         const ia = order.indexOf(a.name);
                         const ib = order.indexOf(b.name);
@@ -586,27 +585,58 @@ export default function SlayStudio() {
                       .map((variable) => {
                         const currentValue = playtestState.variableValues[variable.id] ?? variable.defaultValue;
 
-                        // Special display for health and mana (show current / max)
+                        // Special row for health and mana (current / max)
                         if (variable.name === 'health' || variable.name === 'mana') {
                           const maxVar = variables.find(v => v.name === `${variable.name}_max`);
                           const maxValue = maxVar ? (playtestState.variableValues[maxVar.id] ?? maxVar.defaultValue) : currentValue;
+
                           return (
-                            <div key={variable.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
                               <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                              <span className="font-mono text-[var(--studio-accent)]">
-                                {currentValue} / {maxValue}
-                              </span>
+                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
+                                <input
+                                  type="number"
+                                  value={currentValue as number}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    updateVariable(variable.id, { defaultValue: val });
+                                  }}
+                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
+                                />
+                                <span>/</span>
+                                {maxVar ? (
+                                  <input
+                                    type="number"
+                                    value={maxValue as number}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      updateVariable(maxVar.id, { defaultValue: val });
+                                    }}
+                                    className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
+                                  />
+                                ) : (
+                                  <span>{maxValue}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         }
 
-                        // Skip the _max versions since we show them paired above
+                        // Skip _max versions (they are shown paired with health/mana)
                         if (variable.name.endsWith('_max')) return null;
 
                         return (
-                          <div key={variable.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                          <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
                             <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                            <span className="font-mono text-[var(--studio-accent)]">{currentValue}</span>
+                            <input
+                              type="number"
+                              value={currentValue as number}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                updateVariable(variable.id, { defaultValue: val });
+                              }}
+                              className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
+                            />
                           </div>
                         );
                       })
