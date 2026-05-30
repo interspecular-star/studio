@@ -234,6 +234,10 @@ type StudioState = {
   playerStatsCollapsed: boolean;
   togglePlayerStatsCollapsed: () => void;
 
+  // Resources panel (permanent collapsed block, like player stats)
+  resourcesCollapsed: boolean;
+  toggleResourcesCollapsed: () => void;
+
   addPage: () => void;
   deletePage: (id: string) => void;
 };
@@ -332,6 +336,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   // Player stats panel starts collapsed by default
   playerStatsCollapsed: true,
+
+  // Resources panel starts collapsed by default (like player stats)
+  resourcesCollapsed: true,
 
   setPages: (pages) => set({ pages }),
 
@@ -713,6 +720,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   toggleRightSidebar: () => set((state) => ({ rightSidebarCollapsed: !state.rightSidebarCollapsed })),
 
   togglePlayerStatsCollapsed: () => set((state) => ({ playerStatsCollapsed: !state.playerStatsCollapsed })),
+
+  toggleResourcesCollapsed: () => set((state) => ({ resourcesCollapsed: !state.resourcesCollapsed })),
 
   setSidebarsForPlaytest: (collapsed) => set({
     leftSidebarCollapsed: collapsed,

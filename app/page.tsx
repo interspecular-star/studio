@@ -68,6 +68,8 @@ export default function SlayStudio() {
     playerStatsCollapsed,
     togglePlayerStatsCollapsed,
     addDefaultResources,
+    resourcesCollapsed,
+    toggleResourcesCollapsed,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -648,48 +650,55 @@ export default function SlayStudio() {
 
             {/* === РЕСУРСЫ (постоянный блок, как характеристики) === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">РЕСУРСЫ</span>
-                <button
-                  onClick={() => {
-                    if (confirm('Добавить стандартные расходники (монеты, бензин, драгоценности)?')) {
-                      addDefaultResources();
-                    }
-                  }}
-                  className="flex items-center gap-1 rounded border border-[var(--studio-border)] px-2 py-0.5 text-xs hover:bg-[var(--studio-bg-panel)]"
-                  title="Добавить монеты, бензин и драгоценности"
-                >
-                  + Добавить
-                </button>
-              </div>
+              <button
+                onClick={toggleResourcesCollapsed}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
+              >
+                <span>РЕСУРСЫ</span>
+                <span className="text-xs">{resourcesCollapsed ? '▶' : '▼'}</span>
+              </button>
 
-              <div className="space-y-1.5 text-sm">
-                {variables.filter(v => v.category === 'resources').length === 0 ? (
-                  <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                    Нажмите «+ Добавить», чтобы создать монеты, бензин и драгоценности.
-                  </p>
-                ) : (
-                  variables
-                    .filter(v => v.category === 'resources')
-                    .map((resource) => {
-                      const value = playtestState.variableValues[resource.id] ?? resource.defaultValue;
-                      return (
-                        <div key={resource.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                          <span className="text-[var(--studio-text-secondary)]">{resource.displayName.ru}</span>
-                          <input
-                            type="number"
-                            value={value as number}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              updateVariable(resource.id, { defaultValue: val });
-                            }}
-                            className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                          />
-                        </div>
-                      );
-                    })
-                )}
-              </div>
+              {!resourcesCollapsed && (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  {variables.filter(v => v.category === 'resources').length === 0 ? (
+                    <div>
+                      <p className="text-[11px] text-[var(--studio-text-muted)] italic mb-2">
+                        Ресурсы (монеты, бензин, драгоценности) отсутствуют.
+                      </p>
+                      <button
+                        onClick={() => {
+                          if (confirm('Добавить стандартные расходники (монеты, бензин, драгоценности)?')) {
+                            addDefaultResources();
+                          }
+                        }}
+                        className="flex items-center gap-1 rounded border border-[var(--studio-border)] px-2 py-0.5 text-xs hover:bg-[var(--studio-bg-panel)]"
+                      >
+                        + Добавить
+                      </button>
+                    </div>
+                  ) : (
+                    variables
+                      .filter(v => v.category === 'resources')
+                      .map((resource) => {
+                        const value = playtestState.variableValues[resource.id] ?? resource.defaultValue;
+                        return (
+                          <div key={resource.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                            <span className="text-[var(--studio-text-secondary)]">{resource.displayName.ru}</span>
+                            <input
+                              type="number"
+                              value={value as number}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                updateVariable(resource.id, { defaultValue: val });
+                              }}
+                              className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
+                            />
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              )}
             </div>
 
             {/* === VARIABLES / ПЕРЕМЕННЫЕ === */}
