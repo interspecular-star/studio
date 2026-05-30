@@ -49,13 +49,16 @@ export default function SlayStudio() {
     deleteVariable,
     playtestState,
     resetPlaytestState,
+    mode,
+    setMode,
+    enterPlaytest,
+    exitPlaytest,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
 
   // Helper: only number variables (for item quantity linking)
   const numberVariables = variables.filter(v => v.type === 'number');
-  const [mode, setMode] = useState<'editor' | 'playtest'>('editor');
   const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'restored'>('saved');
 

@@ -202,6 +202,12 @@ type StudioState = {
   resetPlaytestState: () => void;
   executeAction: (action: ButtonAction) => void; // Главная функция выполнения действий
 
+  // === Editor / Playtest Mode ===
+  mode: 'editor' | 'playtest';
+  setMode: (mode: 'editor' | 'playtest') => void;
+  enterPlaytest: () => void;
+  exitPlaytest: () => void;
+
   addPage: () => void;
   deletePage: (id: string) => void;
 };
@@ -286,6 +292,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   playtestState: {
     variableValues: {},
   },
+
+  // Editor / Playtest mode
+  mode: 'editor',
 
   setPages: (pages) => set({ pages }),
 
@@ -577,6 +586,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       playtestState: { variableValues: {} },
       snappingGuide: null,
     });
+  },
+
+  // === Mode Management (Editor / Playtest) ===
+  setMode: (newMode) => set({ mode: newMode }),
+
+  enterPlaytest: () => {
+    set({ mode: 'playtest' });
+  },
+
+  exitPlaytest: () => {
+    set({ mode: 'editor' });
   },
 
   executeAction: (action) => {
