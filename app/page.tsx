@@ -65,6 +65,8 @@ export default function SlayStudio() {
     canvasFuture,
     renamePage,
     addDefaultPlayerStats,
+    playerStatsCollapsed,
+    togglePlayerStatsCollapsed,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -555,6 +557,64 @@ export default function SlayStudio() {
               </p>
             </div>
 
+            {/* === ХАРАКТЕРИСТИКИ ГГ (постоянный блок) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <button
+                onClick={togglePlayerStatsCollapsed}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
+              >
+                <span>ХАРАКТЕРИСТИКИ ГГ</span>
+                <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
+              </button>
+
+              {!playerStatsCollapsed && (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  {variables.filter(v => v.category === 'player').length === 0 ? (
+                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                      Нажмите «+ Характеристики ГГ» выше, чтобы добавить.
+                    </p>
+                  ) : (
+                    variables
+                      .filter(v => v.category === 'player')
+                      .sort((a, b) => {
+                        // Nice ordering: health/mana first, then main stats, then progress
+                        const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'level', 'exp'];
+                        const ia = order.indexOf(a.name);
+                        const ib = order.indexOf(b.name);
+                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+                      })
+                      .map((variable) => {
+                        const currentValue = playtestState.variableValues[variable.id] ?? variable.defaultValue;
+
+                        // Special display for health and mana (show current / max)
+                        if (variable.name === 'health' || variable.name === 'mana') {
+                          const maxVar = variables.find(v => v.name === `${variable.name}_max`);
+                          const maxValue = maxVar ? (playtestState.variableValues[maxVar.id] ?? maxVar.defaultValue) : currentValue;
+                          return (
+                            <div key={variable.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
+                              <span className="font-mono text-[var(--studio-accent)]">
+                                {currentValue} / {maxValue}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Skip the _max versions since we show them paired above
+                        if (variable.name.endsWith('_max')) return null;
+
+                        return (
+                          <div key={variable.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                            <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
+                            <span className="font-mono text-[var(--studio-accent)]">{currentValue}</span>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* === VARIABLES / ПЕРЕМЕННЫЕ === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between mb-2">
@@ -603,7 +663,9 @@ export default function SlayStudio() {
               )}
 
               <div className="space-y-2 max-h-72 overflow-auto pr-1">
-                {variables.map((variable) => (
+                {variables
+                  .filter(v => v.category !== 'player') // Player stats are shown in their own block above
+                  .map((variable) => (
                   <div key={variable.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">

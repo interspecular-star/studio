@@ -227,6 +227,10 @@ type StudioState = {
   toggleRightSidebar: () => void;
   setSidebarsForPlaytest: (collapsed: boolean) => void;
 
+  // Player stats panel (permanent collapsed block in editor)
+  playerStatsCollapsed: boolean;
+  togglePlayerStatsCollapsed: () => void;
+
   addPage: () => void;
   deletePage: (id: string) => void;
 };
@@ -322,6 +326,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Sidebar states (auto-collapsed in Playtest by default)
   leftSidebarCollapsed: false,
   rightSidebarCollapsed: false,
+
+  // Player stats panel starts collapsed by default
+  playerStatsCollapsed: true,
 
   setPages: (pages) => set({ pages }),
 
@@ -701,6 +708,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Sidebar collapse helpers
   toggleLeftSidebar: () => set((state) => ({ leftSidebarCollapsed: !state.leftSidebarCollapsed })),
   toggleRightSidebar: () => set((state) => ({ rightSidebarCollapsed: !state.rightSidebarCollapsed })),
+
+  togglePlayerStatsCollapsed: () => set((state) => ({ playerStatsCollapsed: !state.playerStatsCollapsed })),
 
   setSidebarsForPlaytest: (collapsed) => set({
     leftSidebarCollapsed: collapsed,
