@@ -101,7 +101,8 @@ export default function SlayStudio() {
     'health', 'health_max',
     'mana', 'mana_max',
     'strength', 'agility', 'endurance', 'defense',
-    'souls', 'level', 'exp'
+    'souls', 'level', 'exp',
+    'crit_chance', 'crit_damage'
   ];
 
   // Item ID editing - per item (for controlled inputs + confirmation)
@@ -594,7 +595,7 @@ export default function SlayStudio() {
                     variables
                       .filter(v => v.category === 'player')
                       .sort((a, b) => {
-                        const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'level', 'exp'];
+                        const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
                         const ia = order.indexOf(a.name);
                         const ib = order.indexOf(b.name);
                         return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
@@ -658,6 +659,74 @@ export default function SlayStudio() {
                         if (variable.name.endsWith('_max')) return null;
 
                         const isProtected = protectedPlayerStats.includes(variable.name);
+
+                        // Специальное отображение для критов
+                        if (variable.name === 'crit_chance') {
+                          return (
+                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
+                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
+                                <input
+                                  type="number"
+                                  value={currentValue as number}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    updateVariable(variable.id, { defaultValue: val });
+                                  }}
+                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
+                                />
+                                <span>%</span>
+                                {!isProtected && (
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
+                                        deleteVariable(variable.id);
+                                      }
+                                    }}
+                                    className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
+                                    title="Удалить характеристику"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (variable.name === 'crit_damage') {
+                          return (
+                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
+                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
+                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
+                                <span>x</span>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={currentValue as number}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 1;
+                                    updateVariable(variable.id, { defaultValue: val });
+                                  }}
+                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
+                                />
+                                {!isProtected && (
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
+                                        deleteVariable(variable.id);
+                                      }
+                                    }}
+                                    className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
+                                    title="Удалить характеристику"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
