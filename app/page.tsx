@@ -54,6 +54,10 @@ export default function SlayStudio() {
     setMode,
     enterPlaytest,
     exitPlaytest,
+    leftSidebarCollapsed,
+    rightSidebarCollapsed,
+    toggleLeftSidebar,
+    toggleRightSidebar,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -344,47 +348,66 @@ export default function SlayStudio() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT: Pages */}
-        <div className="panel flex w-72 flex-shrink-0 flex-col border-r">
-          <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
-            <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СТРАНИЦЫ</span>
-            <button
-              onClick={handleAddPage}
-              className="studio-btn flex items-center gap-1.5 rounded-md bg-[var(--studio-accent)] px-3 py-1 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Новая
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2">
-            {pages.map((page) => (
-              <div
-                key={page.id}
-                className={`group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-all mb-1 ${selectedPageId === page.id
-                  ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
-                  : 'hover:bg-[var(--studio-bg-elevated)] text-[var(--studio-text-primary)]'
-                  }`}
+        <div className={`panel flex flex-shrink-0 flex-col border-r transition-all duration-200 overflow-hidden ${leftSidebarCollapsed ? 'w-8' : 'w-72'}`}>
+          {leftSidebarCollapsed ? (
+            // Collapsed state - thin vertical bar
+            <div className="flex flex-col h-full items-center pt-3 border-b border-[var(--studio-border)]">
+              <button
+                onClick={toggleLeftSidebar}
+                className="rotate-90 text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1 text-xs tracking-widest"
+                title="Развернуть панель страниц"
               >
+                СТРАНИЦЫ
+              </button>
+            </div>
+          ) : (
+            // Expanded state
+            <>
+              <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
+                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СТРАНИЦЫ</span>
                 <button
-                  onClick={() => selectPage(page.id)}
-                  className="flex-1 text-left"
+                  onClick={handleAddPage}
+                  className="studio-btn flex items-center gap-1.5 rounded-md bg-[var(--studio-accent)] px-3 py-1 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
                 >
-                  {page.title.ru}
-                  <div className="font-mono text-[10px] opacity-60 mt-0.5">{page.id}</div>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }}
-                  className="ml-2 opacity-0 group-hover:opacity-60 hover:opacity-100 p-1"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5" />
+                  Новая
                 </button>
               </div>
-            ))}
-          </div>
 
-          <div className="border-t border-[var(--studio-border)] p-3 text-[10px] text-[var(--studio-text-muted)]">
-            {pages.length} страниц
-          </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {pages.map((page) => (
+                  <div
+                    key={page.id}
+                    className={`group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-all mb-1 ${selectedPageId === page.id
+                      ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
+                      : 'hover:bg-[var(--studio-bg-elevated)] text-[var(--studio-text-primary)]'
+                      }`}
+                  >
+                    <button
+                      onClick={() => selectPage(page.id)}
+                      className="flex-1 text-left"
+                    >
+                      {page.title.ru}
+                      <div className="font-mono text-[10px] opacity-60 mt-0.5">{page.id}</div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }}
+                      className="ml-2 opacity-0 group-hover:opacity-60 hover:opacity-100 p-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-[var(--studio-border)] p-3 text-[10px] text-[var(--studio-text-muted)] flex items-center justify-between">
+                <span>{pages.length} страниц</span>
+                <button onClick={toggleLeftSidebar} className="hover:text-[var(--studio-text-primary)]" title="Свернуть панель">
+                  ◀
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* CENTER: Canvas */}
@@ -423,16 +446,29 @@ export default function SlayStudio() {
         </div>
 
         {/* RIGHT: Inspector — Balanced & Useful */}
-        <div className="panel flex w-80 flex-shrink-0 flex-col border-l">
-          {mode === 'playtest' ? (
-            <PlaytestStatePanel />
+        <div className={`panel flex flex-shrink-0 flex-col border-l transition-all duration-200 overflow-hidden ${rightSidebarCollapsed ? 'w-8' : 'w-80'}`}>
+          {rightSidebarCollapsed ? (
+            // Collapsed thin bar on the right
+            <div className="flex flex-col h-full items-center pt-3 border-b border-[var(--studio-border)]">
+              <button
+                onClick={toggleRightSidebar}
+                className="-rotate-90 text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1 text-xs tracking-widest"
+                title="Развернуть правую панель"
+              >
+                {mode === 'playtest' ? 'СОСТОЯНИЕ' : 'СВОЙСТВА'}
+              </button>
+            </div>
           ) : (
             <>
-              <div className="border-b border-[var(--studio-border)] px-4 py-3">
-                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СВОЙСТВА</span>
-              </div>
+              {mode === 'playtest' ? (
+                <PlaytestStatePanel />
+              ) : (
+                <>
+                  <div className="border-b border-[var(--studio-border)] px-4 py-3">
+                    <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СВОЙСТВА</span>
+                  </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Snapping Toggle - always visible and independent */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div className="flex items-center justify-between">
@@ -1132,6 +1168,8 @@ export default function SlayStudio() {
             </button>
           </div>
           )}
+                </>
+              )}
             </>
           )}
         </div>

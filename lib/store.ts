@@ -208,6 +208,13 @@ type StudioState = {
   enterPlaytest: () => void;
   exitPlaytest: () => void;
 
+  // === Sidebar Collapse (especially useful in Playtest) ===
+  leftSidebarCollapsed: boolean;
+  rightSidebarCollapsed: boolean;
+  toggleLeftSidebar: () => void;
+  toggleRightSidebar: () => void;
+  setSidebarsForPlaytest: (collapsed: boolean) => void;
+
   addPage: () => void;
   deletePage: (id: string) => void;
 };
@@ -295,6 +302,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   // Editor / Playtest mode
   mode: 'editor',
+
+  // Sidebar states (auto-collapsed in Playtest by default)
+  leftSidebarCollapsed: false,
+  rightSidebarCollapsed: false,
 
   setPages: (pages) => set({ pages }),
 
@@ -592,12 +603,31 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setMode: (newMode) => set({ mode: newMode }),
 
   enterPlaytest: () => {
-    set({ mode: 'playtest' });
+    set({
+      mode: 'playtest',
+      // Automatically collapse sidebars when entering Playtest (user can still expand manually)
+      leftSidebarCollapsed: true,
+      rightSidebarCollapsed: true,
+    });
   },
 
   exitPlaytest: () => {
-    set({ mode: 'editor' });
+    set({
+      mode: 'editor',
+      // Expand sidebars when returning to editor for better editing experience
+      leftSidebarCollapsed: false,
+      rightSidebarCollapsed: false,
+    });
   },
+
+  // Sidebar collapse helpers
+  toggleLeftSidebar: () => set((state) => ({ leftSidebarCollapsed: !state.leftSidebarCollapsed })),
+  toggleRightSidebar: () => set((state) => ({ rightSidebarCollapsed: !state.rightSidebarCollapsed })),
+
+  setSidebarsForPlaytest: (collapsed) => set({
+    leftSidebarCollapsed: collapsed,
+    rightSidebarCollapsed: collapsed,
+  }),
 
   executeAction: (action) => {
     const state = get();
