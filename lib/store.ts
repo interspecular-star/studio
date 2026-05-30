@@ -25,6 +25,11 @@ export type ItemRarity =
   | 'mythic' 
   | 'overpowered';
 
+export type StatModifier = {
+  statId: string;   // ID of the variable (e.g. "damage", "strength")
+  value: number;    // how much to add/subtract
+};
+
 export const ItemRarityLabels: Record<ItemRarity, string> = {
   trash: 'Мусор',
   junk: 'Хлам',
@@ -61,6 +66,9 @@ export type Item = {
   isEquippable: boolean;
   slot?: 'weapon' | 'armor' | 'accessory' | null;
   price: number;
+
+  // Stat modifiers (bonuses from equipment)
+  modifiers?: StatModifier[];
 };
 
 // === Variables System ===
@@ -773,6 +781,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isEquippable: itemData.isEquippable ?? false,
       slot: itemData.slot ?? null,
       price: itemData.price ?? 0,
+      modifiers: itemData.modifiers ?? [],
     };
     set((state) => ({
       items: [...state.items, newItem],
@@ -1165,6 +1174,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       { name: 'agility', displayName: { ru: 'Ловкость', en: 'Agility' }, type: 'number', defaultValue: 5, category: 'player' },
       { name: 'endurance', displayName: { ru: 'Выносливость', en: 'Endurance' }, type: 'number', defaultValue: 10, category: 'player' },
       { name: 'defense', displayName: { ru: 'Защита', en: 'Defense' }, type: 'number', defaultValue: 2, category: 'player' },
+
+      // Базовый урон (от силы, без оружия)
+      { name: 'damage', displayName: { ru: 'Урон', en: 'Damage' }, type: 'number', defaultValue: 5, category: 'player' },
 
       // Специальные
       { name: 'souls', displayName: { ru: 'Души', en: 'Souls' }, type: 'number', defaultValue: 0, category: 'player' },

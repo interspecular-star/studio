@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item, type Variable } from '@/lib/store';
+import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
@@ -95,6 +95,14 @@ export default function SlayStudio() {
 
   // Page ID editing (local state for controlled input + confirmation flow)
   const [editingPageId, setEditingPageId] = useState('');
+
+  // Protected core player stats that cannot be deleted
+  const protectedPlayerStats = [
+    'health', 'health_max',
+    'mana', 'mana_max',
+    'strength', 'agility', 'endurance', 'defense',
+    'souls', 'level', 'exp'
+  ];
 
   // Item ID editing - per item (for controlled inputs + confirmation)
   const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
@@ -599,6 +607,8 @@ export default function SlayStudio() {
                           const maxVar = variables.find(v => v.name === `${variable.name}_max`);
                           const maxValue = maxVar ? (playtestState.variableValues[maxVar.id] ?? maxVar.defaultValue) : currentValue;
 
+                          const isProtected = protectedPlayerStats.includes(variable.name) || protectedPlayerStats.includes(variable.name.replace('_max', ''));
+
                           return (
                             <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
                               <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
@@ -626,6 +636,19 @@ export default function SlayStudio() {
                                 ) : (
                                   <span>{maxValue}</span>
                                 )}
+                                {!isProtected && (
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
+                                        deleteVariable(variable.id);
+                                      }
+                                    }}
+                                    className="ml-2 text-[var(--studio-danger)] hover:text-red-400 text-xs"
+                                    title="Удалить характеристику"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -634,18 +657,35 @@ export default function SlayStudio() {
                         // Skip _max versions (they are shown paired with health/mana)
                         if (variable.name.endsWith('_max')) return null;
 
+                        const isProtected = protectedPlayerStats.includes(variable.name);
+
                         return (
                           <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
                             <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                            <input
-                              type="number"
-                              value={currentValue as number}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                updateVariable(variable.id, { defaultValue: val });
-                              }}
-                              className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={currentValue as number}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  updateVariable(variable.id, { defaultValue: val });
+                                }}
+                                className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
+                              />
+                              {!isProtected && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
+                                      deleteVariable(variable.id);
+                                    }
+                                  }}
+                                  className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
+                                  title="Удалить характеристику"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })
@@ -1062,6 +1102,85 @@ export default function SlayStudio() {
                                     <option value="armor">Броня</option>
                                     <option value="accessory">Аксессуар</option>
                                   </select>
+                                )}
+                              </div>
+
+                              {/* === Модификаторы характеристик === */}
+                              <div className="col-span-2 mt-2 pt-2 border-t border-[var(--studio-border)]">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="text-[10px] text-[var(--studio-text-muted)]">Бонусы к характеристикам</div>
+                                  <button
+                                    onClick={() => {
+                                      const playerVars = variables.filter(v => v.category === 'player');
+                                      if (playerVars.length === 0) {
+                                        alert('Сначала создайте характеристики ГГ');
+                                        return;
+                                      }
+                                      const newMod: StatModifier = {
+                                        statId: playerVars[0].id,
+                                        value: 1,
+                                      };
+                                      const currentMods = item.modifiers || [];
+                                      updateItem(item.id, { modifiers: [...currentMods, newMod] });
+                                    }}
+                                    className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                                  >
+                                    + Бонус
+                                  </button>
+                                </div>
+
+                                {(item.modifiers || []).length > 0 && (
+                                  <div className="space-y-1.5">
+                                    {(item.modifiers || []).map((mod, index) => {
+                                      const stat = variables.find(v => v.id === mod.statId);
+                                      return (
+                                        <div key={index} className="flex items-center gap-2 text-xs">
+                                          <select
+                                            value={mod.statId}
+                                            onChange={(e) => {
+                                              const newMods = [...(item.modifiers || [])];
+                                              newMods[index] = { ...mod, statId: e.target.value };
+                                              updateItem(item.id, { modifiers: newMods });
+                                            }}
+                                            className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                          >
+                                            {variables
+                                              .filter(v => v.category === 'player')
+                                              .map(v => (
+                                                <option key={v.id} value={v.id}>{v.displayName.ru}</option>
+                                              ))}
+                                          </select>
+
+                                          <input
+                                            type="number"
+                                            value={mod.value}
+                                            onChange={(e) => {
+                                              const newMods = [...(item.modifiers || [])];
+                                              newMods[index] = { ...mod, value: parseInt(e.target.value) || 0 };
+                                              updateItem(item.id, { modifiers: newMods });
+                                            }}
+                                            className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs text-right"
+                                          />
+
+                                          <button
+                                            onClick={() => {
+                                              const newMods = (item.modifiers || []).filter((_, i) => i !== index);
+                                              updateItem(item.id, { modifiers: newMods.length > 0 ? newMods : undefined });
+                                            }}
+                                            className="text-[var(--studio-danger)] hover:text-red-400"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {(item.modifiers || []).length === 0 && (
+                                  <div className="text-[10px] text-[var(--studio-text-muted)] italic">
+                                    Нет бонусов. Нажмите "+ Бонус", чтобы добавить (например +3 к Урону).
+                                  </div>
                                 )}
                               </div>
                             </div>
