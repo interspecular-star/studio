@@ -578,31 +578,19 @@ export default function SlayStudio() {
 
             {/* === ХАРАКТЕРИСТИКИ ГГ (постоянный блок) === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
+              <div
                 onClick={togglePlayerStatsCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
+                className="flex w-full cursor-pointer items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
               >
                 <span>ХАРАКТЕРИСТИКИ ГГ</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addCriticalStats();
-                    }}
-                    className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                    title="Добавить Шанс крита и Силу крита"
-                  >
-                    + Крит
-                  </button>
-                  <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
-                </div>
-              </button>
+                <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
+              </div>
 
               {!playerStatsCollapsed && (
                 <div className="mt-3 space-y-1.5 text-sm">
                   {variables.filter(v => v.category === 'player').length === 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                    <div>
+                      <p className="text-[11px] text-[var(--studio-text-muted)] italic mb-2">
                         Нет характеристик ГГ.
                       </p>
                       <button
@@ -613,13 +601,7 @@ export default function SlayStudio() {
                         }}
                         className="text-xs px-3 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
                       >
-                        + Стандартные характеристики
-                      </button>
-                      <button
-                        onClick={() => addCriticalStats()}
-                        className="text-xs px-3 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] ml-2"
-                      >
-                        + Шанс и Сила крита
+                        + Характеристики ГГ
                       </button>
                     </div>
                   ) : (
