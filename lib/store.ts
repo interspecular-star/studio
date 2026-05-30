@@ -5,12 +5,62 @@ export type LocalizedString = {
   en: string;
 };
 
+export type ItemType = 
+  | 'weapon' 
+  | 'armor' 
+  | 'accessory' 
+  | 'consumable' 
+  | 'material' 
+  | 'quest' 
+  | 'misc';
+
+export type ItemRarity = 
+  | 'trash' 
+  | 'junk' 
+  | 'common' 
+  | 'uncommon' 
+  | 'rare' 
+  | 'epic' 
+  | 'legendary' 
+  | 'mythic' 
+  | 'overpowered';
+
+export const ItemRarityLabels: Record<ItemRarity, string> = {
+  trash: 'Мусор',
+  junk: 'Хлам',
+  common: 'Простой',
+  uncommon: 'Средний',
+  rare: 'Высокий',
+  epic: 'Легендарный',
+  legendary: 'Мифический',
+  mythic: 'Имбовый',
+  overpowered: 'Имбовый+',
+};
+
+export const ItemTypeLabels: Record<ItemType, string> = {
+  weapon: 'Оружие',
+  armor: 'Броня',
+  accessory: 'Аксессуар',
+  consumable: 'Расходник',
+  material: 'Материал',
+  quest: 'Квестовый',
+  misc: 'Прочее',
+};
+
 export type Item = {
   id: string;
   name: LocalizedString;
   description: LocalizedString;
-  quantityVariableId?: string; // ID переменной, которая хранит количество этого предмета
-  // В будущем можно будет добавить: icon, weight, rarity и т.д.
+  quantityVariableId?: string;
+
+  // Новые поля для системы предметов
+  type: ItemType;
+  rarity: ItemRarity;
+  maxDurability: number;
+  durability: number;
+  isEquippable: boolean;
+  slot?: 'weapon' | 'armor' | 'accessory' | null;
+  price: number;
 };
 
 // === Variables System ===
@@ -715,6 +765,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const newItem: Item = {
       ...itemData,
       id: `item_${Date.now().toString(36)}`,
+      // Дефолтные значения для новых полей
+      type: itemData.type ?? 'misc',
+      rarity: itemData.rarity ?? 'common',
+      maxDurability: itemData.maxDurability ?? 100,
+      durability: itemData.durability ?? (itemData.maxDurability ?? 100),
+      isEquippable: itemData.isEquippable ?? false,
+      slot: itemData.slot ?? null,
+      price: itemData.price ?? 0,
     };
     set((state) => ({
       items: [...state.items, newItem],

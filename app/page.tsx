@@ -864,6 +864,13 @@ export default function SlayStudio() {
                     const newItem: Omit<Item, 'id'> = {
                       name: { ru: 'Новый предмет', en: 'New Item' },
                       description: { ru: '', en: '' },
+                      type: 'misc',
+                      rarity: 'common',
+                      maxDurability: 100,
+                      durability: 100,
+                      isEquippable: false,
+                      slot: null,
+                      price: 0,
                     };
                     addItem(newItem);
                   }}
@@ -949,6 +956,116 @@ export default function SlayStudio() {
                               className="font-mono text-[10px] bg-transparent border-b border-[var(--studio-border)] focus:outline-none w-auto"
                             />
                           </div>
+
+                          {/* Новые свойства предмета */}
+                          {!isCollapsed && (
+                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                              {/* Тип предмета */}
+                              <div>
+                                <div className="text-[var(--studio-text-muted)] mb-0.5">Тип</div>
+                                <select
+                                  value={item.type}
+                                  onChange={(e) => updateItem(item.id, { type: e.target.value as any })}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                >
+                                  {Object.entries({
+                                    weapon: 'Оружие',
+                                    armor: 'Броня',
+                                    accessory: 'Аксессуар',
+                                    consumable: 'Расходник',
+                                    material: 'Материал',
+                                    quest: 'Квестовый',
+                                    misc: 'Прочее',
+                                  }).map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Редкость */}
+                              <div>
+                                <div className="text-[var(--studio-text-muted)] mb-0.5">Редкость</div>
+                                <select
+                                  value={item.rarity}
+                                  onChange={(e) => updateItem(item.id, { rarity: e.target.value as any })}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                >
+                                  {Object.entries({
+                                    trash: 'Мусор',
+                                    junk: 'Хлам',
+                                    common: 'Простой',
+                                    uncommon: 'Средний',
+                                    rare: 'Высокий',
+                                    epic: 'Легендарный',
+                                    legendary: 'Мифический',
+                                    mythic: 'Имбовый',
+                                    overpowered: 'Имбовый+',
+                                  }).map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Прочность */}
+                              <div className="col-span-2">
+                                <div className="text-[var(--studio-text-muted)] mb-0.5">Прочность</div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    value={item.durability}
+                                    onChange={(e) => updateItem(item.id, { durability: parseInt(e.target.value) || 0 })}
+                                    className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                  />
+                                  <span>/</span>
+                                  <input
+                                    type="number"
+                                    value={item.maxDurability}
+                                    onChange={(e) => updateItem(item.id, { maxDurability: parseInt(e.target.value) || 1 })}
+                                    className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Цена */}
+                              <div>
+                                <div className="text-[var(--studio-text-muted)] mb-0.5">Цена</div>
+                                <input
+                                  type="number"
+                                  value={item.price}
+                                  onChange={(e) => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                />
+                              </div>
+
+                              {/* Можно одевать + Слот */}
+                              <div>
+                                <div className="flex items-center gap-2 mt-4">
+                                  <label className="flex items-center gap-1 text-[10px]">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.isEquippable}
+                                      onChange={(e) => updateItem(item.id, { isEquippable: e.target.checked })}
+                                    />
+                                    Одеваемый
+                                  </label>
+                                </div>
+                                {item.isEquippable && (
+                                  <select
+                                    value={item.slot || ''}
+                                    onChange={(e) => updateItem(item.id, { 
+                                      slot: (e.target.value || null) as 'weapon' | 'armor' | 'accessory' | null 
+                                    })}
+                                    className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
+                                  >
+                                    <option value="">— Слот —</option>
+                                    <option value="weapon">Оружие</option>
+                                    <option value="armor">Броня</option>
+                                    <option value="accessory">Аксессуар</option>
+                                  </select>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <button
