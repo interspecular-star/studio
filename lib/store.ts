@@ -61,6 +61,19 @@ export const RarityFilterLabels: Record<ItemRarity | 'all', string> = {
   ...ItemRarityLabels,
 };
 
+// Цвета редкости для визуала (рамки, кнопки фильтров и т.д.)
+export const RarityColors: Record<ItemRarity, string> = {
+  trash: '#6B7280',      // серый (мусор)
+  junk: '#4B5563',       // тёмно-серый (хлам)
+  common: '#D1D5DB',     // светло-серый / почти белый (простой)
+  uncommon: '#22C55E',   // зелёный (средний)
+  rare: '#3B82F6',       // синий (высокий)
+  epic: '#F97316',       // оранжевый (легендарный)
+  legendary: '#A855F7',  // фиолетовый (мифический)
+  mythic: '#EF4444',     // красный (имбовый)
+  overpowered: '#E11D48',// ярко-красный / розово-красный (имба+)
+};
+
 export const ItemTypeLabels: Record<ItemType, string> = {
   weapon: 'Оружие',
   armor: 'Броня',
@@ -424,6 +437,10 @@ type StudioState = {
   equipItem: (itemId: string, targetSlot?: EquipmentSlot) => void;
   unequipItem: (itemId: string) => void;
   isItemEquipped: (itemId: string) => boolean;
+
+  // Инвентарные действия
+  dropItem: (itemId: string, amount?: number) => void;
+  useItem: (itemId: string) => void;
 
   // Инвентарь
   openInventory: () => void;
@@ -1150,6 +1167,42 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set((s) => ({
       playtestState: { ...s.playtestState, isInventoryOpen: false },
     }));
+  },
+
+  // === Инвентарные действия ===
+  dropItem: (itemId, amount = 1) => {
+    const state = get();
+    const item = state.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (item.quantityVariableId) {
+      const current = Number(state.playtestState.variableValues[item.quantityVariableId] ?? 0);
+      const newVal = Math.max(0, current - amount);
+
+      // 1. Обновляем live значение (для текущей сессии Playtest)
+      get().setPlaytestVariableValue(item.quantityVariableId, newVal);
+
+      // 2. Сохраняем в defaultValue переменной
+      get().updateVariable(item.quantityVariableId, { defaultValue: newVal });
+
+      // 3. Синхронизируем startingInventory (это источник истины для resetPlaytestState при перезагрузке).
+      get().setStartingInventoryQuantity(itemId, newVal);
+    } else {
+      // Для чисто startingInventory предметов (без quantityVariableId)
+      const current = state.startingInventory[itemId] ?? 0;
+      const newVal = Math.max(0, current - amount);
+      get().setStartingInventoryQuantity(itemId, newVal);
+    }
+  },
+
+  useItem: (itemId) => {
+    // Простая реализация: уменьшаем количество на 1
+    // В будущем здесь можно будет триггерить эффекты (heal, buff и т.д.)
+    get().dropItem(itemId, 1);
+    const item = get().items.find(i => i.id === itemId);
+    if (item) {
+      // Можно будет расширить на toast с эффектом
+    }
   },
 
   // Возвращает актуальный инвентарь игрока во время Playtest

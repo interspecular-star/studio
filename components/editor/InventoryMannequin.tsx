@@ -1,6 +1,6 @@
 'use client';
 
-import { EquipmentSlot, EquipmentSlotLabels, AccessoryRowSlots, BeltRowSlots } from '@/lib/store';
+import { EquipmentSlot, EquipmentSlotLabels, AccessoryRowSlots, BeltRowSlots, RarityColors } from '@/lib/store';
 import { useStudioStore, type Item } from '@/lib/store';
 
 interface InventoryMannequinProps {
@@ -88,8 +88,8 @@ export default function InventoryMannequin({
       `;
     } else if (isOccupied) {
       stateClasses = `
-        border-[var(--studio-accent)] bg-[#2A251F] 
-        text-[var(--studio-accent)] hover:border-[var(--studio-accent-hover)]
+        bg-[#2A251F] 
+        text-[var(--studio-accent)] hover:brightness-110
       `;
     } else {
       stateClasses = `
@@ -113,11 +113,21 @@ export default function InventoryMannequin({
         key={uniqueKey}
         onClick={handleClick}
         className={`${baseClasses} ${stateClasses}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        style={{ 
+          width: `${size}px`, 
+          height: `${size}px`,
+          borderColor: isOccupied && equippedItem ? RarityColors[equippedItem.rarity] : undefined,
+          borderWidth: isOccupied ? '2px' : '1px'
+        }}
         title={equippedItem ? equippedItem.name.ru : EquipmentSlotLabels[slot]}
       >
         {isOccupied && equippedItem ? (
           <>
+            {/* Цветная полоска редкости сверху */}
+            <div 
+              className="w-full h-[3px] -mt-1 mb-1 rounded-full"
+              style={{ backgroundColor: RarityColors[equippedItem.rarity] }}
+            />
             <div className="text-[9px] opacity-70 leading-none mb-0.5">
               {EquipmentSlotLabels[slot]}
             </div>
