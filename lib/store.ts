@@ -98,7 +98,16 @@ export type Item = {
  * Используем отдельные значения (Вариант А) — это надёжнее и расширяемее в долгосрочной перспективе.
  */
 export type EquipmentSlot =
-  | 'weapon'
+  // === Позиционные слоты на манекене ===
+  | 'weapon_right'      // Правая рука
+  | 'weapon_left'       // Левая рука (может держать оружие или щит)
+  | 'shield'            // Щит (только левая рука)
+
+  // === Типы оружия при создании предмета ===
+  | 'one_handed_weapon' // Одноручное оружие (может быть в любой руке)
+  | 'two_handed_weapon' // Двуручное оружие (занимает обе руки)
+
+  // === Обычные слоты брони/аксессуаров ===
   | 'helmet'
   | 'gloves'
   | 'chest'
@@ -112,7 +121,16 @@ export type EquipmentSlot =
 
 // Отображаемые названия слотов (для UI)
 export const EquipmentSlotLabels: Record<EquipmentSlot, string> = {
-  weapon: 'Оружие',
+  // Позиционные (на манекене)
+  weapon_right: 'Правая рука',
+  weapon_left: 'Левая рука',
+  shield: 'Щит',
+
+  // Типы оружия (при создании предмета)
+  one_handed_weapon: 'Одноручное оружие',
+  two_handed_weapon: 'Двуручное оружие',
+
+  // Броня и аксессуары
   helmet: 'Шлем',
   gloves: 'Перчатки',
   chest: 'Тело',
@@ -125,21 +143,24 @@ export const EquipmentSlotLabels: Record<EquipmentSlot, string> = {
   minion: 'Миньон',
 };
 
-// Группировка для компактного отображения аксессуаров (как просил пользователь)
-export const AccessorySlots: EquipmentSlot[] = ['amulet', 'ring', 'cloak', 'minion'];
+// === Группировки для визуального манекена ===
 
-// Основные слоты брони/одежды (для основного манекена)
-export const MainEquipmentSlots: EquipmentSlot[] = [
+// Вертикальный столб брони (шлем → тело → пояс → ноги → ботинки)
+export const MainBodySlots: EquipmentSlot[] = [
   'helmet',
   'chest',
-  'gloves',
+  'belt',
   'legs',
   'boots',
-  'belt',
 ];
 
-// Порядок слотов в нижней горизонтальной полосе аксессуаров
-// (по решению пользователя: Амулет → 4 Кольца → Плащ → Миньон)
+// Слоты, которые отображаются в одном ряду с поясом (перчатки)
+export const BeltRowSlots: EquipmentSlot[] = ['gloves', 'belt'];
+
+// Слоты рук (располагаются по бокам от тела)
+export const HandSlots: EquipmentSlot[] = ['weapon_right', 'weapon_left'];
+
+// Полная нижняя полоса аксессуаров (в ряд)
 export const AccessoryRowSlots: EquipmentSlot[] = [
   'amulet',
   'ring',
@@ -150,7 +171,7 @@ export const AccessoryRowSlots: EquipmentSlot[] = [
   'minion',
 ];
 
-// Оставляем для обратной совместимости и общих проверок
+// Оставляем для обратной совместимости
 export const CompactAccessorySlots: EquipmentSlot[] = [
   'amulet',
   'ring',
@@ -158,10 +179,26 @@ export const CompactAccessorySlots: EquipmentSlot[] = [
   'minion',
 ];
 
-// Проверка, является ли слот "аксессуарным" (для группировки в UI)
+// Вспомогательные функции
 export function isAccessorySlot(slot: EquipmentSlot | null | undefined): boolean {
   if (!slot) return false;
   return CompactAccessorySlots.includes(slot);
+}
+
+export function isHandSlot(slot: EquipmentSlot | null | undefined): boolean {
+  if (!slot) return false;
+  return HandSlots.includes(slot);
+}
+
+// Проверка: можно ли надеть предмет этого слота в конкретную руку
+export function canEquipToHand(itemSlot: EquipmentSlot, hand: 'weapon_right' | 'weapon_left'): boolean {
+  if (itemSlot === 'shield') {
+    return hand === 'weapon_left';
+  }
+  if (itemSlot === 'weapon_right' || itemSlot === 'weapon_left') {
+    return true; // Оружие можно в любую руку (выбор будет у игрока)
+  }
+  return false;
 }
 
 // Стиль для "заблокированного" / специального слота (пока используется для Миньона)
@@ -326,10 +363,10 @@ type StudioState = {
   // === Playtest / Preview State ===
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
   playtestState: {
-    variableValues: Record<string, number | boolean | string>; // текущие значения переменных
-    equippedItemIds: string[]; // IDs предметов, которые "одеты" только в рамках этой сессии Playtest
-    isInventoryOpen: boolean; // открыт ли модальный инвентарь
-    // В будущем: carriedItemIds: string[] — предметы, которые игрок носит с собой (не в ячейках, а просто в инвентаре)
+    variableValues: Record<string, number | boolean | string>;
+    equippedItemIds: string[]; // legacy
+    equippedSlots: Partial<Record<EquipmentSlot, string>>; // Новый способ: slot -> itemId
+    isInventoryOpen: boolean;
   };
 
   // Actions
@@ -376,18 +413,24 @@ type StudioState = {
   deleteVariable: (id: string) => void;
   getVariable: (id: string) => Variable | undefined;
 
+  // Live playtest value mutation (so editing endurance etc in sidebar during Playtest immediately affects backpack size, damage etc)
+  setPlaytestVariableValue: (id: string, value: number | boolean | string) => void;
+
   // === Playtest State Management ===
   resetPlaytestState: () => void;
   executeAction: (action: ButtonAction) => void; // Главная функция выполнения действий
 
   // === Playtest Equipment (только для визуального фидбэка в Playtest) ===
-  equipItem: (itemId: string) => void;
+  equipItem: (itemId: string, targetSlot?: EquipmentSlot) => void;
   unequipItem: (itemId: string) => void;
   isItemEquipped: (itemId: string) => boolean;
 
   // Инвентарь
   openInventory: () => void;
   closeInventory: () => void;
+
+  // === Player Inventory (для модального окна инвентаря в Playtest) ===
+  getPlayerInventory: () => Array<{ item: Item; quantity: number }>;
 
   // === Editor / Playtest Mode ===
   mode: 'editor' | 'playtest';
@@ -527,6 +570,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   playtestState: {
     variableValues: {},
     equippedItemIds: [],
+    equippedSlots: {},
     isInventoryOpen: false,
   },
 
@@ -990,6 +1034,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
+  setPlaytestVariableValue: (id, value) => {
+    set((state) => ({
+      playtestState: {
+        ...state.playtestState,
+        variableValues: {
+          ...state.playtestState.variableValues,
+          [id]: value,
+        },
+      },
+    }));
+    // no saveToLocalStorage — this is transient playtest-only state
+  },
+
   getVariable: (id) => {
     return get().variables.find((v) => v.id === id);
   },
@@ -1016,6 +1073,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       playtestState: {
         variableValues: newVariableValues,
         equippedItemIds: [],
+        equippedSlots: {},
         isInventoryOpen: false,
       },
       snappingGuide: null,
@@ -1023,13 +1081,31 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   // === Playtest Equipment (live only during playtest session) ===
-  equipItem: (itemId) => {
+  equipItem: (itemId, targetSlot) => {
     set((state) => {
-      const current = state.playtestState.equippedItemIds;
+      const ps = state.playtestState;
+
+      // Если указан целевой слот (weapon_right / weapon_left / shield и т.д.), 
+      // записываем в equippedSlots
+      if (targetSlot) {
+        return {
+          playtestState: {
+            ...ps,
+            equippedSlots: {
+              ...ps.equippedSlots,
+              [targetSlot]: itemId,
+            },
+          },
+        };
+      }
+
+      // Fallback — старое поведение
+      const current = ps.equippedItemIds;
       if (current.includes(itemId)) return state;
+
       return {
         playtestState: {
-          ...state.playtestState,
+          ...ps,
           equippedItemIds: [...current, itemId],
         },
       };
@@ -1037,16 +1113,31 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   unequipItem: (itemId) => {
-    set((state) => ({
-      playtestState: {
-        ...state.playtestState,
-        equippedItemIds: state.playtestState.equippedItemIds.filter(id => id !== itemId),
-      },
-    }));
+    set((state) => {
+      const ps = state.playtestState;
+
+      // Удаляем из equippedSlots, если там лежит
+      const newEquippedSlots = { ...ps.equippedSlots };
+      Object.keys(newEquippedSlots).forEach((slot) => {
+        if (newEquippedSlots[slot as EquipmentSlot] === itemId) {
+          delete newEquippedSlots[slot as EquipmentSlot];
+        }
+      });
+
+      return {
+        playtestState: {
+          ...ps,
+          equippedSlots: newEquippedSlots,
+          equippedItemIds: ps.equippedItemIds.filter(id => id !== itemId),
+        },
+      };
+    });
   },
 
   isItemEquipped: (itemId) => {
-    return get().playtestState.equippedItemIds.includes(itemId);
+    const ps = get().playtestState;
+    return ps.equippedItemIds.includes(itemId) ||
+           Object.values(ps.equippedSlots).includes(itemId);
   },
 
   openInventory: () => {
@@ -1059,6 +1150,30 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set((s) => ({
       playtestState: { ...s.playtestState, isInventoryOpen: false },
     }));
+  },
+
+  // Возвращает актуальный инвентарь игрока во время Playtest
+  // (учитывает и startingInventory, и изменения через giveItem/removeItem)
+  getPlayerInventory: () => {
+    const state = get();
+    const inventory: Array<{ item: Item; quantity: number }> = [];
+
+    state.items.forEach((item) => {
+      if (item.quantityVariableId) {
+        const quantity = Number(state.playtestState.variableValues[item.quantityVariableId] ?? 0);
+        if (quantity > 0) {
+          inventory.push({ item, quantity });
+        }
+      } else {
+        // Если quantityVariableId нет, но предмет есть в startingInventory — показываем
+        const startingQty = state.startingInventory[item.id] ?? 0;
+        if (startingQty > 0) {
+          inventory.push({ item, quantity: startingQty });
+        }
+      }
+    });
+
+    return inventory;
   },
 
   // === Mode Management (Editor / Playtest) ===
@@ -1341,6 +1456,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       playtestState: {
         variableValues: currentValues,
         equippedItemIds: s.playtestState.equippedItemIds,
+        equippedSlots: s.playtestState.equippedSlots,
         isInventoryOpen: s.playtestState.isInventoryOpen,
       },
     }));
@@ -1616,6 +1732,7 @@ export const useCurrentPage = () => {
 export type PlaytestSnapshot = {
   variableValues: Record<string, number | boolean | string>;
   equippedItemIds: string[];
+  equippedSlots?: Partial<Record<EquipmentSlot, string>>;
 };
 
 /**
@@ -1648,6 +1765,18 @@ export function getEquippedItems(items: Item[], equippedIds: string[]): Item[] {
   return equippedIds
     .map(id => items.find(i => i.id === id))
     .filter((i): i is Item => !!i);
+}
+
+/**
+ * Collects ALL equipped item IDs from both legacy equippedItemIds array
+ * and the new equippedSlots map. Dedupes to avoid counting two-handed twice.
+ * Used by all effective stat / damage formulas so that equipping via Inventory modal
+ * (which uses equippedSlots) immediately affects calculations including backpack size.
+ */
+export function getAllEquippedItemIds(playtestState: PlaytestSnapshot & { equippedSlots?: Partial<Record<EquipmentSlot, string>> }): string[] {
+  const legacy = playtestState.equippedItemIds || [];
+  const fromSlots = Object.values(playtestState.equippedSlots || {}).filter((v): v is string => Boolean(v));
+  return Array.from(new Set([...legacy, ...fromSlots]));
 }
 
 /**
@@ -1684,7 +1813,9 @@ export function getEffectivePlayerStat(
   const live = playtestState.variableValues[variable.id];
   const base = typeof live === 'number' ? live : (variable.defaultValue as number) ?? 0;
 
-  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+  // Use both legacy + slots so Inventory modal (and two-handed) affect effective stats & backpack size
+  const allIds = getAllEquippedItemIds(playtestState);
+  const equipped = getEquippedItems(items, allIds);
 
   const bonus = equipped.reduce((sum, item) => {
     const mods = item.modifiers || [];
@@ -1701,7 +1832,8 @@ export function getEffectivePlayerStat(
  * For v1 we allow multiple and sum their weaponDamage.
  */
 export function getEquippedWeaponDamage(items: Item[], playtestState: PlaytestSnapshot): number {
-  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+  const allIds = getAllEquippedItemIds(playtestState);
+  const equipped = getEquippedItems(items, allIds);
   return equipped.reduce((sum, item) => {
     return sum + (item.weaponDamage ?? 0);
   }, 0);
@@ -1747,7 +1879,8 @@ export function getEffectiveCritDamage(
  * Returns human-readable name of the main equipped weapon (if any).
  */
 export function getEquippedWeaponName(items: Item[], playtestState: PlaytestSnapshot): string | null {
-  const equipped = getEquippedItems(items, playtestState.equippedItemIds);
+  const allIds = getAllEquippedItemIds(playtestState);
+  const equipped = getEquippedItems(items, allIds);
   const weapon = equipped.find(i => i.type === 'weapon' || (i.weaponDamage ?? 0) > 0);
   return weapon ? weapon.name.ru : null;
 }

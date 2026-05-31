@@ -10,6 +10,7 @@ import {
   getEquippedWeaponName,
   getEquippedWeaponDamage,
   getEquippedItems,
+  getAllEquippedItemIds,
 } from '@/lib/store';
 import { RefreshCw, Sword, Shield } from 'lucide-react';
 
@@ -71,7 +72,7 @@ export default function PlaytestStatePanel() {
   const baseCritDamageVar = variables.find(v => v.name === 'crit_damage');
   const baseCritDamage = baseCritDamageVar ? Number(getCurrentValue(baseCritDamageVar) ?? 1.5) : 1.5;
 
-  const equippedItems = getEquippedItems(items, playtestState.equippedItemIds);
+  const equippedItems = getEquippedItems(items, getAllEquippedItemIds(playtestState));
   const equippableItems = items.filter(i => i.isEquippable);
 
   const handleReset = () => {
@@ -95,6 +96,7 @@ export default function PlaytestStatePanel() {
       playtestState: {
         ...s.playtestState,
         equippedItemIds: [],
+        equippedSlots: {},
       },
     }));
   };

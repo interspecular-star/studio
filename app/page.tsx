@@ -81,6 +81,7 @@ export default function SlayStudio() {
     setStartingInventoryQuantity,
     inventoryCollapsed,
     toggleInventoryCollapsed,
+    setPlaytestVariableValue,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -112,6 +113,18 @@ export default function SlayStudio() {
     'souls', 'level', 'exp',
     'crit_chance', 'crit_damage'
   ];
+
+  /**
+   * Update a player stat value.
+   * - In Playtest: updates live variableValues immediately (so backpack size, damage etc react)
+   * - Always updates the schema defaultValue (for persistence across resets / new sessions)
+   */
+  const updatePlayerStatValue = (varId: string, val: number) => {
+    updateVariable(varId, { defaultValue: val });
+    if (mode === 'playtest') {
+      setPlaytestVariableValue(varId, val);
+    }
+  };
 
   // Item ID editing - per item (for controlled inputs + confirmation)
   const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
@@ -644,7 +657,7 @@ export default function SlayStudio() {
                                   value={currentValue as number}
                                   onChange={(e) => {
                                     const val = parseInt(e.target.value) || 0;
-                                    updateVariable(variable.id, { defaultValue: val });
+                                    updatePlayerStatValue(variable.id, val);
                                   }}
                                   className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
                                 />
@@ -655,7 +668,7 @@ export default function SlayStudio() {
                                     value={maxValue as number}
                                     onChange={(e) => {
                                       const val = parseInt(e.target.value) || 0;
-                                      updateVariable(maxVar.id, { defaultValue: val });
+                                      updatePlayerStatValue(maxVar.id, val);
                                     }}
                                     className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
                                   />
@@ -696,7 +709,7 @@ export default function SlayStudio() {
                                   value={currentValue as number}
                                   onChange={(e) => {
                                     const val = parseInt(e.target.value) || 0;
-                                    updateVariable(variable.id, { defaultValue: val });
+                                    updatePlayerStatValue(variable.id, val);
                                   }}
                                   className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
                                 />
@@ -731,7 +744,7 @@ export default function SlayStudio() {
                                   value={currentValue as number}
                                   onChange={(e) => {
                                     const val = parseFloat(e.target.value) || 1;
-                                    updateVariable(variable.id, { defaultValue: val });
+                                    updatePlayerStatValue(variable.id, val);
                                   }}
                                   className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
                                 />
@@ -762,7 +775,7 @@ export default function SlayStudio() {
                                 value={currentValue as number}
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value) || 0;
-                                  updateVariable(variable.id, { defaultValue: val });
+                                  updatePlayerStatValue(variable.id, val);
                                 }}
                                 className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
                               />
@@ -1266,7 +1279,9 @@ export default function SlayStudio() {
                                     className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
                                   >
                                     <option value="">— Слот —</option>
-                                    <option value="weapon">Оружие</option>
+                                    <option value="one_handed_weapon">Одноручное оружие</option>
+                                    <option value="two_handed_weapon">Двуручное оружие</option>
+                                    <option value="shield">Щит</option>
                                     <option value="helmet">Шлем</option>
                                     <option value="gloves">Перчатки</option>
                                     <option value="chest">Тело</option>
