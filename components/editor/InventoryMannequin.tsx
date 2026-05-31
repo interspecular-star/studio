@@ -39,13 +39,13 @@ export default function InventoryMannequin({
     );
   };
 
-  const renderSlot = (slot: EquipmentSlot, isBlocked = false, index?: number) => {
+  const renderSlot = (slot: EquipmentSlot, isBlocked = false, index?: number, size: number = 62) => {
     const equippedItem = getEquippedItemForSlot(slot);
     const isOccupied = !!equippedItem;
 
     const baseClasses = `
       flex flex-col items-center justify-center 
-      w-20 h-16 rounded-xl border text-xs transition-all
+      rounded-xl border text-[10px] transition-all
       cursor-pointer select-none
     `;
 
@@ -77,6 +77,7 @@ export default function InventoryMannequin({
         key={uniqueKey}
         onClick={() => onSlotClick?.(slot)}
         className={`${baseClasses} ${stateClasses}`}
+        style={{ width: `${size}px`, height: `${size}px` }}
         title={equippedItem ? equippedItem.name.ru : EquipmentSlotLabels[slot]}
       >
         <div className="font-medium text-[10px] mb-0.5">
@@ -90,9 +91,9 @@ export default function InventoryMannequin({
   };
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center gap-4">
       {/* === ОСНОВНОЙ МАНЕКЕН (вертикально) === */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-1">
         {/* Шлем */}
         <div>{renderSlot('helmet')}</div>
 
@@ -113,15 +114,12 @@ export default function InventoryMannequin({
       </div>
 
       {/* === ГОРИЗОНТАЛЬНАЯ ПОЛОСА АКСЕССУАРОВ (внизу) === */}
-      <div className="w-full pt-4 border-t border-[var(--studio-border)]">
-        <div className="text-xs text-[var(--studio-text-muted)] mb-2 text-center">
-          Аксессуары
-        </div>
-
-        <div className="flex justify-center gap-3 flex-wrap">
+      <div className="w-full pt-2 border-t border-[var(--studio-border)]">
+        <div className="flex justify-center gap-1.5 flex-wrap">
           {AccessoryRowSlots.map((slot, index) => {
             const isMinion = slot === 'minion';
-            return renderSlot(slot, isMinion, index);
+            // Аксессуары внизу делаем чуть меньше основных слотов для экономии места
+            return renderSlot(slot, isMinion, index, 54);
           })}
         </div>
       </div>

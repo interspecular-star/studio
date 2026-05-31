@@ -52,18 +52,17 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
           </button>
         </div>
 
-        <div className="flex h-[560px]">
-          {/* === МАНЕКЕН === */}
-          <div className="w-[380px] border-r border-[var(--studio-border)] p-6 flex flex-col">
-            <div className="mb-3 text-sm font-medium text-[var(--studio-text-secondary)]">
+        <div className="flex h-[555px]">
+          {/* === МАНЕКЕН (левая колонка) === */}
+          <div className="w-[340px] border-r border-[var(--studio-border)] p-5 flex flex-col">
+            <div className="mb-2 text-sm font-medium text-[var(--studio-text-secondary)]">
               ЭКИПИРОВКА
             </div>
 
-            <div className="flex-1 flex items-start justify-center overflow-auto">
+            <div className="flex-1 flex items-start justify-center overflow-hidden">
               <InventoryMannequin
                 equippedItemIds={playtestState.equippedItemIds || []}
                 onSlotClick={(slot) => {
-                  // Пока просто заглушка. Позже здесь будет логика drag & drop / выбор предмета
                   console.log('Clicked slot:', slot);
                 }}
               />
@@ -82,13 +81,13 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
             </div>
 
             {/* Сетка */}
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-5 gap-2.5">
               {Array.from({ length: inventorySize }).map((_, index) => (
                 <div 
                   key={index}
-                  className="aspect-square rounded-xl border border-[var(--studio-border)] bg-[#161310] flex items-center justify-center text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)] transition-colors cursor-pointer"
+                  className="aspect-square w-full max-w-[62px] rounded-xl border border-[var(--studio-border)] bg-[#161310] flex items-center justify-center text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)] transition-colors cursor-pointer mx-auto"
                 >
-                  <div className="text-xs opacity-30">#{index + 1}</div>
+                  <div className="text-[10px] opacity-30">#{index + 1}</div>
                 </div>
               ))}
             </div>
