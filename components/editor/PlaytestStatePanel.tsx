@@ -9,6 +9,7 @@ import {
   getEffectiveCritDamage,
   getEquippedWeaponName,
   getEquippedWeaponDamage,
+  getEquippedDefense,
   getEquippedItems,
   getAllEquippedItemIds,
 } from '@/lib/store';
@@ -71,6 +72,12 @@ export default function PlaytestStatePanel() {
   const effectiveCritDamage = getEffectiveCritDamage(variables, items, playtestState);
   const baseCritDamageVar = variables.find(v => v.name === 'crit_damage');
   const baseCritDamage = baseCritDamageVar ? Number(getCurrentValue(baseCritDamageVar) ?? 1.5) : 1.5;
+
+  // Defense calculations (аналогично урону)
+  const defenseVar = variables.find(v => v.name === 'defense');
+  const baseDefense = defenseVar ? Number(getCurrentValue(defenseVar) ?? 0) : 0;
+  const equippedDefense = getEquippedDefense(items, playtestState);
+  const totalDefense = baseDefense + equippedDefense;
 
   const equippedItems = getEquippedItems(items, getAllEquippedItemIds(playtestState));
   const equippableItems = items.filter(i => i.isEquippable);
@@ -171,6 +178,20 @@ export default function PlaytestStatePanel() {
               </div>
             </div>
 
+            {/* Defense block */}
+            <div className="flex items-baseline justify-between rounded bg-[#161310] px-3 py-2">
+              <div>
+                <div className="text-xs text-[var(--studio-text-muted)]">ЗАЩИТА</div>
+                <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
+                  База {baseDefense}
+                  {equippedDefense > 0 && ` + ${equippedDefense} от предметов`}
+                </div>
+              </div>
+              <div className="font-mono text-2xl font-semibold text-[var(--studio-accent)] tabular-nums">
+                {totalDefense}
+              </div>
+            </div>
+
             {/* Crit stats */}
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded bg-[#161310] px-3 py-2">
@@ -201,7 +222,7 @@ export default function PlaytestStatePanel() {
           </div>
 
           <div className="mt-2 text-[10px] text-[var(--studio-text-muted)]">
-            Сила — всегда база. Урон оружия суммируется. Бонусы от экипированных предметов применяются автоматически.
+            Сила — всегда база. Урон оружия суммируется. Защита с предметов добавляется к базовой. Бонусы от экипированных предметов применяются автоматически.
           </div>
         </div>
 

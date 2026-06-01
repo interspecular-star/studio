@@ -1,6 +1,13 @@
 'use client';
 
-import { EquipmentSlot, EquipmentSlotLabels, AccessoryRowSlots, BeltRowSlots, RarityColors } from '@/lib/store';
+import { 
+  EquipmentSlot, 
+  EquipmentSlotLabels, 
+  AccessoryRowSlots, 
+  BeltRowSlots, 
+  RarityColors,
+  canEquipItemToSlot 
+} from '@/lib/store';
 import { useStudioStore, type Item } from '@/lib/store';
 
 interface InventoryMannequinProps {
@@ -10,6 +17,12 @@ interface InventoryMannequinProps {
   onSlotClick?: (slot: EquipmentSlot) => void;
   // Новый колбэк: клик по занятому слоту → снять предмет
   onUnequipFromSlot?: (slot: EquipmentSlot) => void;
+
+  // === Drag & Drop support ===
+  draggedItemId?: string | null;
+  onDropItem?: (itemId: string, targetSlot: EquipmentSlot) => void;
+  onDragStartItem?: (itemId: string) => void;
+  onDragEndItem?: () => void;
 }
 
 /**
@@ -33,6 +46,10 @@ export default function InventoryMannequin({
   equippedItemIds,
   onSlotClick,
   onUnequipFromSlot,
+  draggedItemId,
+  onDropItem,
+  onDragStartItem,
+  onDragEndItem,
 }: InventoryMannequinProps) {
   const { items } = useStudioStore();
 
@@ -108,11 +125,45 @@ export default function InventoryMannequin({
       }
     };
 
+    const canDropHere = !!draggedItemId && !isBlocked;
+
+    // Проверяем совместимость слота с помощью централизованной функции
+    const draggedItem = draggedItemId ? items.find(i => i.id === draggedItemId) : null;
+    const isCompatible = !draggedItemId || canEquipItemToSlot(draggedItem?.slot, slot);
+
+    const showDropHighlight = canDropHere && isCompatible;
+    const showInvalidHighlight = canDropHere && !isCompatible;
+
+    const handleDragOver = (e: React.DragEvent) => {
+      if (canDropHere) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      const itemId = e.dataTransfer.getData('text/plain');
+      if (itemId && onDropItem) {
+        onDropItem(itemId, slot);
+      }
+    };
+
     return (
       <div
         key={uniqueKey}
+        draggable={isOccupied && !!equippedItem}
+        onDragStart={(e) => {
+          if (isOccupied && equippedItem) {
+            e.dataTransfer.setData('text/plain', equippedItem.id);
+            onDragStartItem?.(equippedItem.id);
+          }
+        }}
+        onDragEnd={() => onDragEndItem?.()}
         onClick={handleClick}
-        className={`${baseClasses} ${stateClasses}`}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className={`${baseClasses} ${stateClasses} ${showDropHighlight ? 'ring-2 ring-[var(--studio-accent)] ring-offset-2 ring-offset-[#1C1814]' : ''} ${showInvalidHighlight ? 'ring-2 ring-red-500/70 ring-offset-2 ring-offset-[#1C1814] opacity-60' : ''}`}
         style={{ 
           width: `${size}px`, 
           height: `${size}px`,

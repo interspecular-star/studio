@@ -94,6 +94,9 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
   } | null>(null);
   const [dropAmount, setDropAmount] = useState(1);
 
+  // === Drag & Drop state ===
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
   // === Фильтры рюкзака ===
   const [filterType, setFilterType] = useState<'all' | ItemType>('all');
   const [filterRarity, setFilterRarity] = useState<'all' | ItemRarity>('all');
@@ -265,7 +268,9 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
   };
 
   // === Главный обработчик экипировки (теперь без window.confirm) ===
-  const handleEquipItem = (itemId: string) => {
+  // preferredSlot — опционально. Используется при прямом дропе на конкретный слот манекена
+  // (например, чтобы одноручное оружие сразу шло в выбранную руку без модалки выбора).
+  const handleEquipItem = (itemId: string, preferredSlot?: EquipmentSlot) => {
     const item = items.find((i) => i.id === itemId);
     if (!item || !item.isEquippable || !item.slot) {
       toast.error('Этот предмет нельзя экипировать');
@@ -282,33 +287,44 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
         return;
       }
 
-      // Оба слота свободны — спрашиваем пользователя явно (через красивую модалку)
-      if (rightFree && leftFree) {
-        setPendingConfirmation({
-          kind: 'chooseHand',
-          newItem: item,
-          message: `В какую руку одеть «${item.name.ru}»?\n\nВыберите руку ниже.`,
-        });
-        return;
+      // Если при дропе явно указали руку — стараемся использовать именно её
+      let chosenHand: EquipmentSlot | null = null;
+
+      if (preferredSlot === 'weapon_right' || preferredSlot === 'weapon_left') {
+        if (!isSlotOccupied(preferredSlot)) {
+          chosenHand = preferredSlot;
+        } else {
+          // Указанная рука занята — показываем замену именно на неё
+          const current = getEquippedItemInSlot(preferredSlot)!;
+          const msg = computeEquipConfirmationMessage(item, [preferredSlot], [current]);
+          setPendingConfirmation({
+            kind: 'replace',
+            newItem: item,
+            targetSlot: preferredSlot,
+            currentItem: current,
+            message: msg,
+          });
+          return;
+        }
       }
 
-      // Только одна рука свободна — сразу целимся в неё
-      const chosenHand: EquipmentSlot = rightFree ? 'weapon_right' : 'weapon_left';
+      // Если не было preferredSlot или выбранная рука была свободна
+      if (!chosenHand) {
+        // Оба слота свободны — спрашиваем пользователя явно (через красивую модалку)
+        if (rightFree && leftFree) {
+          setPendingConfirmation({
+            kind: 'chooseHand',
+            newItem: item,
+            message: `В какую руку одеть «${item.name.ru}»?\n\nВыберите руку ниже.`,
+          });
+          return;
+        }
 
-      if (isSlotOccupied(chosenHand)) {
-        const current = getEquippedItemInSlot(chosenHand)!;
-        const msg = computeEquipConfirmationMessage(item, [chosenHand], [current]);
-        setPendingConfirmation({
-          kind: 'replace',
-          newItem: item,
-          targetSlot: chosenHand,
-          currentItem: current,
-          message: msg,
-        });
-        return;
+        // Только одна рука свободна — сразу целимся в неё
+        chosenHand = rightFree ? 'weapon_right' : 'weapon_left';
       }
 
-      // Свободно — экипируем сразу без вопросов
+      // Свободно — экипируем сразу
       equipItem(itemId, chosenHand);
       toast.success(`${item.name.ru} экипирован (${EquipmentSlotLabels[chosenHand]})`);
       return;
@@ -366,6 +382,45 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
     toast.success(`${item.name.ru} экипирован`);
   };
 
+  // === Обработчик дропа предмета на конкретный слот манекена ===
+  // Передаём targetSlot как preferredSlot в handleEquipItem.
+  // Это позволяет:
+  // - Для одноручного оружия — сразу экипировать в указанную руку без модалки выбора.
+  // - Для всего остального — использовать единую логику экипировки и подтверждений.
+  const handleDropOnMannequinSlot = (itemId: string, targetSlot: EquipmentSlot) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item || !item.isEquippable || !item.slot) {
+      toast.error('Этот предмет нельзя экипировать');
+      setDraggedItemId(null);
+      return;
+    }
+
+    handleEquipItem(itemId, targetSlot);
+    setDraggedItemId(null);
+  };
+
+  // === Общие обработчики для дроп-зон снятия предметов (устраняет дублирование) ===
+  const getUnequipDropHandlers = () => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (draggedItemId) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      const itemId = e.dataTransfer.getData('text/plain');
+      if (itemId) {
+        unequipItem(itemId);
+        const droppedItem = items.find(i => i.id === itemId);
+        if (droppedItem) {
+          toast.info(`${droppedItem.name.ru} снят`);
+        }
+      }
+      setDraggedItemId(null);
+    },
+  });
+
   // === Обработчики контекстного меню ===
   const openContextMenu = (item: Item, quantity: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -381,7 +436,7 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
 
   const handleContextEquip = () => {
     if (!contextMenu) return;
-    handleEquipItem(contextMenu.item.id);
+    handleEquipItem(contextMenu.item.id); // без preferredSlot — обычный путь с возможным выбором руки
     closeContextMenu();
   };
 
@@ -410,33 +465,26 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
   // Размер рюкзака теперь полностью динамический от Выносливости (см. backpackSize ниже)
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
       <div 
         className="w-[920px] max-w-[95vw] rounded-2xl border border-[var(--studio-border)] bg-[#1C1814] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--studio-border)] bg-[#161310] px-6 py-4">
-          <div>
-            <span className="text-lg font-semibold tracking-tight">Инвентарь</span>
-            <span className="ml-3 text-xs text-[var(--studio-text-muted)]">
-              Рюкзак: {backpackSize} слотов (Выносливость: {enduranceValue})
-            </span>
-          </div>
+        <div className="relative flex items-center border-b border-[var(--studio-border)] bg-[#161310] px-6 py-4">
+          <span className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold tracking-tight">Инвентарь</span>
+          
           <button 
             onClick={handleClose}
-            className="rounded p-1 hover:bg-white/10"
+            className="ml-auto rounded p-1 hover:bg-white/10"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex h-[555px]">
+        <div className="flex h-[580px]">
           {/* === МАНЕКЕН (левая колонка) === */}
-          <div className="w-[340px] border-r border-[var(--studio-border)] p-5 flex flex-col">
-            <div className="mb-2 text-sm font-medium text-[var(--studio-text-secondary)]">
-              ЭКИПИРОВКА
-            </div>
+          <div className="w-[340px] border-r border-[var(--studio-border)] p-5 flex flex-col pt-3">
 
             <div className="flex-1 flex items-start justify-center overflow-hidden">
               <InventoryMannequin
@@ -445,20 +493,17 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
                 onSlotClick={(slot) => {
                   // Можно будет открыть выбор предмета для этого слота
                 }}
+                draggedItemId={draggedItemId}
+                onDropItem={handleDropOnMannequinSlot}
+                onDragStartItem={(id) => setDraggedItemId(id)}
+                onDragEndItem={() => setDraggedItemId(null)}
               />
             </div>
           </div>
 
           {/* === СЕТКА ИНВЕНТАРЯ === */}
-          <div className="flex-1 p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-medium text-[var(--studio-text-secondary)]">
-                РЮКЗАК
-              </div>
-              <div className="text-xs text-[var(--studio-text-muted)]">
-                {filteredBackpackItems.length} / {backpackItems.length} в рюкзаке
-              </div>
-            </div>
+          <div className="flex-1 p-6 relative">
+            <div className="mb-2" /> {/* Spacer instead of РЮКЗАК + counter */}
 
             {/* === Фильтры === */}
             <div className="mb-3 space-y-2">
@@ -540,14 +585,31 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
               )}
             </div>
 
-            {/* Сетка инвентаря (только то, что в рюкзаке) */}
-            <div className="grid grid-cols-5 gap-2.5">
+            {/* Область рюкзака — большая дроп-зона для снятия предметов */}
+            <div
+              className={`relative min-h-[260px] rounded-xl p-2 transition-all -mx-2 -my-1 ${
+                draggedItemId 
+                  ? 'bg-[#2A251F]/50 ring-1 ring-[var(--studio-accent)]/40' 
+                  : ''
+              }`}
+              {...getUnequipDropHandlers()}
+            >
+              {/* Сетка инвентаря */}
+              <div className="grid grid-cols-5 gap-2.5">
               {/* Реальные предметы в рюкзаке (с учётом фильтров) */}
               {filteredBackpackItems.map(({ item, quantity }) => {
-                const canEquip = item.isEquippable && item.slot;
+                const canEquip = !!(item.isEquippable && item.slot);
                 return (
                   <div 
                     key={item.id}
+                    draggable={canEquip}
+                    onDragStart={(e) => {
+                      if (canEquip) {
+                        e.dataTransfer.setData('text/plain', item.id);
+                        setDraggedItemId(item.id);
+                      }
+                    }}
+                    onDragEnd={() => setDraggedItemId(null)}
                     onClick={(e) => {
                       e.stopPropagation();
                       setContextMenu({
@@ -559,13 +621,14 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
                     }}
                     className={`aspect-square w-full max-w-[62px] rounded-xl border-2 flex flex-col items-center justify-center text-[10px] transition-all mx-auto p-1 overflow-hidden ${
                       canEquip 
-                        ? 'bg-[#161310] hover:bg-[#2A251F] cursor-pointer active:scale-[0.98]' 
+                        ? 'bg-[#161310] hover:bg-[#2A251F] cursor-grab active:cursor-grabbing active:scale-[0.98]' 
                         : 'bg-[#161310] opacity-50 cursor-not-allowed'
                     }`}
                     style={{
                       borderColor: canEquip ? RarityColors[item.rarity] : '#374151',
+                      opacity: draggedItemId === item.id ? 0.5 : 1,
                     }}
-                    title={canEquip ? `Нажмите для меню: ${item.name.ru}` : `${item.name.ru} (нельзя экипировать)`}
+                    title={canEquip ? `Перетащите для экипировки или нажмите для меню: ${item.name.ru}` : `${item.name.ru} (нельзя экипировать)`}
                   >
                     {/* Цветная полоска редкости сверху */}
                     <div 
@@ -605,13 +668,19 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
                 Array.from({ length: Math.max(0, backpackSize - backpackItems.length) }).map((_, index) => (
                   <div 
                     key={`empty-${index}`}
-                    className="aspect-square w-full max-w-[62px] rounded-xl border border-[var(--studio-border)] bg-[#161310] flex items-center justify-center text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)] transition-colors cursor-pointer mx-auto"
+                    className={`aspect-square w-full max-w-[62px] rounded-xl border flex items-center justify-center text-[var(--studio-text-muted)] transition-colors mx-auto ${
+                      draggedItemId 
+                        ? 'border-[var(--studio-accent)]/60 bg-[#2A251F]/30 ring-1 ring-[var(--studio-accent)]/20' 
+                        : 'border-[var(--studio-border)] bg-[#161310] hover:border-[var(--studio-accent)] cursor-pointer'
+                    }`}
+                    {...getUnequipDropHandlers()}
                   >
                     <div className="text-[10px] opacity-20">—</div>
                   </div>
                 ))
               )}
-            </div>
+              </div> {/* end of grid */}
+            </div> {/* end of big backpack drop zone */}
 
             {playerInventory.length === 0 && (
               <div className="mt-6 text-center text-xs text-[var(--studio-text-muted)]">
@@ -619,6 +688,11 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
                 Добавь предметы через блок «ИНВЕНТАРЬ» в редакторе или используй действие giveItem.
               </div>
             )}
+
+            {/* Endurance info - bottom right */}
+            <div className="absolute bottom-4 right-6 text-xs text-[var(--studio-text-muted)]">
+              Выносливость: {enduranceValue}
+            </div>
           </div>
         </div>
 
@@ -761,41 +835,117 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
           </>
         )}
 
-        {/* === Модалка просмотра предмета === */}
+        {/* === Модалка просмотра предмета (новая версия) === */}
         {viewingItem && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-[130]">
-            <div className="bg-[#1C1814] border border-[var(--studio-border)] rounded-xl p-6 w-[420px] max-w-[92%]">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="text-xl font-semibold" style={{ color: RarityColors[viewingItem.item.rarity] }}>
+            <div className="bg-[#1C1814] border border-[var(--studio-border)] rounded-xl p-5 w-[520px] max-w-[94%]">
+              <div className="flex gap-4">
+                {/* Левая колонка — Иконка */}
+                <div 
+                  className="w-20 h-20 flex-shrink-0 rounded-lg border flex items-center justify-center text-3xl"
+                  style={{ 
+                    backgroundColor: `${RarityColors[viewingItem.item.rarity]}20`,
+                    borderColor: RarityColors[viewingItem.item.rarity]
+                  }}
+                >
+                  {viewingItem.item.icon ? (
+                    <img 
+                      src={viewingItem.item.icon} 
+                      alt={viewingItem.item.name.ru}
+                      className="max-w-[60px] max-h-[60px] object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="text-[var(--studio-text-muted)] text-xs text-center leading-tight">
+                      Нет<br />иконки
+                    </div>
+                  )}
+                </div>
+
+                {/* Правая колонка — Информация */}
+                <div className="flex-1 min-w-0">
+                  {/* Название */}
+                  <div 
+                    className="text-xl font-semibold leading-tight"
+                    style={{ color: RarityColors[viewingItem.item.rarity] }}
+                  >
                     {viewingItem.item.name.ru}
                   </div>
-                  <div className="text-xs text-[var(--studio-text-muted)]">
-                    {RarityFilterLabels[viewingItem.item.rarity]} • {ItemTypeLabels[viewingItem.item.type]}
+
+                  {/* Тип */}
+                  <div className="text-xs text-[var(--studio-text-muted)] mt-0.5">
+                    {ItemTypeLabels[viewingItem.item.type]}
+                    {viewingItem.item.slot && ` • ${EquipmentSlotLabels[viewingItem.item.slot] || viewingItem.item.slot}`}
+                  </div>
+
+                  {/* Описание */}
+                  {viewingItem.item.description?.ru && (
+                    <div className="mt-3 text-sm text-[var(--studio-text-secondary)] whitespace-pre-line leading-snug">
+                      {viewingItem.item.description.ru}
+                    </div>
+                  )}
+
+                  {/* Характеристики */}
+                  <div className="mt-4 pt-3 border-t border-[var(--studio-border)] space-y-1.5 text-sm">
+                    {viewingItem.item.weaponDamage ? (
+                      <div className="flex justify-between">
+                        <span className="text-[var(--studio-text-muted)]">Урон оружия</span>
+                        <span className="font-mono text-[var(--studio-accent)]">+{viewingItem.item.weaponDamage}</span>
+                      </div>
+                    ) : null}
+
+                    {(viewingItem.item.modifiers || []).length > 0 && (
+                      <div>
+                        <div className="text-[var(--studio-text-muted)] mb-1">Бонусы</div>
+                        <div className="pl-2 space-y-0.5 text-[13px]">
+                          {(viewingItem.item.modifiers || []).map((mod, idx) => {
+                            const stat = variables.find(v => v.id === mod.statId);
+                            const statName = stat 
+                              ? (stat.displayName?.ru || stat.name) 
+                              : mod.statId;
+
+                            return (
+                              <div key={idx} className="text-[var(--studio-text-secondary)]">
+                                +{mod.value} {statName}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {typeof viewingItem.item.maxDurability === 'number' && viewingItem.item.maxDurability > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-[var(--studio-text-muted)]">Прочность</span>
+                        <span className="font-mono">
+                          {viewingItem.item.durability ?? viewingItem.item.maxDurability} / {viewingItem.item.maxDurability}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between">
+                      <span className="text-[var(--studio-text-muted)]">Цена</span>
+                      <span className="font-mono text-[var(--studio-accent)]">{viewingItem.item.price}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-[var(--studio-text-muted)]">В рюкзаке</span>
+                      <span className="font-mono text-[var(--studio-accent)]">{viewingItem.quantity}</span>
+                    </div>
                   </div>
                 </div>
-                <button onClick={() => setViewingItem(null)} className="text-[var(--studio-text-muted)] hover:text-white">✕</button>
               </div>
 
-              {viewingItem.item.description?.ru && (
-                <div className="mb-4 text-sm text-[var(--studio-text-secondary)] whitespace-pre-line">
-                  {viewingItem.item.description.ru}
-                </div>
-              )}
-
-              <div className="space-y-2 text-sm border-t border-[var(--studio-border)] pt-3">
-                {viewingItem.item.weaponDamage ? <div>Урон оружия: <span className="font-mono text-[var(--studio-accent)]">+{viewingItem.item.weaponDamage}</span></div> : null}
-                {(viewingItem.item.modifiers || []).length > 0 && (
-                  <div>Бонусы: <span className="text-[var(--studio-text-muted)]">+{(viewingItem.item.modifiers || []).map(m => m.value).join(', +')}</span></div>
-                )}
-                {typeof viewingItem.item.maxDurability === 'number' && viewingItem.item.maxDurability > 0 && (
-                  <div>Прочность: <span className="font-mono">{viewingItem.item.durability ?? viewingItem.item.maxDurability} / {viewingItem.item.maxDurability}</span></div>
-                )}
-                <div>Количество: <span className="font-mono text-[var(--studio-accent)]">{viewingItem.quantity}</span></div>
-              </div>
-
+              {/* Кнопка закрытия */}
               <div className="mt-5 flex justify-end">
-                <button onClick={() => setViewingItem(null)} className="px-4 py-2 rounded bg-[var(--studio-accent)] text-[#1C1814] font-medium hover:bg-[var(--studio-accent-hover)]">Закрыть</button>
+                <button 
+                  onClick={() => setViewingItem(null)} 
+                  className="px-4 py-1.5 rounded bg-[var(--studio-accent)] text-[#1C1814] text-sm font-medium hover:bg-[var(--studio-accent-hover)]"
+                >
+                  Закрыть
+                </button>
               </div>
             </div>
           </div>

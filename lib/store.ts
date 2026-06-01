@@ -88,6 +88,7 @@ export type Item = {
   id: string;
   name: LocalizedString;
   description: LocalizedString;
+  icon?: string; // путь к картинке (например "/icons/sword.png"). Пока можно оставлять пустым
   quantityVariableId?: string;
 
   // Новые поля для системы предметов
@@ -104,6 +105,9 @@ export type Item = {
 
   // Базовый урон оружия (только для оружия, отдельно от модификаторов)
   weaponDamage?: number;
+
+  // Защита от брони / аксессуаров (отдельное значение, суммируется с базовой Защитой персонажа)
+  defenseValue?: number;
 };
 
 /**
@@ -493,8 +497,16 @@ type StudioState = {
   inventoryCollapsed: boolean;
   toggleInventoryCollapsed: () => void;
 
+  // Variables block
+  variablesCollapsed: boolean;
+  toggleVariablesCollapsed: () => void;
+
+  // Items block
+  itemsCollapsed: boolean;
+  toggleItemsCollapsed: () => void;
+
   // Collapsed state for individual items (to reduce scrolling when many items)
-  collapsedItemIds: string[];
+  collapsedItemIds: string[]; // Теперь хранит ID РАЗВЁРНУТЫХ предметов. По умолчанию все свёрнуты.
   toggleItemCollapsed: (itemId: string) => void;
 
   // === Starting Inventory (explicit management of items player begins with) ===
@@ -611,7 +623,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Inventory block starts collapsed by default
   inventoryCollapsed: true,
 
-  // No items collapsed by default
+  // Variables and Items blocks start collapsed by default
+  variablesCollapsed: true,
+  itemsCollapsed: true,
+
+  // No items collapsed by default (individual items)
   collapsedItemIds: [],
 
   // Starting inventory (empty by default)
@@ -1267,12 +1283,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   toggleInventoryCollapsed: () => set((state) => ({ inventoryCollapsed: !state.inventoryCollapsed })),
 
+  toggleVariablesCollapsed: () => set((state) => ({ variablesCollapsed: !state.variablesCollapsed })),
+  toggleItemsCollapsed: () => set((state) => ({ itemsCollapsed: !state.itemsCollapsed })),
+
   toggleItemCollapsed: (itemId) => set((state) => {
-    const isCollapsed = state.collapsedItemIds.includes(itemId);
+    // Теперь collapsedItemIds = список РАЗВЁРНУТЫХ предметов.
+    // По умолчанию (если id нет в массиве) — предмет свёрнут.
+    const isExpanded = state.collapsedItemIds.includes(itemId);
     return {
-      collapsedItemIds: isCollapsed
-        ? state.collapsedItemIds.filter(id => id !== itemId)
-        : [...state.collapsedItemIds, itemId]
+      collapsedItemIds: isExpanded
+        ? state.collapsedItemIds.filter(id => id !== itemId)   // был развёрнут → сворачиваем
+        : [...state.collapsedItemIds, itemId]                  // был свёрнут → разворачиваем
     };
   }),
 
@@ -1846,6 +1867,53 @@ function resolvePlayerVariable(statIdOrName: string, variables: Variable[]): Var
 }
 
 /**
+ * Суммирует всю защиту от экипированных предметов.
+ * Аналог getEquippedWeaponDamage.
+ */
+export function getEquippedDefense(items: Item[], playtestState: PlaytestSnapshot): number {
+  const allIds = getAllEquippedItemIds(playtestState);
+  const equipped = getEquippedItems(items, allIds);
+  return equipped.reduce((sum, item) => {
+    return sum + (item.defenseValue ?? 0);
+  }, 0);
+}
+
+/**
+ * Проверяет, можно ли экипировать предмет с указанным item.slot в целевой слот на манекене.
+ *
+ * Используется в:
+ * - InventoryMannequin (подсветка при Drag & Drop)
+ * - handleDropOnMannequinSlot / handleEquipItem (будущая унификация)
+ *
+ * Правила:
+ * - Щит: только weapon_left или shield
+ * - Одноручное оружие: weapon_right или weapon_left
+ * - Двуручное оружие: weapon_right или weapon_left
+ * - Всё остальное (броня, аксессуары): строго в свой слот
+ */
+export function canEquipItemToSlot(
+  itemSlot: EquipmentSlot | null | undefined,
+  targetSlot: EquipmentSlot
+): boolean {
+  if (!itemSlot) return false;
+
+  if (itemSlot === 'shield') {
+    return targetSlot === 'weapon_left' || targetSlot === 'shield';
+  }
+
+  if (itemSlot === 'one_handed_weapon') {
+    return targetSlot === 'weapon_right' || targetSlot === 'weapon_left';
+  }
+
+  if (itemSlot === 'two_handed_weapon') {
+    return targetSlot === 'weapon_right' || targetSlot === 'weapon_left';
+  }
+
+  // Для всех обычных слотов брони и аксессуаров — только точное совпадение
+  return itemSlot === targetSlot;
+}
+
+/**
  * Calculates effective value of a player stat = base value + sum of all modifiers
  * from currently equipped items that target this stat.
  *
@@ -1877,7 +1945,15 @@ export function getEffectivePlayerStat(
     return sum + relevant.reduce((s, m) => s + (m.value || 0), 0);
   }, 0);
 
-  return base + bonus;
+  let total = base + bonus;
+
+  // Специальная обработка для Защиты: добавляем defenseValue с предметов
+  // (аналогично тому, как weaponDamage добавляется к урону)
+  if (variable.name === 'defense') {
+    total += getEquippedDefense(items, playtestState);
+  }
+
+  return total;
 }
 
 /**
