@@ -8,6 +8,8 @@ import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModi
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
+import PageSection from '@/components/editor/PageSection';
+import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
 import InventoryModal from '@/components/editor/InventoryModal';
 
@@ -132,6 +134,7 @@ export default function SlayStudio() {
 
   // Item ID editing - per item (for controlled inputs + confirmation)
   const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
 
   // Load project from localStorage on first mount
   useEffect(() => {
@@ -329,6 +332,28 @@ export default function SlayStudio() {
             </button>
           </div>
 
+          {/* Snapping Toggle - moved out of sidebar into top bar (compact) */}
+          <div className="flex items-center gap-2 ml-2 pl-3 border-l border-[var(--studio-border)]">
+            <span className="text-xs text-[var(--studio-text-muted)]">Прилипание</span>
+            <button
+              onClick={() => {
+                const newValue = !snapEnabled;
+                setSnapEnabled(newValue);
+                if (!newValue) setSnappingGuide(null);
+              }}
+              className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors ${
+                snapEnabled ? 'bg-[var(--studio-accent)]' : 'bg-[var(--studio-border)]'
+              }`}
+              title="Вкл/выкл прилипание кнопок к направляющим"
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  snapEnabled ? 'translate-x-[17px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Canvas Undo / Redo - only for canvas button positions */}
           <div className="flex items-center gap-1 ml-2">
             <button
@@ -445,19 +470,18 @@ export default function SlayStudio() {
           ) : (
             // Expanded state
             <>
-              {/* Small control bar when left sidebar is expanded */}
-              <div className="flex justify-start border-b border-[var(--studio-border)] px-2 py-1">
-                <button
-                  onClick={toggleLeftSidebar}
-                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1"
-                  title="Свернуть панель страниц"
-                >
-                  ◀
-                </button>
-              </div>
-
+              {/* Left sidebar header with integrated collapse button */}
               <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
-                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СТРАНИЦЫ</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleLeftSidebar}
+                    className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1 -ml-1"
+                    title="Свернуть панель страниц"
+                  >
+                    ◀
+                  </button>
+                  <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СТРАНИЦЫ</span>
+                </div>
                 <button
                   onClick={handleAddPage}
                   className="studio-btn flex items-center gap-1.5 rounded-md bg-[var(--studio-accent)] px-3 py-1 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
@@ -537,6 +561,18 @@ export default function SlayStudio() {
             {mode === 'playtest' && playtestState.isInventoryOpen && (
               <InventoryModal onClose={() => {}} />
             )}
+
+            {/* Item Creation Modal */}
+            <ItemCreationModal
+              isOpen={isItemModalOpen}
+              onClose={() => setIsItemModalOpen(false)}
+              onCreate={(newItem) => {
+                addItem(newItem);
+                toast.success('Предмет создан');
+              }}
+              variables={variables}
+              items={items}
+            />
           </div>
         </div>
 
@@ -555,12 +591,15 @@ export default function SlayStudio() {
             </div>
           ) : (
             <>
-              {/* Small control bar when right sidebar is expanded */}
-              <div className="flex justify-end border-b border-[var(--studio-border)] px-2 py-1">
+              {/* Right sidebar header with integrated collapse button */}
+              <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
+                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">
+                  {mode === 'playtest' ? 'СОСТОЯНИЕ' : 'СВОЙСТВА'}
+                </span>
                 <button
                   onClick={toggleRightSidebar}
-                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1"
-                  title="Свернуть правую панель"
+                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1 -mr-1"
+                  title="Свернуть панель"
                 >
                   ▶
                 </button>
@@ -570,48 +609,14 @@ export default function SlayStudio() {
                 <PlaytestStatePanel />
               ) : (
                 <>
-                  <div className="border-b border-[var(--studio-border)] px-4 py-3">
-                    <span className="text-sm font-medium text-[var(--studio-text-secondary)]">СВОЙСТВА</span>
-                  </div>
-
                   <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {/* Snapping Toggle - always visible and independent */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[var(--studio-text-secondary)]">ПРИЛИПАНИЕ</span>
-                <button
-                  onClick={() => {
-                    const newValue = !snapEnabled;
-                    setSnapEnabled(newValue);
-                    if (!newValue) {
-                      setSnappingGuide(null);
-                    }
-                  }}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    snapEnabled ? 'bg-[var(--studio-accent)]' : 'bg-[var(--studio-border)]'
-                  }`}
-                  role="switch"
-                  aria-checked={snapEnabled}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      snapEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-              <p className="mt-2 text-[11px] leading-snug text-[var(--studio-text-muted)]">
-                При перетаскивании кнопки автоматически прилипают к направляющим.
-              </p>
-            </div>
-
-            {/* === ХАРАКТЕРИСТИКИ ГГ (постоянный блок) === */}
+            {/* === ХАРАКТЕРИСТИКИ (постоянный блок) === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
               <div
                 onClick={togglePlayerStatsCollapsed}
                 className="flex w-full cursor-pointer items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
               >
-                <span>ХАРАКТЕРИСТИКИ ГГ</span>
+                <span>ХАРАКТЕРИСТИКИ</span>
                 <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
               </div>
 
@@ -1084,24 +1089,10 @@ export default function SlayStudio() {
                 <>
                   <div className="flex items-center justify-between mb-2">
                     <button
-                      onClick={() => {
-                        const newItem: Omit<Item, 'id'> = {
-                          name: { ru: 'Новый предмет', en: 'New Item' },
-                          description: { ru: '', en: '' },
-                          type: 'misc',
-                          rarity: 'common',
-                          maxDurability: 100,
-                          durability: 100,
-                          isEquippable: false,
-                          slot: null,
-                          price: 0,
-                          defenseValue: 0,
-                        };
-                        addItem(newItem);
-                      }}
-                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
+                      onClick={() => setIsItemModalOpen(true)}
+                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-3 py-1.5 text-sm font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full justify-center"
                     >
-                      + Добавить
+                      + Создать предмет
                     </button>
                   </div>
 
@@ -1547,337 +1538,28 @@ export default function SlayStudio() {
 
             </div>
 
-            {/* Page Properties */}
-            <div className="space-y-4">
-              {/* Page Name + ID */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">НАЗВАНИЕ СТРАНИЦЫ</label>
-                <div className="space-y-1.5">
-                  <input
-                    value={currentPage?.title.ru || ''}
-                    onChange={(e) =>
-                      renamePage(currentPage!.id, currentPage!.id, {
-                        ...currentPage!.title,
-                        ru: e.target.value,
-                      })
-                    }
-                    placeholder="Название (РУ)"
-                    className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
-                  <input
-                    value={currentPage?.title.en || ''}
-                    onChange={(e) =>
-                      renamePage(currentPage!.id, currentPage!.id, {
-                        ...currentPage!.title,
-                        en: e.target.value,
-                      })
-                    }
-                    placeholder="Title (EN)"
-                    className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
+            <PageSection
+              currentPage={currentPage}
+              renamePage={renamePage}
+              updateCurrentPage={updateCurrentPage}
+              editingPageId={editingPageId}
+              setEditingPageId={setEditingPageId}
+              langTab={langTab}
+              setLangTab={setLangTab}
+              handleAddButton={handleAddButton}
+              selectedButtonId={selectedButtonId}
+              selectButton={selectButton}
+              handleDeleteButton={handleDeleteButton}
+              selectedButton={selectedButton}
+              updateSelectedButton={updateSelectedButton}
+              updateSelectedButtonLayout={updateSelectedButtonLayout}
+              handleCopyCoordinates={handleCopyCoordinates}
+              handlePasteCoordinates={handlePasteCoordinates}
+              coordinateClipboard={coordinateClipboard}
+              variables={variables}
+              items={items}
+            />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">
-                  ID СТРАНИЦЫ <span className="text-[var(--studio-danger)]">(осторожно!)</span>
-                </label>
-                <input
-                  value={editingPageId}
-                  onChange={(e) => setEditingPageId(e.target.value)}
-                  onBlur={() => {
-                    const newId = editingPageId.trim();
-                    if (newId && currentPage && newId !== currentPage.id) {
-                      if (confirm(`Изменить ID страницы с "${currentPage.id}" на "${newId}"?\nВсе ссылки (goToPage) на эту страницу будут автоматически обновлены.`)) {
-                        renamePage(currentPage.id, newId);
-                      } else {
-                        // revert to original ID
-                        setEditingPageId(currentPage.id);
-                      }
-                    } else if (currentPage) {
-                      // If no change or empty, reset to current
-                      setEditingPageId(currentPage.id);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.currentTarget.blur();
-                    }
-                    if (e.key === 'Escape' && currentPage) {
-                      setEditingPageId(currentPage.id);
-                      e.currentTarget.blur();
-                    }
-                  }}
-                  className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                />
-                <p className="mt-1 text-[10px] text-[var(--studio-text-muted)]">
-                  Используется в действиях "Перейти на страницу". Изменение обновит все ссылки.
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">ФОН СЦЕНЫ</label>
-                <select
-                  value={currentPage?.background}
-                  onChange={(e) => updateCurrentPage({ background: e.target.value })}
-                  className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                >
-                  <option value="village_morning">Деревня — утро</option>
-                  <option value="tavern">Таверна</option>
-                  <option value="cave">Пещера Слэя</option>
-                  <option value="forest">Лес у Границы</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">КТО ГОВОРИТ</label>
-                <select
-                  value={currentPage?.speaker}
-                  onChange={(e) => updateCurrentPage({ speaker: e.target.value })}
-                  className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                >
-                  <option value="narrator">Рассказчик</option>
-                  <option value="slay">Слэй</option>
-                  <option value="mila">Мила</option>
-                  <option value="zyrk">Зырк</option>
-                  <option value="zosya">Зося</option>
-                  <option value="burmil">Бурмил</option>
-                </select>
-              </div>
-
-              {/* Bilingual Text */}
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-xs font-medium text-[var(--studio-text-secondary)]">ТЕКСТ ДИАЛОГА</label>
-                  <div className="flex text-[10px]">
-                    <button
-                      onClick={() => setLangTab('ru')}
-                      className={`rounded px-2 py-0.5 ${langTab === 'ru' ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium' : 'hover:bg-[var(--studio-bg-elevated)]'}`}
-                    >
-                      РУ
-                    </button>
-                    <button
-                      onClick={() => setLangTab('en')}
-                      className={`rounded px-2 py-0.5 ${langTab === 'en' ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium' : 'hover:bg-[var(--studio-bg-elevated)]'}`}
-                    >
-                      EN
-                    </button>
-                  </div>
-                </div>
-
-                <textarea
-                  value={langTab === 'ru' ? currentPage?.text.ru : currentPage?.text.en}
-                  onChange={(e) => {
-                    const field = langTab === 'ru' ? 'ru' : 'en';
-                    updateCurrentPage({
-                      text: { ...currentPage!.text, [field]: e.target.value },
-                    });
-                  }}
-                  className="h-24 w-full resize-y rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  placeholder={langTab === 'ru' ? 'Текст на русском...' : 'English text...'}
-                />
-              </div>
-            </div>
-
-            {/* Buttons Section */}
-            <div className="border-t border-[var(--studio-border)] pt-5">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-medium text-[var(--studio-text-secondary)]">
-                  КНОПКИ ({currentPage?.buttons.length ?? 0})
-                </div>
-                <button
-                  onClick={handleAddButton}
-                  className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2.5 py-1 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
-                >
-                  <Plus className="h-3 w-3" /> Добавить
-                </button>
-              </div>
-
-              {/* Buttons list */}
-              <div className="space-y-1.5 mb-4">
-                {currentPage?.buttons.length === 0 && (
-                  <div className="text-xs text-[var(--studio-text-muted)] py-2">Кнопок пока нет</div>
-                )}
-                {currentPage?.buttons.map((btn) => (
-                  <div
-                    key={btn.id}
-                    onClick={() => selectButton(btn.id)}
-                    className={`group flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm transition ${selectedButtonId === btn.id
-                      ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]'
-                      : 'border-[var(--studio-border)] hover:border-[var(--studio-border-strong)]'
-                      }`}
-                  >
-                    <span className="truncate pr-2">{btn.text.ru}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteButton(btn.id); }}
-                      className="opacity-40 hover:opacity-100 p-0.5"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Selected Button Inspector */}
-              {selectedButton && (
-                <div className="space-y-4 rounded-xl border border-[var(--studio-accent)]/40 bg-[var(--studio-bg-elevated)] p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-[var(--studio-accent)]">РЕДАКТИРОВАНИЕ КНОПКИ</div>
-                    <button
-                      onClick={() => handleDeleteButton(selectedButton.id)}
-                      className="text-[var(--studio-danger)] hover:text-red-400"
-                      title="Удалить кнопку"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Button text */}
-                  <div>
-                    <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Текст кнопки (РУ)</label>
-                    <input
-                      value={selectedButton.text.ru}
-                      onChange={(e) => updateSelectedButton({ text: { ...selectedButton.text, ru: e.target.value } })}
-                      className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Текст кнопки (EN)</label>
-                    <input
-                      value={selectedButton.text.en}
-                      onChange={(e) => updateSelectedButton({ text: { ...selectedButton.text, en: e.target.value } })}
-                      className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                    />
-                  </div>
-
-                  {/* === COORDINATES + COPY/PASTE (User request) === */}
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <label className="text-[10px] font-medium text-[var(--studio-text-secondary)]">КООРДИНАТЫ И РАЗМЕР</label>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={handleCopyCoordinates}
-                          className="rounded border border-[var(--studio-border)] px-2 py-0.5 text-[10px] hover:border-[var(--studio-accent)]"
-                          title="Скопировать координаты и размер этой кнопки"
-                        >
-                          Копировать
-                        </button>
-                        <button
-                          onClick={handlePasteCoordinates}
-                          disabled={!coordinateClipboard}
-                          className="rounded border border-[var(--studio-border)] px-2 py-0.5 text-[10px] hover:border-[var(--studio-accent)] disabled:cursor-not-allowed disabled:opacity-40"
-                          title="Вставить скопированные координаты и размер"
-                        >
-                          Вставить
-                        </button>
-                      </div>
-                    </div>
-
-                    {coordinateClipboard && (
-                      <div className="mb-2 rounded bg-[var(--studio-accent)]/10 px-2 py-1 text-[10px] text-[var(--studio-accent)]">
-                        В буфере: X {coordinateClipboard.x}% / Y {coordinateClipboard.y}%
-                      </div>
-                    )}
-
-                    {/* Editable coordinates - very useful for precision */}
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      {[
-                        { label: 'X', key: 'x' as const },
-                        { label: 'Y', key: 'y' as const },
-                        { label: 'Ширина', key: 'width' as const },
-                        { label: 'Высота', key: 'height' as const },
-                      ].map(({ label, key }) => (
-                        <div key={key}>
-                          <div className="text-[9px] text-[var(--studio-text-muted)]">{label}</div>
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="1"
-                            max={key === 'x' || key === 'y' ? 90 : 60}
-                            value={selectedButton.layout[key]}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              if (!isNaN(val)) {
-                                updateSelectedButtonLayout({ [key]: Math.max(4, Math.min(90, val)) });
-                              }
-                            }}
-                            className="w-full rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-center text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-1 text-center text-[9px] text-[var(--studio-text-muted)]">
-                      Можно вводить точные значения вручную
-                    </div>
-                  </div>
-
-                  {/* Style */}
-                  <div>
-                    <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Стиль кнопки</label>
-                    <select
-                      value={selectedButton.layout.style}
-                      onChange={(e) => updateSelectedButton({ layout: { ...selectedButton.layout, style: e.target.value } })}
-                      className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm"
-                    >
-                      <option value="default">Обычная</option>
-                      <option value="important">Важная (выделяется)</option>
-                      <option value="danger">Опасная / негативная</option>
-                      <option value="subtle">Тонкая / малозаметная</option>
-                    </select>
-                  </div>
-
-                  {/* Action - Advanced */}
-                  <div>
-                    <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Что делает кнопка</label>
-                    
-                    <ActionEditor
-                      action={selectedButton.action}
-                      onChange={(newAction) => updateSelectedButton({ action: newAction })}
-                      variables={variables}
-                      items={items}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* === УСЛОВИЯ (Простой редактор) === */}
-              {selectedButton && (
-                <div className="space-y-4 pt-4 border-t border-[var(--studio-border)]">
-                  <div className="text-xs font-medium text-[var(--studio-accent)]">УСЛОВИЯ</div>
-
-                  {/* visibleWhen */}
-                  <ConditionEditor
-                    label="Видимость кнопки"
-                    condition={selectedButton.visibleWhen}
-                    onChange={(newCondition) =>
-                      updateSelectedButton({ visibleWhen: newCondition })
-                    }
-                    variables={variables}
-                    items={items}
-                  />
-
-                  {/* enabledWhen */}
-                  <ConditionEditor
-                    label="Доступность кнопки"
-                    condition={selectedButton.enabledWhen}
-                    onChange={(newCondition) =>
-                      updateSelectedButton({ enabledWhen: newCondition })
-                    }
-                    variables={variables}
-                    items={items}
-                  />
-                </div>
-              )}
-
-              {!selectedButton && currentPage && currentPage.buttons.length > 0 && (
-                <div className="text-center text-xs text-[var(--studio-text-muted)] py-3">
-                  Выбери кнопку на холсте или в списке
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
             Перетаскивай кнопки прямо на холсте
           </div>
