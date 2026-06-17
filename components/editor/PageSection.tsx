@@ -302,8 +302,18 @@ export default function PageSection({
             )}
 
             <div className="space-y-2">
-              {(currentPage?.uiWidgets || []).map((w: any, idx: number) => (
-                <div key={w.id} className="rounded border border-[var(--studio-border)] bg-[#161310] p-2 text-[10px]">
+              {(currentPage?.uiWidgets || []).map((w: any) => {
+                const isSel = useStudioStore.getState().selectedWidgetId === w.id;
+                return (
+                <div
+                  key={w.id}
+                  onClick={() => {
+                    const st = useStudioStore.getState();
+                    st.selectWidget(w.id);
+                    st.selectButton(null);
+                  }}
+                  className={`rounded border px-2 py-2 text-[10px] cursor-pointer ${isSel ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]' : 'border-[var(--studio-border)] bg-[#161310] hover:border-[var(--studio-border-strong)]'}`}
+                >
                   <div className="flex justify-between items-center mb-1">
                     <span className="font-mono text-[var(--studio-accent)]">{w.type}</span>
                     <button
@@ -342,8 +352,27 @@ export default function PageSection({
                     ))}
                   </div>
                   <div className="text-[9px] text-[var(--studio-text-muted)] mt-0.5">Z: {w.layout.z ?? 0} (слой)</div>
+
+                  {/* Basic asset link (Phase 2) */}
+                  <div className="mt-1">
+                    <label className="text-[9px] text-[var(--studio-text-muted)]">Ассет (опц.)</label>
+                    <select
+                      value={w.assetId || ''}
+                      onChange={(e) => {
+                        const store = useStudioStore.getState();
+                        store.updateUIWidget(currentPage.id, w.id, { assetId: e.target.value || undefined });
+                      }}
+                      className="w-full text-[10px] bg-[#1C1814] border border-[var(--studio-border)] px-1 py-0.5"
+                    >
+                      <option value="">— нет —</option>
+                      {(useStudioStore.getState().uiAssets || []).map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.name.ru}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">
               Виджеты видны на холсте. Меняй % — позиция обновляется сразу. (Позже drag&amp;drop + ассеты)

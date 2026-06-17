@@ -19,8 +19,10 @@ export default function SlayStudio() {
     pages,
     selectedPageId,
     selectedButtonId,
+    selectedWidgetId,
     selectPage,
     selectButton,
+    selectWidget,
     addPage,
     deletePage,
     updatePage,
@@ -156,6 +158,11 @@ export default function SlayStudio() {
 
   // For the new dedicated Backgrounds block (deep editor for custom images + advanced settings like parallax, brightness, conditions)
   const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
+
+  // For UI Assets (Dialogue UI skins, portraits etc)
+  const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
+
+  const [uiAssetsCollapsed, setUiAssetsCollapsed] = useState(false);
 
   // For Top Resource Bar testing in playtest (force show/hide regardless of page flag)
   // HUD visibility override for testing in Playtest.
@@ -1969,6 +1976,90 @@ export default function SlayStudio() {
                   <p className="mt-2 text-[9px] text-[var(--studio-text-muted)]">
                     Фоны глобальные. Можно использовать на любых страницах. Для динамических изменений (диалог → смена яркости) используй действия на кнопках позже.
                   </p>
+                </>
+              )}
+            </div>
+
+            {/* === UI АССЕТЫ (для виджетов диалога: скины кнопок, портреты, бары) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <button
+                onClick={() => setUiAssetsCollapsed(!uiAssetsCollapsed)}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
+              >
+                <span>UI АССЕТЫ</span>
+                <span className="text-xs">{uiAssetsCollapsed ? '▶' : '▼'}</span>
+              </button>
+
+              {!uiAssetsCollapsed && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => {
+                        const nameRu = prompt('Название ассета (РУ):', 'Новый скин') || 'Новый ассет';
+                        const url = prompt('URL (от public, с /):', '/ui/button.png');
+                        if (url) {
+                          const { addUIAsset } = useStudioStore.getState();
+                          let finalUrl = url.trim().replace(/\\/g, '/');
+                          if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('/')) finalUrl = '/' + finalUrl;
+                          addUIAsset({
+                            name: { ru: nameRu, en: nameRu },
+                            type: 'buttonSkin',
+                            url: finalUrl,
+                          });
+                          setTimeout(() => {
+                            const latest = useStudioStore.getState().uiAssets.slice(-1)[0];
+                            if (latest) setEditingUIAssetId(latest.id);
+                          }, 0);
+                        }
+                      }}
+                      className="text-[10px] px-2 py-1 rounded bg-[var(--studio-accent)] text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full"
+                    >
+                      + Добавить ассет (PNG)
+                    </button>
+                  </div>
+
+                  {useStudioStore.getState().uiAssets.length === 0 && (
+                    <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет ассетов. Добавь скины кнопок / портреты (прозрачный PNG).</p>
+                  )}
+
+                  <div className="space-y-1.5 max-h-48 overflow-auto text-xs">
+                    {(useStudioStore.getState().uiAssets || []).map((asset: any) => {
+                      const isEd = editingUIAssetId === asset.id;
+                      return (
+                        <div key={asset.id} className={`rounded border p-1.5 ${isEd ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}>
+                          <div className="flex items-center justify-between">
+                            <button onClick={() => setEditingUIAssetId(isEd ? null : asset.id)} className="truncate flex-1 text-left hover:underline">
+                              {asset.name.ru} <span className="text-[9px] opacity-60">({asset.type})</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (confirm('Удалить ассет?')) { const { deleteUIAsset } = useStudioStore.getState(); deleteUIAsset(asset.id); if (isEd) setEditingUIAssetId(null); } }}
+                              className="text-red-400 px-1"
+                            >×</button>
+                          </div>
+                          {isEd && (
+                            <div className="mt-1 space-y-1 border-t pt-1">
+                              <input
+                                value={asset.url || ''}
+                                placeholder="/ui/xxx.png"
+                                onChange={(e) => {
+                                  let v = e.target.value.trim().replace(/\\/g,'/');
+                                  if (v && !v.startsWith('http') && !v.startsWith('/')) v = '/' + v;
+                                  const { updateUIAsset } = useStudioStore.getState();
+                                  updateUIAsset(asset.id, { url: v });
+                                }}
+                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                              />
+                              <div className="text-[9px] text-[var(--studio-text-muted)]">Используй в виджетах (assetId) или кнопках (image)</div>
+                              {asset.url && (
+                                <img src={asset.url} className="max-h-8 border border-[var(--studio-border)] mt-0.5" alt="" onError={(e:any)=> e.currentTarget.style.opacity='0.3'} />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">Ассеты для портретов, скинов кнопок. Позже: 9-slice, варианты hover.</p>
                 </>
               )}
             </div>

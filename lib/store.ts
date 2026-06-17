@@ -506,6 +506,8 @@ type StudioState = {
   setPages: (pages: StudioPage[]) => void;
   selectPage: (id: string) => void;
   selectButton: (id: string | null) => void;
+  selectedWidgetId: string | null;
+  selectWidget: (id: string | null) => void;
 
   updatePage: (id: string, updates: Partial<StudioPage>) => void;
   updateButton: (pageId: string, buttonId: string, updates: Partial<StudioButton>) => void;
@@ -567,6 +569,8 @@ type StudioState = {
   addUIWidget: (pageId: string, widget: Omit<UIWidget, 'id'>) => void;
   updateUIWidget: (pageId: string, widgetId: string, updates: Partial<Omit<UIWidget, 'id'>>) => void;
   deleteUIWidget: (pageId: string, widgetId: string) => void;
+  updateUIWidgetLayout: (pageId: string, widgetId: string, layout: Partial<UIWidget['layout']>) => void;
+  moveUIWidget: (pageId: string, widgetId: string, x: number, y: number) => void;
   // Optional: helper to apply a preset layout of widgets to a page
   applyUILayoutPreset: (pageId: string, preset: StudioPage['uiLayoutPreset']) => void;
 
@@ -736,6 +740,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   pages: createDefaultPages(),
   selectedPageId: 'intro_01',
   selectedButtonId: null,
+  selectedWidgetId: null,
 
   // Guides start empty
   guides: {
@@ -799,10 +804,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   setPages: (pages) => set({ pages }),
 
-  selectPage: (id) => set({ selectedPageId: id, selectedButtonId: null }),
+  selectPage: (id) => set({ selectedPageId: id, selectedButtonId: null, selectedWidgetId: null }),
 
   selectButton: (id) => {
-    set({ selectedButtonId: id });
+    set((s) => ({ selectedButtonId: id, selectedWidgetId: id ? null : s.selectedWidgetId }));
     // Seed initial history entry if this button has no history yet (so UI shows immediately)
     if (id) {
       const state = get();
@@ -826,6 +831,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         get().saveToLocalStorage();
       }
     }
+  },
+
+  selectWidget: (id) => {
+    set((state) => ({
+      selectedWidgetId: id,
+      // Clear button selection when widget is selected (mutually exclusive for inspector focus)
+      selectedButtonId: id ? null : state.selectedButtonId,
+    }));
   },
 
   updatePage: (id, updates) => {
@@ -1489,6 +1502,40 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
+  updateUIWidgetLayout: (pageId, widgetId, layoutUpdates) => {
+    set((state) => ({
+      pages: state.pages.map((page) =>
+        page.id === pageId
+          ? {
+              ...page,
+              uiWidgets: (page.uiWidgets || []).map((w) =>
+                w.id === widgetId
+                  ? { ...w, layout: { ...w.layout, ...layoutUpdates } }
+                  : w
+              ),
+            }
+          : page
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  moveUIWidget: (pageId, widgetId, x, y) => {
+    set((state) => ({
+      pages: state.pages.map((page) =>
+        page.id === pageId
+          ? {
+              ...page,
+              uiWidgets: (page.uiWidgets || []).map((w) =>
+                w.id === widgetId ? { ...w, layout: { ...w.layout, x, y } } : w
+              ),
+            }
+          : page
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
   // === Playtest State ===
   resetPlaytestState: () => {
     const state = get();
@@ -2004,6 +2051,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         pages: migratedPages,
         selectedPageId: parsed.selectedPageId || migratedPages[0]?.id || null,
         selectedButtonId: null,
+        selectedWidgetId: null,
         coordinateClipboard: null,
         // Backward compatible: default to empty guides
         guides: parsed.guides || { horizontal: [], vertical: [] },
@@ -2093,6 +2141,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         pages: migratedPages,
         selectedPageId: migratedPages[0]?.id || null,
         selectedButtonId: null,
+        selectedWidgetId: null,
         coordinateClipboard: null,
         // Support guides in imported files
         guides: data.guides || { horizontal: [], vertical: [] },
@@ -2128,6 +2177,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pages: createDefaultPages(),
       selectedPageId: 'intro_01',
       selectedButtonId: null,
+      selectedWidgetId: null,
       coordinateClipboard: null,
       guides: { horizontal: [], vertical: [] },
       snappingGuide: null,
@@ -2256,6 +2306,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pages: [...state.pages, newPage],
       selectedPageId: newPage.id,
       selectedButtonId: null,
+      selectedWidgetId: null,
     }));
     get().saveToLocalStorage();
   },
@@ -2268,6 +2319,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         pages: filtered,
         selectedPageId: newSelected,
         selectedButtonId: null,
+        selectedWidgetId: null,
       };
       return result;
     }),

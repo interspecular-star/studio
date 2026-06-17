@@ -23,6 +23,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     selectedButtonId, 
     selectButton, 
     moveButton, 
+    selectedWidgetId,
+    selectWidget,
+    updateUIWidget,
+    moveUIWidget,
     backgrounds,
     guides,
     snapEnabled,
@@ -34,6 +38,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
   // Loaded custom images for buttons (image support added for Dialogue UI Phase 1) and future widgets
   const [buttonImages, setButtonImages] = useState<Record<string, HTMLImageElement>>({});
+  const [widgetImages, setWidgetImages] = useState<Record<string, HTMLImageElement>>({});
 
   const currentPage = pages.find((p) => p.id === selectedPageId);
   if (!currentPage) {
@@ -89,11 +94,34 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     });
   }, [currentPage?.buttons]);
 
+  // Load widget asset images (portraits, button skins for choice etc)
+  useEffect(() => {
+    const assets = useStudioStore.getState().uiAssets || [];
+    const wAssets = (currentPage?.uiWidgets || [])
+      .map((w: any) => w.assetId)
+      .filter((id: any): id is string => !!id);
+    wAssets.forEach((aid: string) => {
+      const asset = assets.find((a: any) => a.id === aid);
+      if (!asset?.url) return;
+      let src = asset.url.trim().replace(/\\/g, '/');
+      if (src && !src.startsWith('http') && !src.startsWith('/')) src = '/' + src;
+      if (widgetImages[src]) return;
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      img.onload = () => setWidgetImages(prev => ({ ...prev, [src]: img }));
+      img.onerror = () => console.warn('Widget asset image load failed:', src);
+    });
+  }, [currentPage?.uiWidgets, (useStudioStore.getState().uiAssets || []).length]);
+
   const stageRef = useRef<StageType>(null);
 
   // Interactive states for buttons (hover / pressed)
   const [hoveredButtonId, setHoveredButtonId] = useState<string | null>(null);
   const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
+
+  // For widgets (Phase 2 drag support)
+  const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
 
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
@@ -168,6 +196,41 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     useStudioStore.getState().setSnappingGuide(null);
   };
 
+  const handleWidgetDragEnd = (widgetId: string, e: any) => {
+    useStudioStore.getState().saveCanvasSnapshot?.(); // if exists
+
+    const node = e.target;
+    const currentXPercent = (node.x() / width) * 100;
+    const currentYPercent = (node.y() / height) * 100;
+
+    const freshState = useStudioStore.getState();
+    const page = freshState.pages.find(p => p.id === selectedPageId);
+    const widget = page?.uiWidgets?.find((w: any) => w.id === widgetId);
+
+    if (!widget || !page) {
+      updateUIWidget(selectedPageId!, widgetId, { layout: { ...widget?.layout, x: currentXPercent, y: currentYPercent } } as any);
+      return;
+    }
+
+    if (snapEnabled) {
+      const snap = getSnappedButtonPosition(
+        {
+          x: currentXPercent,
+          y: currentYPercent,
+          width: widget.layout.width,
+          height: widget.layout.height,
+        },
+        freshState.guides,
+        2.0
+      );
+      moveUIWidget(page.id, widgetId, snap.x, snap.y);
+    } else {
+      moveUIWidget(page.id, widgetId, currentXPercent, currentYPercent);
+    }
+
+    useStudioStore.getState().setSnappingGuide(null);
+  };
+
   const handleButtonClick = (buttonId: string, e: any) => {
     e.cancelBubble = true;
     selectButton(buttonId);
@@ -176,6 +239,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   const handleStageClick = (e: any) => {
     if (e.target === e.target.getStage()) {
       selectButton(null);
+      selectWidget(null);
     }
   };
 
@@ -290,10 +354,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
           {/* Location label removed from workflow view as per request (was cluttering top-left in both dialog and game modes) */}
 
-          {/* === DIALOGUE UI WIDGETS (new system, Phase 1) ===
-              Widgets are rendered from page.uiWidgets (or auto-generated defaults for legacy speaker pages).
-              Positions/sizes are % based -> fully draggable/resizable in future editor.
-              The old fixed speaker/dialogue is replaced by this to support custom layouts.
+          {/* === DIALOGUE UI WIDGETS (Phase 2: draggable) ===
+              Draggable + selectable like buttons. Uses snapping.
+              Positions update live via moveUIWidget / update.
           */}
           {pageWidgets
             .slice()
@@ -304,80 +367,176 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               const wW = pctToPx(widget.layout.width, width);
               const wH = pctToPx(widget.layout.height, height);
 
-              if (widget.type === 'dialogueBox') {
-                const dialogText = currentPage?.text?.ru || '';
-                // Dynamic height calc based on widget height % (scales nicely)
-                const boxH = Math.max(48, wH);
-                const innerPad = 14;
-                return (
-                  <Group key={widget.id} x={wX} y={wY}>
-                    <Rect
-                      x={0}
-                      y={0}
-                      width={wW}
-                      height={boxH}
-                      cornerRadius={10}
-                      fill="rgba(33, 29, 24, 0.94)"
-                      stroke="#534B40"
-                      strokeWidth={1.5}
-                    />
-                    <Text
-                      x={innerPad}
-                      y={10}
-                      width={wW - innerPad * 2}
-                      height={boxH - 18}
-                      text={dialogText}
-                      fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
-                      fill="#EDE4D4"
-                      lineHeight={1.32}
-                      wrap="word"
-                    />
-                  </Group>
-                );
-              }
+              const isSelected = widget.id === selectedWidgetId;
+              const isHovered = hoveredWidgetId === widget.id;
+              const isPlaytestMode = isPlaytest;
 
-              if (widget.type === 'textLabel' || widget.type === 'portrait') {
-                // Speaker pill / label (simple for Phase 1). Portrait will evolve to image later.
-                const spId = widget.data?.speakerId || currentPage?.speaker || '';
-                const label = speakerNames[spId] || spId || 'Speaker';
+              // Common wrapper for all widget types — adds drag/select in editor
+              const renderWidgetContent = () => {
+                if (widget.type === 'dialogueBox') {
+                  const dialogText = currentPage?.text?.ru || '';
+                  const boxH = Math.max(48, wH);
+                  const innerPad = 14;
+                  return (
+                    <>
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={wW}
+                        height={boxH}
+                        cornerRadius={10}
+                        fill="rgba(33, 29, 24, 0.94)"
+                        stroke={isSelected ? '#C5A46E' : '#534B40'}
+                        strokeWidth={isSelected ? 2.5 : 1.5}
+                        shadowColor="rgba(0,0,0,0.4)"
+                        shadowBlur={isSelected ? 8 : 0}
+                      />
+                      <Text
+                        x={innerPad}
+                        y={10}
+                        width={wW - innerPad * 2}
+                        height={boxH - 18}
+                        text={dialogText}
+                        fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
+                        fill="#EDE4D4"
+                        lineHeight={1.32}
+                        wrap="word"
+                      />
+                    </>
+                  );
+                }
+
+                if (widget.type === 'textLabel' || widget.type === 'portrait') {
+                  const spId = widget.data?.speakerId || currentPage?.speaker || '';
+                  const label = speakerNames[spId] || spId || 'Speaker';
+                  const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                  let imgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
+                  if (imgSrc && !imgSrc.startsWith('http') && !imgSrc.startsWith('/')) imgSrc = '/' + imgSrc;
+                  const wImg = imgSrc ? widgetImages[imgSrc] : null;
+
+                  if (wImg && widget.type === 'portrait') {
+                    return <KonvaImage image={wImg} width={wW} height={wH} />;
+                  }
+                  return (
+                    <>
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={wW}
+                        height={wH}
+                        cornerRadius={4}
+                        fill="rgba(0,0,0,0.55)"
+                        stroke={isSelected ? '#C5A46E' : '#534B40'}
+                        strokeWidth={isSelected ? 2 : 1}
+                      />
+                      <Text
+                        x={0}
+                        y={Math.max(2, (wH - 12) / 2)}
+                        width={wW}
+                        height={wH}
+                        text={label}
+                        fontSize={Math.max(9, Math.min(12, Math.round(wH * 0.45)))}
+                        align="center"
+                        fill="#C5A46E"
+                        fontStyle="500"
+                      />
+                    </>
+                  );
+                }
+
+                if (widget.type === 'choiceButton') {
+                  return (
+                    <>
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={wW}
+                        height={wH}
+                        cornerRadius={5}
+                        fill="rgba(80,65,45,0.85)"
+                        stroke={isSelected ? '#E8D4A0' : '#8a7655'}
+                        strokeWidth={isSelected ? 2 : 1}
+                      />
+                      <Text x={2} y={wH / 2 - 6} width={wW} text={widget.text?.ru || 'Choice'} fontSize={11} fill="#EDE4D4" align="center" />
+                    </>
+                  );
+                }
+
+                // Fallback
                 return (
-                  <Group key={widget.id} x={wX} y={wY}>
+                  <Rect x={0} y={0} width={wW} height={wH} fill="#222" stroke="#555" />
+                );
+              };
+
+              return (
+                <Group
+                  key={widget.id}
+                  x={wX}
+                  y={wY}
+                  draggable={!isPlaytestMode}
+                  onMouseEnter={() => setHoveredWidgetId(widget.id)}
+                  onMouseLeave={() => setHoveredWidgetId(null)}
+                  onDragMove={(e) => {
+                    if (isPlaytestMode) return;
+                    const node = e.target;
+                    const cx = (node.x() / width) * 100;
+                    const cy = (node.y() / height) * 100;
+
+                    if (snapEnabled) {
+                      const snap = getSnappedButtonPosition(
+                        { x: cx, y: cy, width: widget.layout.width, height: widget.layout.height },
+                        guides,
+                        2.0
+                      );
+                      const sx = (snap.x / 100) * width;
+                      const sy = (snap.y / 100) * height;
+                      node.x(sx);
+                      node.y(sy);
+                      if (snap.snappedToVertical || snap.snappedToHorizontal) {
+                        useStudioStore.getState().setSnappingGuide({ vertical: snap.snappedToVertical, horizontal: snap.snappedToHorizontal });
+                      } else {
+                        useStudioStore.getState().setSnappingGuide(null);
+                      }
+                    } else {
+                      useStudioStore.getState().setSnappingGuide(null);
+                    }
+                  }}
+                  onDragEnd={(e) => {
+                    if (isPlaytestMode) return;
+                    handleWidgetDragEnd(widget.id, e);
+                  }}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    if (!isPlaytestMode) {
+                      selectWidget(widget.id);
+                      selectButton(null);
+                    }
+                  }}
+                  onTap={(e) => {
+                    e.cancelBubble = true;
+                    if (!isPlaytestMode) {
+                      selectWidget(widget.id);
+                      selectButton(null);
+                    }
+                  }}
+                >
+                  {/* Optional highlight ring for hover/selected */}
+                  {(isSelected || isHovered) && (
                     <Rect
-                      x={0}
-                      y={0}
-                      width={wW}
-                      height={wH}
-                      cornerRadius={4}
-                      fill="rgba(0,0,0,0.55)"
-                      stroke="#534B40"
+                      x={-3}
+                      y={-3}
+                      width={wW + 6}
+                      height={wH + (widget.type === 'dialogueBox' ? Math.max(48, wH) + 6 : wH + 6)}
+                      cornerRadius={8}
+                      stroke={isSelected ? '#C5A46E' : '#8a7655'}
                       strokeWidth={1}
+                      dash={[3, 2]}
+                      listening={false}
                     />
-                    <Text
-                      x={0}
-                      y={Math.max(2, (wH - 12) / 2)}
-                      width={wW}
-                      height={wH}
-                      text={label}
-                      fontSize={Math.max(9, Math.min(12, Math.round(wH * 0.45)))}
-                      align="center"
-                      fill="#C5A46E"
-                      fontStyle="500"
-                    />
-                  </Group>
-                );
-              }
-
-              // Other widget types (choiceButton, intensity etc) rendered as placeholder in Phase 1
-              if (widget.type === 'choiceButton') {
-                return (
-                  <Group key={widget.id} x={wX} y={wY}>
-                    <Rect x={0} y={0} width={wW} height={wH} cornerRadius={5} fill="rgba(80,65,45,0.85)" stroke="#8a7655" />
-                    <Text x={2} y={wH/2-6} width={wW} text={widget.text?.ru || 'Choice'} fontSize={11} fill="#EDE4D4" align="center" />
-                  </Group>
-                );
-              }
-
-              return null;
+                  )}
+                  {renderWidgetContent()}
+                </Group>
+              );
             })}
 
           {/* Draggable Buttons */}
