@@ -327,15 +327,50 @@ export type StudioButton = {
   action: ButtonAction;
   visibleWhen?: Condition;
   enabledWhen?: Condition;
+
+  // === Ported from old visual editor: per-button position history ===
+  // Allows restoring previous positions of this specific button (better than global canvas undo)
+  history?: Array<{
+    layout: StudioButton['layout'];
+    ts: string;           // ISO timestamp
+    authorId?: string;    // for future collab / audit
+  }>;
 };
 
 export type StudioPage = {
   id: string;
   title: LocalizedString;
-  background: string;
+  background: string; // now backgroundId (custom or built-in)
   speaker: string;
   text: LocalizedString;
   buttons: StudioButton[];
+  // Visibility / scene UI flags (ported + extended for Top Resource Bar)
+  showTopResourceBar?: boolean; // default true; per-scene control for the floating HUD
+  sceneType?: 'exploration' | 'dialog' | 'combat' | 'menu'; // helps with smart defaults (e.g. hide bar on dialog/menu)
+};
+
+export type BackgroundSettings = {
+  scale: number;           // 1 = original size
+  offsetX: number;
+  offsetY: number;
+  brightness: number;      // 1 = normal, 0 = black, 2 = bright
+  opacity: number;         // 0-1
+  fitMode: 'cover' | 'contain' | 'fill' | 'manual';  // how to fit the image to canvas
+  parallax: {
+    enabled: boolean;
+    speedX: number;        // multiplier for movement
+    speedY: number;
+    reverse: boolean;      // reverse direction
+  };
+};
+
+export type Background = {
+  id: string;
+  name: LocalizedString;
+  url?: string;            // if present → image background, else gradient (legacy)
+  // base settings (can be overridden per-page or via actions/conditions later)
+  settings: BackgroundSettings;
+  isBuiltIn?: boolean;     // prevent delete for legacy gradients
 };
 
 export type ProjectMeta = {
@@ -371,11 +406,19 @@ type StudioState = {
   // Controls whether button snapping to guides is enabled
   snapEnabled: boolean;
 
+  // Canvas / viewport design resolution (used for both editor preview and playtest "game" view)
+  // Default changed to 16:9 for modern feel. Buttons use % so they adapt.
+  canvasWidth: number;
+  canvasHeight: number;
+
   // Реестр предметов (простая версия на первом этапе)
   items: Item[];
 
   // Variables (гибкая система состояния проекта)
   variables: Variable[];
+
+  // Backgrounds (гибкая система фонов сцены)
+  backgrounds: Background[];
 
   // === Playtest / Preview State ===
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
@@ -384,6 +427,8 @@ type StudioState = {
     equippedItemIds: string[]; // legacy
     equippedSlots: Partial<Record<EquipmentSlot, string>>; // Новый способ: slot -> itemId
     isInventoryOpen: boolean;
+    // For Top Resource Bar avatar evolution (auto changes over time based on state, no player input)
+    playerAvatar?: string; // 'default' | 'wounded' | 'veteran' | ...
   };
 
   // Actions
@@ -398,6 +443,9 @@ type StudioState = {
   moveButton: (pageId: string, buttonId: string, x: number, y: number) => void;
   updateButtonLayout: (pageId: string, buttonId: string, layout: Partial<StudioButton['layout']>) => void;
 
+  // === Per-button history (ported from old visual editor) ===
+  restoreButtonFromHistory: (pageId: string, buttonId: string, historyIndex: number) => void; // historyIndex from end (0 = most recent previous)
+
   copyButtonCoordinates: (pageId: string, buttonId: string) => void;
   pasteButtonCoordinates: (pageId: string, buttonId: string) => void;
   clearCoordinateClipboard: () => void;
@@ -409,6 +457,9 @@ type StudioState = {
   moveGuide: (axis: 'horizontal' | 'vertical', oldPosition: number, newPosition: number) => void;
   setSnappingGuide: (snap: { vertical?: number; horizontal?: number } | null) => void;
   setSnapEnabled: (enabled: boolean) => void;
+
+  // Canvas size (design resolution, 16:9 recommended). Changing it re-interprets all % button layouts on the new aspect.
+  setCanvasSize: (width: number, height: number) => void;
 
   // === Project Persistence ===
   saveToLocalStorage: () => void;
@@ -429,6 +480,12 @@ type StudioState = {
   updateVariable: (id: string, updates: Partial<Omit<Variable, 'id'>>) => void;
   deleteVariable: (id: string) => void;
   getVariable: (id: string) => Variable | undefined;
+
+  // === Backgrounds (Гибкая система фонов) ===
+  addBackground: (background: Omit<Background, 'id'>) => void;
+  updateBackground: (id: string, updates: Partial<Omit<Background, 'id'>>) => void;
+  deleteBackground: (id: string) => void;
+  getBackground: (id: string) => Background | undefined;
 
   // Live playtest value mutation (so editing endurance etc in sidebar during Playtest immediately affects backpack size, damage etc)
   setPlaytestVariableValue: (id: string, value: number | boolean | string) => void;
@@ -505,6 +562,10 @@ type StudioState = {
   itemsCollapsed: boolean;
   toggleItemsCollapsed: () => void;
 
+  // Backgrounds block (new dedicated deep editor for custom scene backgrounds)
+  backgroundsCollapsed: boolean;
+  toggleBackgroundsCollapsed: () => void;
+
   // Collapsed state for individual items (to reduce scrolling when many items)
   collapsedItemIds: string[]; // Теперь хранит ID РАЗВЁРНУТЫХ предметов. По умолчанию все свёрнуты.
   toggleItemCollapsed: (itemId: string) => void;
@@ -522,13 +583,15 @@ type StudioState = {
 const createDefaultPage = (id: string): StudioPage => ({
   id,
   title: { ru: 'Новая страница', en: 'New Page' },
-  background: 'village_morning',
-  speaker: 'narrator',
+  background: '',  // no built-in, user creates custom
+  speaker: 'none',
   text: {
-    ru: 'Текст на русском...',
-    en: 'English text...',
+    ru: '',
+    en: '',
   },
   buttons: [],
+  showTopResourceBar: true,
+  sceneType: 'exploration',
 });
 
 const DEFAULT_PROJECT_NAME = 'Табуреткино — Акт 1';
@@ -537,7 +600,7 @@ const createDefaultPages = (): StudioPage[] => [
   {
     id: 'intro_01',
     title: { ru: 'Введение — Окраина Табуреткино', en: 'Introduction — Edge of Taburetkiно' },
-    background: 'village_morning',
+    background: '',
     speaker: 'narrator',
     text: {
       ru: 'Ты стоишь на окраине Табуреткино. В воздухе пахнет свежим хлебом и старым магическим бензином.',
@@ -561,13 +624,15 @@ const createDefaultPages = (): StudioPage[] => [
   {
     id: 'tavern_01',
     title: { ru: 'Таверна. Мила', en: 'The Tavern. Mila' },
-    background: 'tavern',
+    background: '',
     speaker: 'mila',
     text: {
       ru: 'Ого, Слэй... Давно не заходил. Выглядишь, будто тебя переехал грузовик.',
       en: 'Well, well, Slay... Haven\'t seen you in a while. You look like you got hit by a truck.',
     },
     buttons: [],
+    showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
+    sceneType: 'dialog',
   },
 ];
 
@@ -592,15 +657,22 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   snappingGuide: null,
   snapEnabled: true,
 
+  // Canvas design resolution (16:9). Buttons layouts are % so they adapt when changed.
+  canvasWidth: 1280,
+  canvasHeight: 720,
+
   // Items registry (Вариант Б — сразу делаем реестр предметов)
   items: [],
   variables: [],
+
+  backgrounds: [],
 
   playtestState: {
     variableValues: {},
     equippedItemIds: [],
     equippedSlots: {},
     isInventoryOpen: false,
+    playerAvatar: 'default',
   },
 
   // Canvas-only history (for button dragging on the canvas)
@@ -626,6 +698,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Variables and Items blocks start collapsed by default
   variablesCollapsed: true,
   itemsCollapsed: true,
+  backgroundsCollapsed: true,
 
   // No items collapsed by default (individual items)
   collapsedItemIds: [],
@@ -637,7 +710,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   selectPage: (id) => set({ selectedPageId: id, selectedButtonId: null }),
 
-  selectButton: (id) => set({ selectedButtonId: id }),
+  selectButton: (id) => {
+    set({ selectedButtonId: id });
+    // Seed initial history entry if this button has no history yet (so UI shows immediately)
+    if (id) {
+      const state = get();
+      const page = state.pages.find(p => p.id === state.selectedPageId);
+      const btn = page?.buttons.find(b => b.id === id);
+      if (btn && (!btn.history || btn.history.length === 0)) {
+        set((s) => ({
+          pages: s.pages.map(p =>
+            p.id === state.selectedPageId
+              ? {
+                  ...p,
+                  buttons: p.buttons.map(b =>
+                    b.id === id
+                      ? { ...b, history: [{ layout: { ...b.layout }, ts: new Date().toISOString() }] }
+                      : b
+                  ),
+                }
+              : p
+          ),
+        }));
+        get().saveToLocalStorage();
+      }
+    }
+  },
 
   updatePage: (id, updates) => {
     set((state) => ({
@@ -674,6 +772,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         style: 'default',
       },
       action: { type: 'goToPage', pageId: '' },
+      history: [], // ported from old editor: per-button history
     };
 
     set((state) => ({
@@ -703,11 +802,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         page.id === pageId
           ? {
               ...page,
-              buttons: page.buttons.map((btn) =>
-                btn.id === buttonId
-                  ? { ...btn, layout: { ...btn.layout, x: Math.max(4, Math.min(82, x)), y: Math.max(8, Math.min(78, y)) } }
-                  : btn
-              ),
+              buttons: page.buttons.map((btn) => {
+                if (btn.id !== buttonId) return btn;
+                const prevLayout = { ...btn.layout };
+                const newHistory = [
+                  ...(btn.history || []),
+                  { layout: prevLayout, ts: new Date().toISOString() },
+                ].slice(-10);
+                return {
+                  ...btn,
+                  layout: { ...btn.layout, x: Math.max(4, Math.min(82, x)), y: Math.max(8, Math.min(78, y)) },
+                  history: newHistory,
+                };
+              }),
             }
           : page
       ),
@@ -721,13 +828,56 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         page.id === pageId
           ? {
               ...page,
-              buttons: page.buttons.map((btn) =>
-                btn.id === buttonId
-                  ? { ...btn, layout: { ...btn.layout, ...layoutUpdates } }
-                  : btn
-              ),
+              buttons: page.buttons.map((btn) => {
+                if (btn.id !== buttonId) return btn;
+
+                // Port from old editor: push previous layout to per-button history (max 10 entries)
+                const prevLayout = { ...btn.layout };
+                const newHistory = [
+                  ...(btn.history || []),
+                  { layout: prevLayout, ts: new Date().toISOString() },
+                ].slice(-10); // keep last 10 like old version-history limit
+
+                return {
+                  ...btn,
+                  layout: { ...btn.layout, ...layoutUpdates },
+                  history: newHistory,
+                };
+              }),
             }
           : page
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  // Ported from old editor: restore a specific previous layout for one button
+  restoreButtonFromHistory: (pageId, buttonId, historyIndex) => {
+    const state = get();
+    const page = state.pages.find(p => p.id === pageId);
+    if (!page) return;
+
+    const btn = page.buttons.find(b => b.id === buttonId);
+    if (!btn || !btn.history || btn.history.length === 0) return;
+
+    // history is oldest-first in array, last is most recent previous state
+    const idx = btn.history.length - 1 - historyIndex; // 0 = last saved previous
+    if (idx < 0 || idx >= btn.history.length) return;
+
+    const entry = btn.history[idx];
+
+    set((s) => ({
+      pages: s.pages.map(p =>
+        p.id === pageId
+          ? {
+              ...p,
+              buttons: p.buttons.map(b =>
+                b.id === buttonId
+                  ? { ...b, layout: { ...entry.layout } }
+                  : b
+              ),
+            }
+          : p
       ),
     }));
     get().saveToLocalStorage();
@@ -903,20 +1053,25 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           page.id === pageId
             ? {
                 ...page,
-                buttons: page.buttons.map((btn) =>
-                  btn.id === buttonId
-                    ? {
-                        ...btn,
-                        layout: {
-                          ...btn.layout,
-                          x: state.coordinateClipboard!.x,
-                          y: state.coordinateClipboard!.y,
-                          width: state.coordinateClipboard!.width,
-                          height: state.coordinateClipboard!.height,
-                        },
-                      }
-                    : btn
-                ),
+                buttons: page.buttons.map((btn) => {
+                  if (btn.id !== buttonId) return btn;
+                  const prevLayout = { ...btn.layout };
+                  const newHistory = [
+                    ...(btn.history || []),
+                    { layout: prevLayout, ts: new Date().toISOString() },
+                  ].slice(-10);
+                  return {
+                    ...btn,
+                    layout: {
+                      ...btn.layout,
+                      x: state.coordinateClipboard!.x,
+                      y: state.coordinateClipboard!.y,
+                      width: state.coordinateClipboard!.width,
+                      height: state.coordinateClipboard!.height,
+                    },
+                    history: newHistory,
+                  };
+                }),
               }
             : page
         ),
@@ -995,6 +1150,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
       return { snapEnabled: true };
     });
+  },
+
+  setCanvasSize: (width, height) => {
+    const w = Math.max(320, Math.min(3840, Math.round(width)));
+    const h = Math.max(180, Math.min(2160, Math.round(height)));
+    set({ canvasWidth: w, canvasHeight: h });
+    get().saveToLocalStorage();
   },
 
   // === Items Management (Вариант Б) ===
@@ -1084,6 +1246,51 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     return get().variables.find((v) => v.id === id);
   },
 
+  // === Backgrounds (Гибкая система фонов сцены) ===
+  addBackground: (bgData) => {
+    const newBg: Background = {
+      ...bgData,
+      id: `bg_${Date.now().toString(36)}`,
+      settings: bgData.settings ?? {
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+        brightness: 1,
+        opacity: 1,
+        fitMode: 'cover',
+        parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false },
+      },
+    };
+    set((state) => ({ backgrounds: [...state.backgrounds, newBg] }));
+    get().saveToLocalStorage();
+  },
+
+  updateBackground: (id, updates) => {
+    set((state) => ({
+      backgrounds: state.backgrounds.map((bg) =>
+        bg.id === id ? { ...bg, ...updates } : bg
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  deleteBackground: (id) => {
+    set((state) => ({
+      backgrounds: state.backgrounds.filter((b) => b.id !== id),
+      // If any page used this bg, reset to first available or ''
+      pages: state.pages.map((p) =>
+        p.background === id
+          ? { ...p, background: (state.backgrounds[0]?.id || '') }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  getBackground: (id) => {
+    return get().backgrounds.find((b) => b.id === id);
+  },
+
   // === Playtest State ===
   resetPlaytestState: () => {
     const state = get();
@@ -1108,6 +1315,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         equippedItemIds: [],
         equippedSlots: {},
         isInventoryOpen: false,
+        playerAvatar: 'default',
       },
       snappingGuide: null,
     });
@@ -1285,6 +1493,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   toggleVariablesCollapsed: () => set((state) => ({ variablesCollapsed: !state.variablesCollapsed })),
   toggleItemsCollapsed: () => set((state) => ({ itemsCollapsed: !state.itemsCollapsed })),
+
+  toggleBackgroundsCollapsed: () => set((state) => ({ backgroundsCollapsed: !state.backgroundsCollapsed })),
 
   toggleItemCollapsed: (itemId) => set((state) => {
     // Теперь collapsedItemIds = список РАЗВЁРНУТЫХ предметов.
@@ -1532,6 +1742,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         equippedItemIds: s.playtestState.equippedItemIds,
         equippedSlots: s.playtestState.equippedSlots,
         isInventoryOpen: s.playtestState.isInventoryOpen,
+        playerAvatar: s.playtestState.playerAvatar ?? 'default',
       },
     }));
   },
@@ -1545,7 +1756,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       selectedPageId: state.selectedPageId,
       items: state.items,
       variables: state.variables,
+      backgrounds: state.backgrounds,
       startingInventory: state.startingInventory,
+      canvasWidth: state.canvasWidth,
+      canvasHeight: state.canvasHeight,
     };
     try {
       localStorage.setItem('slay-studio-project', JSON.stringify(dataToSave));
@@ -1563,10 +1777,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const parsed = JSON.parse(saved);
       if (!parsed.pages || !Array.isArray(parsed.pages)) return false;
 
+      const loadedBackgrounds = parsed.backgrounds || [];
+      const bgIdSet = new Set(loadedBackgrounds.map((b: any) => b.id));
+
+      // Migrate legacy page.background (old string keys like 'forest') to '' or valid id
+      const migratedPages = parsed.pages.map((p: any) => ({
+        ...p,
+        background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
+      }));
+
       set({
         meta: parsed.meta || createInitialMeta(),
-        pages: parsed.pages,
-        selectedPageId: parsed.selectedPageId || parsed.pages[0]?.id || null,
+        pages: migratedPages,
+        selectedPageId: parsed.selectedPageId || migratedPages[0]?.id || null,
         selectedButtonId: null,
         coordinateClipboard: null,
         // Backward compatible: default to empty guides
@@ -1575,7 +1798,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snapEnabled: parsed.snapEnabled ?? true,
         items: parsed.items || [],
         variables: parsed.variables || [],
+        backgrounds: loadedBackgrounds,
         startingInventory: parsed.startingInventory || {},
+        // Canvas resolution (default to 16:9 1280x720 for new/legacy projects)
+        canvasWidth: parsed.canvasWidth || 1280,
+        canvasHeight: parsed.canvasHeight || 720,
       });
       return true;
     } catch (e) {
@@ -1596,7 +1823,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       guides: state.guides,
       items: state.items,
       variables: state.variables,
+      backgrounds: state.backgrounds,
       startingInventory: state.startingInventory,
+      canvasWidth: state.canvasWidth,
+      canvasHeight: state.canvasHeight,
     };
 
     const json = JSON.stringify(exportData, null, 2);
@@ -1622,10 +1852,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return false;
       }
 
+      const importedBackgrounds = data.backgrounds || [];
+      const bgIdSet = new Set(importedBackgrounds.map((b: any) => b.id));
+
+      const migratedPages = data.pages.map((p: any) => ({
+        ...p,
+        background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
+      }));
+
       set({
         meta: data.meta || { ...createInitialMeta(), name: 'Импортированный проект' },
-        pages: data.pages,
-        selectedPageId: data.pages[0]?.id || null,
+        pages: migratedPages,
+        selectedPageId: migratedPages[0]?.id || null,
         selectedButtonId: null,
         coordinateClipboard: null,
         // Support guides in imported files
@@ -1634,7 +1872,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         snapEnabled: data.snapEnabled ?? true,
         items: data.items || [],
         variables: data.variables || [],
+        backgrounds: importedBackgrounds,
         startingInventory: data.startingInventory || {},
+        canvasWidth: data.canvasWidth || 1280,
+        canvasHeight: data.canvasHeight || 720,
       });
 
       // Auto-save after import
@@ -1664,7 +1905,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       snapEnabled: true,
       items: [],
       variables: [],
+      backgrounds: [],
       startingInventory: {},
+      playtestState: {
+        variableValues: {},
+        equippedItemIds: [],
+        equippedSlots: {},
+        isInventoryOpen: false,
+        playerAvatar: 'default',
+      },
+      canvasWidth: 1280,
+      canvasHeight: 720,
     });
     get().saveToLocalStorage();
   },
@@ -1700,8 +1951,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       // Ресурсы (теперь как расходники)
       { name: 'coins', displayName: { ru: 'Монеты', en: 'Coins' }, type: 'number', defaultValue: 15, category: 'resources' },
-      { name: 'gasoline', displayName: { ru: 'Бензин', en: 'Gasoline' }, type: 'number', defaultValue: 0, category: 'resources' },
-      { name: 'gems', displayName: { ru: 'Драгоценности', en: 'Gems' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gasoline', displayName: { ru: 'Топливо', en: 'Fuel' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gems', displayName: { ru: 'Сталлонки', en: 'Stallons' }, type: 'number', defaultValue: 0, category: 'resources' },
     ];
 
     const newVariables = defaultStats
@@ -1726,8 +1977,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     const resources: Omit<Variable, 'id'>[] = [
       { name: 'coins', displayName: { ru: 'Монеты', en: 'Coins' }, type: 'number', defaultValue: 15, category: 'resources' },
-      { name: 'gasoline', displayName: { ru: 'Бензин', en: 'Gasoline' }, type: 'number', defaultValue: 0, category: 'resources' },
-      { name: 'gems', displayName: { ru: 'Драгоценности', en: 'Gems' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gasoline', displayName: { ru: 'Топливо', en: 'Fuel' }, type: 'number', defaultValue: 0, category: 'resources' },
+      { name: 'gems', displayName: { ru: 'Сталлонки', en: 'Stallons' }, type: 'number', defaultValue: 0, category: 'resources' },
     ];
 
     const newResources = resources
@@ -1807,6 +2058,7 @@ export type PlaytestSnapshot = {
   variableValues: Record<string, number | boolean | string>;
   equippedItemIds: string[];
   equippedSlots?: Partial<Record<EquipmentSlot, string>>;
+  playerAvatar?: string; // for TopResourceBar avatar (computed live from state)
 };
 
 /**

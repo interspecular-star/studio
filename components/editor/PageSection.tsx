@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, History, RotateCcw } from 'lucide-react';
+import { useStudioStore } from '@/lib/store';
 import ActionEditor from './ActionEditor';
 import ConditionEditor from './ConditionEditor';
 
@@ -48,6 +49,7 @@ export default function PageSection({
   variables,
   items,
 }: PageSectionProps) {
+  const { backgrounds } = useStudioStore();
   const [collapsed, setCollapsed] = useState(false);
 
   if (!currentPage) return null;
@@ -135,20 +137,74 @@ export default function PageSection({
               onChange={(e) => updateCurrentPage({ background: e.target.value })}
               className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
             >
-              <option value="village_morning">Деревня — утро</option>
-              <option value="tavern">Таверна</option>
-              <option value="cave">Пещера Слэя</option>
-              <option value="forest">Лес у Границы</option>
+              {backgrounds.length === 0 ? (
+                <option value="">Нет фонов</option>
+              ) : (
+                backgrounds.map((bg) => (
+                  <option key={bg.id} value={bg.id}>
+                    {bg.name.ru} {bg.url ? '(изображение)' : '(градиент)'}
+                  </option>
+                ))
+              )}
             </select>
+            <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">
+              Для гибких настроек (масштаб, параллакс, яркость) — см. блок «ФОНЫ» в сайдбаре. Встроенных градиентов больше нет.
+            </p>
+            <button
+              onClick={() => {
+                const nameRu = prompt('Название фона (РУ):', 'Мой новый фон') || 'Новый фон';
+                const url = prompt('URL изображения (от корня public, с / в начале):', '/bg/intro_forest.png');
+                if (url) {
+                  const { addBackground } = useStudioStore.getState();
+                  let finalUrl = url.trim().replace(/\\/g, '/');
+                  if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('/')) {
+                    finalUrl = '/' + finalUrl;
+                  }
+                  addBackground({
+                    name: { ru: nameRu, en: nameRu },
+                    url: finalUrl,
+                    settings: {
+                      scale: 1,
+                      offsetX: 0,
+                      offsetY: 0,
+                      brightness: 1,
+                      opacity: 1,
+                      fitMode: 'cover',
+                      parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false },
+                    },
+                  });
+                  // auto select the new one for current page
+                  const newId = useStudioStore.getState().backgrounds.slice(-1)[0]?.id;
+                  if (newId) updateCurrentPage({ background: newId });
+                }
+              }}
+              className="mt-1 text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+            >
+              + Добавить свой фон (изображение)
+            </button>
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--studio-text-secondary)]">КТО ГОВОРИТ</label>
             <select
-              value={currentPage?.speaker}
-              onChange={(e) => updateCurrentPage({ speaker: e.target.value })}
+              value={currentPage?.speaker || 'none'}
+              onChange={(e) => {
+                const val = e.target.value;
+                const updates: any = { speaker: val };
+                if (!val || val === 'none') {
+                  // Switching to "no dialog / game" mode → make it a proper gameplay page with HUD
+                  updates.sceneType = 'exploration';
+                  updates.showTopResourceBar = true;
+                  // Optional: clear placeholder dialog text so it's clean
+                  if (currentPage) {
+                    updates.text = { ru: '', en: '' };
+                  }
+                }
+                updateCurrentPage(updates);
+              }}
               className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
             >
+              <option value="none">Нет диалога / Игровой режим</option>
               <option value="narrator">Рассказчик</option>
               <option value="slay">Слэй</option>
               <option value="mila">Мила</option>
@@ -189,6 +245,38 @@ export default function PageSection({
               className="h-24 w-full resize-y rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
               placeholder={langTab === 'ru' ? 'Текст на русском...' : 'English text...'}
             />
+          </div>
+
+          {/* Per-scene Top Resource Bar visibility (ported + extended) */}
+          <div className="pt-1">
+            <label className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--studio-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={currentPage?.showTopResourceBar !== false}
+                onChange={(e) => updateCurrentPage({ showTopResourceBar: e.target.checked })}
+                className="accent-[var(--studio-accent)]"
+              />
+              Показывать HUD ресурсов по умолчанию на этой сцене
+            </label>
+            <div className="text-[9px] text-[var(--studio-text-muted)] pl-5">
+              Это — дизайнерское намерение для финальной игры. 
+              Во время Playtest есть отдельная кнопка «HUD: force show» над холстом — она позволяет видеть бар на любой странице независимо от этих настроек (удобно для тестирования).
+            </div>
+
+            {/* sceneType (bonus for smart defaults + future logic) */}
+            <div className="mt-2 pl-5">
+              <label className="text-[9px] text-[var(--studio-text-muted)] mr-1">Тип сцены:</label>
+              <select
+                value={currentPage?.sceneType || 'exploration'}
+                onChange={(e) => updateCurrentPage({ sceneType: e.target.value as any })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-1.5 py-0.5 text-[10px]"
+              >
+                <option value="exploration">Простой / Исследование</option>
+                <option value="dialog">Диалог / Кат-сцена</option>
+                <option value="combat">Бой</option>
+                <option value="menu">Меню / Интерфейс</option>
+              </select>
+            </div>
           </div>
 
           {/* Buttons Section */}
@@ -235,13 +323,60 @@ export default function PageSection({
               <div className="space-y-4 rounded-xl border border-[var(--studio-accent)]/40 bg-[var(--studio-bg-elevated)] p-4">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-medium text-[var(--studio-accent)]">РЕДАКТИРОВАНИЕ КНОПКИ</div>
-                  <button
-                    onClick={() => handleDeleteButton(selectedButton.id)}
-                    className="text-[var(--studio-danger)] hover:text-red-400"
-                    title="Удалить кнопку"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* Version history - ported from old visual editor per-button history */}
+                    <button
+                      onClick={() => {
+                        const store = useStudioStore.getState();
+                        if ((selectedButton.history?.length ?? 0) > 0) {
+                          store.restoreButtonFromHistory(currentPage.id, selectedButton.id, 0);
+                        }
+                      }}
+                      disabled={(selectedButton.history?.length ?? 0) === 0}
+                      className="text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] p-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={(selectedButton.history?.length ?? 0) > 0 ? "Восстановить предыдущую позицию этой кнопки" : "История пока пуста — переместите кнопку на холсте"}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteButton(selectedButton.id)}
+                      className="text-[var(--studio-danger)] hover:text-red-400"
+                      title="Удалить кнопку"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mini history list - always visible for visibility (inspired by old VersionHistory.tsx) */}
+                <div className="mt-2 mb-3 border border-[var(--studio-border)] rounded p-2 bg-[#161310] text-[10px]">
+                  <div className="flex items-center gap-1 mb-1 text-[var(--studio-text-muted)]">
+                    <History className="h-3 w-3" /> История позиций 
+                    {(selectedButton.history?.length ?? 0) > 0 ? `(последние ${Math.min(5, selectedButton.history!.length)})` : '(пока пуста)'}
+                  </div>
+                  {(selectedButton.history?.length ?? 0) > 0 ? (
+                    <div className="space-y-1 max-h-20 overflow-auto">
+                      {selectedButton.history!.slice(-5).reverse().map((entry: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-[var(--studio-text-muted)]">
+                          <span className="font-mono">
+                            x:{entry.layout.x.toFixed(0)} y:{entry.layout.y.toFixed(0)}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const store = useStudioStore.getState();
+                              store.restoreButtonFromHistory(currentPage.id, selectedButton.id, idx);
+                            }}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                          >
+                            Восст.
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[9px] text-[var(--studio-text-muted)]">Переместите кнопку на холсте (drag или редактируйте координаты), чтобы записать предыдущие позиции для отката.</div>
+                  )}
+                  <div className="text-[9px] text-[var(--studio-text-muted)] mt-1">Позиции сохраняются автоматически при перемещении/изменении layout</div>
                 </div>
 
                 {/* Button text */}

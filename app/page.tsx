@@ -12,6 +12,7 @@ import PageSection from '@/components/editor/PageSection';
 import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
 import InventoryModal from '@/components/editor/InventoryModal';
+import TopResourceBar from '@/components/editor/TopResourceBar';
 
 export default function SlayStudio() {
   const {
@@ -43,11 +44,18 @@ export default function SlayStudio() {
     snapEnabled,
     setSnapEnabled,
     setSnappingGuide,
+    canvasWidth,
+    canvasHeight,
+    setCanvasSize,
     items,
     addItem,
     updateItem,
     deleteItem,
     variables,
+    backgrounds,
+    addBackground,
+    updateBackground,
+    deleteBackground,
     addVariable,
     updateVariable,
     deleteVariable,
@@ -87,6 +95,8 @@ export default function SlayStudio() {
     toggleVariablesCollapsed,
     itemsCollapsed,
     toggleItemsCollapsed,
+    backgroundsCollapsed,
+    toggleBackgroundsCollapsed,
     setPlaytestVariableValue,
   } = useStudioStore();
 
@@ -135,6 +145,16 @@ export default function SlayStudio() {
   // Item ID editing - per item (for controlled inputs + confirmation)
   const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+
+  // For the new dedicated Backgrounds block (deep editor for custom images + advanced settings like parallax, brightness, conditions)
+  const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
+
+  // For Top Resource Bar testing in playtest (force show/hide regardless of page flag)
+  // HUD visibility override for testing in Playtest.
+  // 'auto' = respect page flags + context (dialog, inventory, etc.)
+  // 'force-show' = always show HUD (even on dialog pages)
+  // 'force-hide' = always hide HUD (for testing clean game view in game mode)
+  const [hudOverride, setHudOverride] = useState<'auto' | 'force-show' | 'force-hide'>('auto');
 
   // Load project from localStorage on first mount
   useEffect(() => {
@@ -194,6 +214,50 @@ export default function SlayStudio() {
   const lastSavedText = meta.lastSaved ? getRelativeTime(meta.lastSaved) : 'ещё не сохранялся';
 
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
+
+  // Visibility logic for Top Resource Bar in Playtest.
+  //
+  // Priorities (higher = stronger):
+  // 1. Not in playtest → never show.
+  // 2. Per-page explicit OFF (showTopResourceBar === false) → hard hide (author's design decision for this scene).
+  // 3. Author testing override (the "HUD: force" button) → force SHOW the HUD no matter what (dialog, inventory, empty pages etc.).
+  //    This is the main tool during testing so you can see the bar on ANY page.
+  // 4. Automatic context hides (inventory, dialog scenes, pages with real dialog text).
+  //
+  // For your example:
+  // - Page 1 and 2 have dialog → auto hide (unless force or explicit per-page ON).
+  // - Page 3 "empty" → should be treated as gameplay and show the HUD by default.
+  const shouldShowTopResourceBar = (): boolean => {
+    if (mode !== 'playtest') return false;
+
+    // 2. Hard per-page author decision to never show on this scene
+    if (currentPage?.showTopResourceBar === false) return false;
+
+    // 3. Author testing override (button above the canvas)
+    if (hudOverride === 'force-show') return true;
+    if (hudOverride === 'force-hide') return false;
+
+    // From here: normal auto logic (auto mode)
+
+    // Inventory is a full-screen UI → hide HUD
+    if (playtestState.isInventoryOpen) return false;
+
+    const scene = currentPage?.sceneType;
+    const dialogText = currentPage?.text?.ru?.trim() || '';
+
+    const isPlaceholderText = dialogText.includes('Текст на русском') || dialogText.length < 10;
+    const hasRealDialog = dialogText.length > 10 && !isPlaceholderText;
+
+    const isDialogContext =
+      scene === 'dialog' ||
+      scene === 'menu' ||
+      (hasRealDialog && scene !== 'exploration');
+
+    if (isDialogContext) return false;
+
+    // Default: show on gameplay / exploration / empty pages (like your page 3)
+    return true;
+  };
 
   // === Handlers ===
   const handleAddPage = () => {
@@ -549,13 +613,68 @@ export default function SlayStudio() {
                 {selectedPageId}
               </span>
             </div>
-            <div className="text-[var(--studio-text-muted)]">960 × 600</div>
+            <div className="flex items-center gap-2 text-[var(--studio-text-muted)]">
+              <span className="font-mono">{canvasWidth} × {canvasHeight}</span>
+              <select
+                value={`${canvasWidth}x${canvasHeight}`}
+                onChange={(e) => {
+                  const [w, h] = e.target.value.split('x').map(Number);
+                  setCanvasSize(w, h);
+                }}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-1 py-0.5 text-[9px] text-[var(--studio-text-muted)]"
+                title="Разрешение игрового холста (16:9 рекомендуется). % координаты кнопок адаптируются автоматически."
+              >
+                <option value="960x600">960×600 (старый 16:10)</option>
+                <option value="1280x720">1280×720 (16:9 HD)</option>
+                <option value="1600x900">1600×900 (16:9)</option>
+                <option value="1920x1080">1920×1080 (16:9 FullHD)</option>
+              </select>
+              {mode === 'playtest' && (
+                <button
+                  onClick={() => {
+                    const order: Array<'auto' | 'force-show' | 'force-hide'> = ['auto', 'force-show', 'force-hide'];
+                    const currentIndex = order.indexOf(hudOverride);
+                    const next = order[(currentIndex + 1) % order.length];
+                    setHudOverride(next);
+                  }}
+                  className="ml-1 rounded border border-[var(--studio-border)] px-1.5 py-0.5 text-[9px] hover:border-[var(--studio-accent)]"
+                  title="HUD override для тестирования: auto → force show → force hide. В game режиме (без диалога) позволяет принудительно скрывать/показывать бар."
+                >
+                  {hudOverride === 'auto' && 'HUD: auto'}
+                  {hudOverride === 'force-show' && 'HUD: force show'}
+                  {hudOverride === 'force-hide' && 'HUD: force hide'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-1 items-center justify-center bg-[#161310] p-6 overflow-auto relative">
-            <CanvasWithRulers width={960} height={600}>
-              <KonvaCanvas width={960} height={600} />
-            </CanvasWithRulers>
+            {mode === 'playtest' ? (
+              /* Playtest: clean exact-resolution "workflow window".
+                 The Top Resource Bar is the top strip *inside* this frame — it hugs the bounds
+                 and automatically adapts when you pick a different size in the selector above. */
+              <div
+                className="relative rounded-2xl border border-[var(--studio-border-strong)] bg-black overflow-hidden shadow-2xl"
+                style={{ width: canvasWidth, height: canvasHeight }}
+              >
+                {shouldShowTopResourceBar() && (
+                  <div className="absolute top-0 left-0 right-0 z-30 pointer-events-auto border-b border-[var(--studio-border)]/60">
+                    <TopResourceBar
+                      currentPage={currentPage}
+                      variables={variables}
+                      playtestState={playtestState}
+                    />
+                  </div>
+                )}
+
+                <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+              </div>
+            ) : (
+              /* Editor: full CanvasWithRulers + guides at the chosen logical size. */
+              <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
+                <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+              </CanvasWithRulers>
+            )}
 
             {/* Модальное окно инвентаря (поверх холста в Playtest) */}
             {mode === 'playtest' && playtestState.isInventoryOpen && (
@@ -1538,6 +1657,314 @@ export default function SlayStudio() {
 
             </div>
 
+            {/* === ФОНЫ (отдельный глубокий блок, как Items / Inventory) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <button
+                onClick={toggleBackgroundsCollapsed}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
+              >
+                <span>ФОНЫ</span>
+                <span className="text-xs">{backgroundsCollapsed ? '▶' : '▼'}</span>
+              </button>
+
+              {!backgroundsCollapsed && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => {
+                        const newBg: any = {
+                          name: { ru: 'Новый фон', en: 'New Background' },
+                          url: '',
+                          settings: {
+                            scale: 1,
+                            offsetX: 0,
+                            offsetY: 0,
+                            brightness: 1,
+                            opacity: 1,
+                            fitMode: 'cover',
+                            parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false },
+                          },
+                        };
+                        const { addBackground, backgrounds: currentBgs } = useStudioStore.getState();
+                        addBackground(newBg);
+                        // Select the newly added one for editing
+                        setTimeout(() => {
+                          const latest = useStudioStore.getState().backgrounds.slice(-1)[0];
+                          if (latest) setEditingBackgroundId(latest.id);
+                        }, 0);
+                      }}
+                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-3 py-1.5 text-sm font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full justify-center"
+                    >
+                      + Новый фон (изображение / градиент)
+                    </button>
+                  </div>
+
+                  {backgrounds.length === 0 && (
+                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                      Нет фонов. Добавьте свой (URL картинки) или используйте встроенные градиенты.
+                    </p>
+                  )}
+
+                  <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                    {backgrounds.map((bg) => {
+                      const isEditing = editingBackgroundId === bg.id;
+
+                      return (
+                        <div
+                          key={bg.id}
+                          className={`rounded border px-2 py-1.5 text-xs ${isEditing ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]' : 'border-[var(--studio-border)] bg-[#1C1814]'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => setEditingBackgroundId(isEditing ? null : bg.id)}
+                              className="flex-1 text-left font-medium truncate hover:underline"
+                            >
+                              {bg.name.ru} {bg.url ? '🖼️' : '🎨'}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Удалить фон "${bg.name.ru}"?`)) {
+                                  const { deleteBackground } = useStudioStore.getState();
+                                  deleteBackground(bg.id);
+                                  if (editingBackgroundId === bg.id) setEditingBackgroundId(null);
+                                }
+                              }}
+                              className="text-[var(--studio-danger)] hover:text-red-400"
+                              title="Удалить фон"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {isEditing && (
+                            <div className="mt-2 space-y-2 border-t border-[var(--studio-border)] pt-2">
+                              {/* Name */}
+                              <div>
+                                <label className="text-[9px] text-[var(--studio-text-muted)]">Название (РУ)</label>
+                                <input
+                                  value={bg.name.ru}
+                                  onChange={(e) => {
+                                    const { updateBackground } = useStudioStore.getState();
+                                    updateBackground(bg.id, { name: { ...bg.name, ru: e.target.value } });
+                                  }}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[9px] text-[var(--studio-text-muted)]">Название (EN)</label>
+                                <input
+                                  value={bg.name.en}
+                                  onChange={(e) => {
+                                    const { updateBackground } = useStudioStore.getState();
+                                    updateBackground(bg.id, { name: { ...bg.name, en: e.target.value } });
+                                  }}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs"
+                                />
+                              </div>
+
+                              {/* URL */}
+                              <div>
+                                <label className="text-[9px] text-[var(--studio-text-muted)]">URL изображения (прямая ссылка)</label>
+                                <input
+                                  value={bg.url || ''}
+                                  placeholder="https://... или /bg/intro_forest.png (от корня public, с / в начале)"
+                                  onChange={(e) => {
+                                    let val = e.target.value.trim().replace(/\\/g, '/');
+                                    if (val && !val.startsWith('http') && !val.startsWith('/')) {
+                                      val = '/' + val;
+                                    }
+                                    const { updateBackground } = useStudioStore.getState();
+                                    updateBackground(bg.id, { url: val || undefined });
+                                  }}
+                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs font-mono"
+                                />
+                                <p className="mt-0.5 text-[8px] text-[var(--studio-text-muted)]">
+                                  Указывай путь от корня public, например /bg/intro_forest.png или /chara/hero.png (всегда с ведущим /)
+                                  <br />Внешние http/https работают для теста. Абсолютные локальные пути (C:\...) не работают в браузере.
+                                </p>
+                                {bg.url && (
+                                  <div className="mt-1">
+                                    <img
+                                      src={bg.url}
+                                      style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', border: '1px solid #444', background: '#111' }}
+                                      alt="bg preview"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.border = '1px solid #c25d3a';
+                                        (e.currentTarget as HTMLImageElement).style.opacity = '0.5';
+                                      }}
+                                    />
+                                    <div className="text-[8px] text-[var(--studio-text-muted)]">Preview — красная рамка = путь неверный или файл не найден</div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Basic advanced settings */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Масштаб</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={bg.settings.scale}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, { settings: { ...bg.settings, scale: parseFloat(e.target.value) || 1 } });
+                                    }}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Режим подгонки</label>
+                                  <select
+                                    value={bg.settings.fitMode || 'cover'}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, { settings: { ...bg.settings, fitMode: e.target.value as any } });
+                                    }}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
+                                  >
+                                    <option value="cover">Cover (заполнить, обрезать)</option>
+                                    <option value="contain">Contain (вписать полностью)</option>
+                                    <option value="fill">Fill (растянуть)</option>
+                                    <option value="manual">Manual (только масштаб)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Прозрачность</label>
+                                  <input
+                                    type="number"
+                                    step="0.05"
+                                    min="0"
+                                    max="1"
+                                    value={bg.settings.opacity}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, { settings: { ...bg.settings, opacity: parseFloat(e.target.value) || 1 } });
+                                    }}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Яркость</label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={bg.settings.brightness}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, { settings: { ...bg.settings, brightness: parseFloat(e.target.value) || 1 } });
+                                    }}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Смещение X</label>
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    value={bg.settings.offsetX}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, { settings: { ...bg.settings, offsetX: parseFloat(e.target.value) || 0 } });
+                                    }}
+                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Parallax mini */}
+                              <div className="pt-1 border-t border-[var(--studio-border)]">
+                                <label className="flex items-center gap-1 text-[9px] text-[var(--studio-text-muted)]">
+                                  <input
+                                    type="checkbox"
+                                    checked={bg.settings.parallax.enabled}
+                                    onChange={(e) => {
+                                      const { updateBackground } = useStudioStore.getState();
+                                      updateBackground(bg.id, {
+                                        settings: {
+                                          ...bg.settings,
+                                          parallax: { ...bg.settings.parallax, enabled: e.target.checked },
+                                        },
+                                      });
+                                    }}
+                                  />
+                                  Параллакс
+                                </label>
+                                {bg.settings.parallax.enabled && (
+                                  <div className="grid grid-cols-3 gap-1 mt-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={bg.settings.parallax.speedX}
+                                      onChange={(e) => {
+                                        const { updateBackground } = useStudioStore.getState();
+                                        updateBackground(bg.id, {
+                                          settings: {
+                                            ...bg.settings,
+                                            parallax: { ...bg.settings.parallax, speedX: parseFloat(e.target.value) || 0 },
+                                          },
+                                        });
+                                      }}
+                                      className="text-xs px-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)]"
+                                      title="Скорость X"
+                                    />
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={bg.settings.parallax.speedY}
+                                      onChange={(e) => {
+                                        const { updateBackground } = useStudioStore.getState();
+                                        updateBackground(bg.id, {
+                                          settings: {
+                                            ...bg.settings,
+                                            parallax: { ...bg.settings.parallax, speedY: parseFloat(e.target.value) || 0 },
+                                          },
+                                        });
+                                      }}
+                                      className="text-xs px-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)]"
+                                      title="Скорость Y"
+                                    />
+                                    <label className="text-[8px] flex items-center gap-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={bg.settings.parallax.reverse}
+                                        onChange={(e) => {
+                                          const { updateBackground } = useStudioStore.getState();
+                                          updateBackground(bg.id, {
+                                            settings: {
+                                              ...bg.settings,
+                                              parallax: { ...bg.settings.parallax, reverse: e.target.checked },
+                                            },
+                                          });
+                                        }}
+                                      />
+                                      Обратный
+                                    </label>
+                                  </div>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={() => setEditingBackgroundId(null)}
+                                className="w-full mt-1 text-[10px] py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
+                              >
+                                Закрыть редактор
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="mt-2 text-[9px] text-[var(--studio-text-muted)]">
+                    Фоны глобальные. Можно использовать на любых страницах. Для динамических изменений (диалог → смена яркости) используй действия на кнопках позже.
+                  </p>
+                </>
+              )}
+            </div>
+
             <PageSection
               currentPage={currentPage}
               renamePage={renamePage}
@@ -1560,9 +1987,12 @@ export default function SlayStudio() {
               items={items}
             />
                 </div>
-          <div className="border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
-            Перетаскивай кнопки прямо на холсте
-          </div>
+          {/* This hint is dialog-oriented. Hide it on pure game pages (speaker=none / no dialog) */}
+          {(currentPage?.speaker && currentPage.speaker !== 'none') && (
+            <div className="border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
+              Перетаскивай кнопки прямо на холсте
+            </div>
+          )}
 
           {/* === GUIDES PANEL (Variant A) - only show when there are guides */}
           {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (

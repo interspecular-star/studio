@@ -9,7 +9,7 @@ const KonvaCanvasInner = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div className="flex h-[600px] w-[960px] items-center justify-center rounded-2xl border border-[var(--studio-border-strong)] bg-[#161310] text-[var(--studio-text-muted)]">
+      <div className="flex h-[720px] w-[1280px] items-center justify-center rounded-2xl border border-[var(--studio-border-strong)] bg-[#161310] text-[var(--studio-text-muted)]">
         Загрузка визуального редактора...
       </div>
     )
@@ -21,6 +21,6 @@ interface KonvaCanvasProps {
   height?: number;
 }
 
-export default function KonvaCanvas({ width = 960, height = 600 }: KonvaCanvasProps) {
+export default function KonvaCanvas({ width = 1280, height = 720 }: KonvaCanvasProps) {
   return <KonvaCanvasInner width={width} height={height} />;
 }

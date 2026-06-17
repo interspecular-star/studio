@@ -1,63 +1,36 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Stage, Layer, Rect, Text, Group } from 'react-konva';
+import { useRef, useState, useEffect } from 'react';
+import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
 
 import { useStudioStore } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
 
-// Background themes for different locations (warm, atmospheric)
-const backgroundThemes: Record<string, { top: string; bottom: string; nameRu: string; nameEn: string }> = {
-  village_morning: {
-    top: '#2C3A2F',
-    bottom: '#1A251C',
-    nameRu: 'Табуреткино • Утро',
-    nameEn: 'Taburetkiно • Morning',
-  },
-  tavern: {
-    top: '#3F2E22',
-    bottom: '#2A2118',
-    nameRu: 'Таверна «У Кривой Козы»',
-    nameEn: 'Tavern "Crooked Goat"',
-  },
-  cave: {
-    top: '#1F2A35',
-    bottom: '#121A22',
-    nameRu: 'Пещера Слэя',
-    nameEn: "Slay's Cave",
-  },
-  forest: {
-    top: '#1E2F1E',
-    bottom: '#121C12',
-    nameRu: 'Лес у Границы Миров',
-    nameEn: 'Forest near the World Boundary',
-  },
-};
+// No more built-in gradient themes (user removed all built-ins)
+
 
 interface KonvaCanvasInnerProps {
   width?: number;
   height?: number;
 }
 
-export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCanvasInnerProps) {
+export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCanvasInnerProps) {
   const { 
     pages, 
     selectedPageId, 
     selectedButtonId, 
     selectButton, 
     moveButton, 
+    backgrounds,
     guides,
     snapEnabled,
     mode,
     playtestState,
   } = useStudioStore();
-  const stageRef = useRef<StageType>(null);
 
-  // Interactive states for buttons (hover / pressed)
-  const [hoveredButtonId, setHoveredButtonId] = useState<string | null>(null);
-  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
+  const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
 
   const currentPage = pages.find((p) => p.id === selectedPageId);
   if (!currentPage) {
@@ -68,8 +41,41 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
     );
   }
 
+  const bgDef = backgrounds.find((b) => b.id === currentPage.background);
+  const bgUrl = bgDef?.url;
+
+  // Load custom image background when URL changes
+  useEffect(() => {
+    if (bgUrl) {
+      let src = bgUrl.trim().replace(/\\/g, '/');
+      // Ensure relative paths from public root start with /
+      if (src && !src.startsWith('http') && !src.startsWith('/')) {
+        src = '/' + src;
+      }
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      img.onload = () => setCustomBgImage(img);
+      img.onerror = () => {
+        console.warn('Background image load failed. Expected public path like /bg/intro_forest.png. Tried:', src);
+        setCustomBgImage(null);
+      };
+    } else {
+      setCustomBgImage(null);
+    }
+  }, [bgUrl]);
+
+  const stageRef = useRef<StageType>(null);
+
+  // Interactive states for buttons (hover / pressed)
+  const [hoveredButtonId, setHoveredButtonId] = useState<string | null>(null);
+  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
+
+  // Mouse for live parallax in playtest
+  const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
+
   const isPlaytest = mode === 'playtest';
-  const theme = backgroundThemes[currentPage.background] || backgroundThemes.village_morning;
+  const bgSettings = bgDef?.settings || { scale: 1, offsetX: 0, offsetY: 0, brightness: 1, opacity: 1, fitMode: 'cover', parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false } };
 
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
 
@@ -140,82 +146,161 @@ export default function KonvaCanvasInner({ width = 960, height = 600 }: KonvaCan
         height={height}
         onClick={handleStageClick}
         onTap={handleStageClick}
+        onMouseMove={(e) => {
+          if (isPlaytest) {
+            const pos = e.target.getStage()?.getPointerPosition();
+            if (pos) setMousePos({ x: pos.x, y: pos.y });
+          }
+        }}
         style={{ background: '#111' }}
       >
         <Layer>
-          {/* Warm gradient background */}
-          <Rect
-            x={0}
-            y={0}
-            width={width}
-            height={height}
-            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
-            fillLinearGradientEndPoint={{ x: 0, y: height }}
-            fillLinearGradientColorStops={[0, theme.top, 1, theme.bottom]}
-          />
+          {/* Custom image or legacy gradient background */}
+          {customBgImage && bgDef ? (
+            (() => {
+              const imgW = customBgImage.width || 1;
+              const imgH = customBgImage.height || 1;
+              const userScale = bgSettings.scale || 1;
+              const fitMode = bgSettings.fitMode || 'cover';
 
-          {/* Subtle vignette for depth */}
+              let scaleX = userScale;
+              let scaleY = userScale;
+
+              if (fitMode === 'cover') {
+                const base = Math.max(width / imgW, height / imgH);
+                scaleX = base * userScale;
+                scaleY = scaleX;
+              } else if (fitMode === 'contain') {
+                const base = Math.min(width / imgW, height / imgH);
+                scaleX = base * userScale;
+                scaleY = scaleX;
+              } else if (fitMode === 'fill') {
+                scaleX = (width / imgW) * userScale;
+                scaleY = (height / imgH) * userScale;
+              } // else manual: just userScale on natural size
+
+              const drawW = imgW * scaleX;
+              const drawH = imgH * scaleY;
+
+              // Live parallax offset in playtest
+              const parallaxX = isPlaytest
+                ? (mousePos.x - width / 2) * (bgSettings.parallax.speedX / 50) * (bgSettings.parallax.reverse ? -1 : 1)
+                : 0;
+              const parallaxY = isPlaytest
+                ? (mousePos.y - height / 2) * (bgSettings.parallax.speedY / 50) * (bgSettings.parallax.reverse ? -1 : 1)
+                : 0;
+
+              // Center + user offset + parallax
+              const drawX = (width - drawW) / 2 + bgSettings.offsetX + parallaxX;
+              const drawY = (height - drawH) / 2 + bgSettings.offsetY + parallaxY;
+
+              return (
+                <KonvaImage
+                  image={customBgImage}
+                  x={drawX}
+                  y={drawY}
+                  scaleX={scaleX}
+                  scaleY={scaleY}
+                  opacity={bgSettings.opacity}
+                />
+              );
+            })()
+          ) : (
+            /* Default dark background (no custom bg set) */
+            <Rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="#1a140f"
+            />
+          )}
+
+          {/* Brightness / dimming overlay (applies to both image and gradient) */}
+          {(() => {
+            const b = bgSettings.brightness ?? 1;
+            if (b === 1) return null;
+            // Darken when <1, brighten when >1
+            const alpha = b < 1 ? (1 - b) * 0.85 : Math.min((b - 1) * 0.55, 0.65);
+            const color = b < 1 ? '#000000' : '#ffffff';
+            return (
+              <Rect
+                x={0}
+                y={0}
+                width={width}
+                height={height}
+                fill={color}
+                opacity={alpha}
+              />
+            );
+          })()}
+
+          {/* Subtle vignette for depth (always, can be adjusted later via bg settings) */}
           <Rect x={0} y={0} width={width} height={height} fill="rgba(0,0,0,0.28)" />
 
-          {/* Location label */}
-          <Text
-            x={28}
-            y={24}
-            text={theme.nameRu}
-            fontSize={13}
-            fontFamily="var(--font-geist-sans)"
-            fill="#B8A88A"
-            opacity={0.7}
-          />
+          {/* Location label removed from workflow view as per request (was cluttering top-left in both dialog and game modes) */}
 
-          {/* Speaker name pill */}
-          <Group x={width / 2 - 80} y={height * 0.58}>
-            <Rect
-              x={0}
-              y={0}
-              width={160}
-              height={28}
-              cornerRadius={4}
-              fill="rgba(0,0,0,0.55)"
-              stroke="#534B40"
-              strokeWidth={1}
-            />
-            <Text
-              x={0}
-              y={6}
-              width={160}
-              text={speakerNames[currentPage.speaker] || currentPage.speaker}
-              fontSize={12}
-              align="center"
-              fill="#C5A46E"
-              fontStyle="500"
-            />
-          </Group>
+          {/* Speaker pill + Dialogue box are only shown when there is a real speaker.
+              If "Нет диалога / Игровой режим" (speaker === 'none') is selected,
+              the page is treated as pure gameplay and the visual dialog elements are hidden. */}
+          {currentPage.speaker && currentPage.speaker !== 'none' && (
+            <>
+              {/* Speaker name pill */}
+              <Group x={width / 2 - 80} y={height * 0.58}>
+                <Rect
+                  x={0}
+                  y={0}
+                  width={160}
+                  height={28}
+                  cornerRadius={4}
+                  fill="rgba(0,0,0,0.55)"
+                  stroke="#534B40"
+                  strokeWidth={1}
+                />
+                <Text
+                  x={0}
+                  y={6}
+                  width={160}
+                  text={speakerNames[currentPage.speaker] || currentPage.speaker}
+                  fontSize={12}
+                  align="center"
+                  fill="#C5A46E"
+                  fontStyle="500"
+                />
+              </Group>
 
-          {/* Dialogue box */}
-          <Group x={width * 0.16} y={height * 0.78}>
-            <Rect
-              x={0}
-              y={0}
-              width={width * 0.68}
-              height={78}
-              cornerRadius={10}
-              fill="rgba(33, 29, 24, 0.94)"
-              stroke="#534B40"
-              strokeWidth={1.5}
-            />
-            <Text
-              x={18}
-              y={14}
-              width={width * 0.68 - 36}
-              height={52}
-              text={currentPage.text.ru}
-              fontSize={14.5}
-              fill="#EDE4D4"
-              lineHeight={1.38}
-              wrap="word"
-            />
-          </Group>
+              {/* Dialogue box - scales with canvas height for different resolutions */}
+              {(() => {
+                const dialogH = Math.max(65, Math.min(100, Math.round(height * 0.11)));
+                const textH = Math.max(40, dialogH - 26);
+                return (
+                  <Group x={width * 0.16} y={height * 0.78}>
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={width * 0.68}
+                      height={dialogH}
+                      cornerRadius={10}
+                      fill="rgba(33, 29, 24, 0.94)"
+                      stroke="#534B40"
+                      strokeWidth={1.5}
+                    />
+                    <Text
+                      x={18}
+                      y={12}
+                      width={width * 0.68 - 36}
+                      height={textH}
+                      text={currentPage.text.ru}
+                      fontSize={Math.max(12, Math.min(16, Math.round(height / 50)))}
+                      fill="#EDE4D4"
+                      lineHeight={1.35}
+                      wrap="word"
+                    />
+                  </Group>
+                );
+              })()}
+            </>
+          )}
 
           {/* Draggable Buttons */}
           {currentPage.buttons

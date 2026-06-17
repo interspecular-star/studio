@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useStudioStore, type Variable, type Item, EquipmentSlotLabels } from '@/lib/store';
+import { getCurrentPlayerAvatar } from '@/components/editor/TopResourceBar';
 import {
   getEffectivePlayerStat,
   getTotalDamage,
@@ -389,6 +390,58 @@ export default function PlaytestStatePanel() {
         </div>
 
         {/* (Инвентарь перенесён выше — сразу после блока "В БОЮ") */}
+      </div>
+
+      {/* === АВАТАР / ОБЛИК ПЕРСОНАЖА (для TopResourceBar, авто-эволюция) === */}
+      <div>
+        <div className="text-xs font-medium text-[var(--studio-text-muted)] mb-2 uppercase tracking-wider">
+          ОБЛИК ПЕРСОНАЖА
+        </div>
+        <div className="flex items-center gap-3 rounded border border-[var(--studio-border)] bg-[#161310] p-2">
+          <div
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[var(--studio-accent)] bg-[#1C1814] text-lg"
+            title={`Текущий аватар: ${playtestState.playerAvatar || 'default'}`}
+          >
+            {(() => {
+              const a = playtestState.playerAvatar || 'default';
+              if (a === 'wounded') return '🤕';
+              if (a === 'veteran') return '🛡️';
+              return '🧔';
+            })()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-[var(--studio-text-muted)]">Аватар (меняется автоматически)</div>
+            <select
+              value={playtestState.playerAvatar || 'default'}
+              onChange={(e) => {
+                useStudioStore.setState((s) => ({
+                  playtestState: { ...s.playtestState, playerAvatar: e.target.value },
+                }));
+              }}
+              className="mt-0.5 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-2 py-1 text-xs"
+            >
+              <option value="default">Обычный (default)</option>
+              <option value="wounded">Ранен (wounded)</option>
+              <option value="veteran">Ветеран (veteran)</option>
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              const st = useStudioStore.getState();
+              const computed = getCurrentPlayerAvatar(st.variables, st.playtestState);
+              useStudioStore.setState((s) => ({
+                playtestState: { ...s.playtestState, playerAvatar: computed },
+              }));
+            }}
+            className="text-[10px] px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] text-[var(--studio-text-muted)]"
+            title="Пересчитать аватар по текущему состоянию (low HP → wounded, уровень+души → veteran)"
+          >
+            Авто
+          </button>
+        </div>
+        <div className="mt-1 text-[9px] text-[var(--studio-text-muted)]">
+          Правила: &lt;30% HP → wounded; ур.≥5 и души≥5 → veteran. Бар обновляет автоматически.
+        </div>
       </div>
 
       {/* Footer hint */}
