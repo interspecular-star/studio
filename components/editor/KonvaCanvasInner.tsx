@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
 
-import { useStudioStore } from '@/lib/store';
+import { useStudioStore, type UIWidget } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
 
@@ -31,6 +31,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   } = useStudioStore();
 
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
+
+  // Loaded custom images for buttons (image support added for Dialogue UI Phase 1) and future widgets
+  const [buttonImages, setButtonImages] = useState<Record<string, HTMLImageElement>>({});
 
   const currentPage = pages.find((p) => p.id === selectedPageId);
   if (!currentPage) {
@@ -65,6 +68,27 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     }
   }, [bgUrl]);
 
+  // Load button images (when button.image changes)
+  useEffect(() => {
+    if (!currentPage) return;
+    const needed = new Set<string>();
+    currentPage.buttons.forEach((b) => {
+      if (b.image) {
+        let src = b.image.trim().replace(/\\/g, '/');
+        if (src && !src.startsWith('http') && !src.startsWith('/')) src = '/' + src;
+        needed.add(src);
+      }
+    });
+    needed.forEach((src) => {
+      if (buttonImages[src]) return;
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      img.onload = () => setButtonImages((prev) => ({ ...prev, [src]: img }));
+      img.onerror = () => console.warn('Button image failed to load:', src);
+    });
+  }, [currentPage?.buttons]);
+
   const stageRef = useRef<StageType>(null);
 
   // Interactive states for buttons (hover / pressed)
@@ -78,6 +102,32 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   const bgSettings = bgDef?.settings || { scale: 1, offsetX: 0, offsetY: 0, brightness: 1, opacity: 1, fitMode: 'cover', parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false } };
 
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
+
+  // === Dialogue UI Widgets: use stored uiWidgets or auto-generate defaults for legacy pages ===
+  // This gives immediate editable positions for dialogue elements (Phase 1)
+  const getDefaultDialogueWidgets = (): UIWidget[] => {
+    if (!currentPage || !currentPage.speaker || currentPage.speaker === 'none') return [];
+    // Approximate classic positions (scaled to % for 1280x720)
+    return [
+      {
+        id: 'auto_dialogue_box',
+        type: 'dialogueBox',
+        layout: { x: 16, y: 78, width: 68, height: 12, z: 20 },
+        style: 'default',
+      },
+      {
+        id: 'auto_speaker_pill',
+        type: 'textLabel', // use textLabel for speaker name pill (simpler for Phase 1)
+        layout: { x: 42, y: 58, width: 16, height: 3, z: 15 },
+        style: 'default',
+        data: { speakerId: currentPage.speaker },
+      },
+    ];
+  };
+
+  const pageWidgets: UIWidget[] = Array.isArray(currentPage?.uiWidgets) && currentPage.uiWidgets.length > 0
+    ? currentPage.uiWidgets
+    : getDefaultDialogueWidgets();
 
   const handleButtonDragEnd = (buttonId: string, e: any) => {
     // Save snapshot before applying the change (only for canvas drags)
@@ -240,67 +290,95 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
           {/* Location label removed from workflow view as per request (was cluttering top-left in both dialog and game modes) */}
 
-          {/* Speaker pill + Dialogue box are only shown when there is a real speaker.
-              If "Нет диалога / Игровой режим" (speaker === 'none') is selected,
-              the page is treated as pure gameplay and the visual dialog elements are hidden. */}
-          {currentPage.speaker && currentPage.speaker !== 'none' && (
-            <>
-              {/* Speaker name pill */}
-              <Group x={width / 2 - 80} y={height * 0.58}>
-                <Rect
-                  x={0}
-                  y={0}
-                  width={160}
-                  height={28}
-                  cornerRadius={4}
-                  fill="rgba(0,0,0,0.55)"
-                  stroke="#534B40"
-                  strokeWidth={1}
-                />
-                <Text
-                  x={0}
-                  y={6}
-                  width={160}
-                  text={speakerNames[currentPage.speaker] || currentPage.speaker}
-                  fontSize={12}
-                  align="center"
-                  fill="#C5A46E"
-                  fontStyle="500"
-                />
-              </Group>
+          {/* === DIALOGUE UI WIDGETS (new system, Phase 1) ===
+              Widgets are rendered from page.uiWidgets (or auto-generated defaults for legacy speaker pages).
+              Positions/sizes are % based -> fully draggable/resizable in future editor.
+              The old fixed speaker/dialogue is replaced by this to support custom layouts.
+          */}
+          {pageWidgets
+            .slice()
+            .sort((a, b) => ((a.layout.z ?? 0) - (b.layout.z ?? 0)) || 0)
+            .map((widget) => {
+              const wX = pctToPx(widget.layout.x, width);
+              const wY = pctToPx(widget.layout.y, height);
+              const wW = pctToPx(widget.layout.width, width);
+              const wH = pctToPx(widget.layout.height, height);
 
-              {/* Dialogue box - scales with canvas height for different resolutions */}
-              {(() => {
-                const dialogH = Math.max(65, Math.min(100, Math.round(height * 0.11)));
-                const textH = Math.max(40, dialogH - 26);
+              if (widget.type === 'dialogueBox') {
+                const dialogText = currentPage?.text?.ru || '';
+                // Dynamic height calc based on widget height % (scales nicely)
+                const boxH = Math.max(48, wH);
+                const innerPad = 14;
                 return (
-                  <Group x={width * 0.16} y={height * 0.78}>
+                  <Group key={widget.id} x={wX} y={wY}>
                     <Rect
                       x={0}
                       y={0}
-                      width={width * 0.68}
-                      height={dialogH}
+                      width={wW}
+                      height={boxH}
                       cornerRadius={10}
                       fill="rgba(33, 29, 24, 0.94)"
                       stroke="#534B40"
                       strokeWidth={1.5}
                     />
                     <Text
-                      x={18}
-                      y={12}
-                      width={width * 0.68 - 36}
-                      height={textH}
-                      text={currentPage.text.ru}
-                      fontSize={Math.max(12, Math.min(16, Math.round(height / 50)))}
+                      x={innerPad}
+                      y={10}
+                      width={wW - innerPad * 2}
+                      height={boxH - 18}
+                      text={dialogText}
+                      fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
                       fill="#EDE4D4"
-                      lineHeight={1.35}
+                      lineHeight={1.32}
                       wrap="word"
                     />
                   </Group>
                 );
-              })()}
-            </>
-          )}
+              }
+
+              if (widget.type === 'textLabel' || widget.type === 'portrait') {
+                // Speaker pill / label (simple for Phase 1). Portrait will evolve to image later.
+                const spId = widget.data?.speakerId || currentPage?.speaker || '';
+                const label = speakerNames[spId] || spId || 'Speaker';
+                return (
+                  <Group key={widget.id} x={wX} y={wY}>
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={wW}
+                      height={wH}
+                      cornerRadius={4}
+                      fill="rgba(0,0,0,0.55)"
+                      stroke="#534B40"
+                      strokeWidth={1}
+                    />
+                    <Text
+                      x={0}
+                      y={Math.max(2, (wH - 12) / 2)}
+                      width={wW}
+                      height={wH}
+                      text={label}
+                      fontSize={Math.max(9, Math.min(12, Math.round(wH * 0.45)))}
+                      align="center"
+                      fill="#C5A46E"
+                      fontStyle="500"
+                    />
+                  </Group>
+                );
+              }
+
+              // Other widget types (choiceButton, intensity etc) rendered as placeholder in Phase 1
+              if (widget.type === 'choiceButton') {
+                return (
+                  <Group key={widget.id} x={wX} y={wY}>
+                    <Rect x={0} y={0} width={wW} height={wH} cornerRadius={5} fill="rgba(80,65,45,0.85)" stroke="#8a7655" />
+                    <Text x={2} y={wH/2-6} width={wW} text={widget.text?.ru || 'Choice'} fontSize={11} fill="#EDE4D4" align="center" />
+                  </Group>
+                );
+              }
+
+              return null;
+            })}
 
           {/* Draggable Buttons */}
           {currentPage.buttons
@@ -457,6 +535,15 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               }
             }
 
+            const btnImageSrc = button.image
+              ? (() => {
+                  let s = button.image.trim().replace(/\\/g, '/');
+                  if (s && !s.startsWith('http') && !s.startsWith('/')) s = '/' + s;
+                  return s;
+                })()
+              : null;
+            const btnImg = btnImageSrc ? buttonImages[btnImageSrc] : null;
+
             return (
               <Group
                 key={button.id}
@@ -546,18 +633,28 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }
                 }}
               >
-                <Rect
-                  width={btnW}
-                  height={btnH}
-                  cornerRadius={6}
-                  fill={bgColor}
-                  stroke={accentColor}
-                  strokeWidth={strokeWidth}
-                  shadowColor="rgba(0,0,0,0.55)"
-                  shadowBlur={shadowBlur}
-                  shadowOffsetY={3}
-                  shadowOpacity={shadowOpacity}
-                />
+                {btnImg ? (
+                  <KonvaImage
+                    image={btnImg}
+                    width={btnW}
+                    height={btnH}
+                    opacity={isEnabled ? 0.95 : 0.6}
+                  />
+                ) : (
+                  <Rect
+                    width={btnW}
+                    height={btnH}
+                    cornerRadius={6}
+                    fill={bgColor}
+                    stroke={accentColor}
+                    strokeWidth={strokeWidth}
+                    shadowColor="rgba(0,0,0,0.55)"
+                    shadowBlur={shadowBlur}
+                    shadowOffsetY={3}
+                    shadowOpacity={shadowOpacity}
+                  />
+                )}
+                {/* Text overlay on top of image or rect (for image buttons: text can be subtle or hidden via future imageOnly widget) */}
                 <Text
                   width={btnW}
                   height={btnH}
@@ -567,7 +664,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   align="center"
                   verticalAlign="middle"
                   fontStyle="500"
-                  opacity={isEnabled ? 1 : 0.85}
+                  opacity={btnImg ? (isEnabled ? 0.92 : 0.6) : (isEnabled ? 1 : 0.85)}
                 />
               </Group>
             );

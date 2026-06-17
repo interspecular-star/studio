@@ -328,6 +328,9 @@ export type StudioButton = {
   visibleWhen?: Condition;
   enabledWhen?: Condition;
 
+  // Optional custom image for button (URL from public/, e.g. /ui/button_choice.png). Text overlay if provided.
+  image?: string;
+
   // === Ported from old visual editor: per-button position history ===
   // Allows restoring previous positions of this specific button (better than global canvas undo)
   history?: Array<{
@@ -347,6 +350,9 @@ export type StudioPage = {
   // Visibility / scene UI flags (ported + extended for Top Resource Bar)
   showTopResourceBar?: boolean; // default true; per-scene control for the floating HUD
   sceneType?: 'exploration' | 'dialog' | 'combat' | 'menu'; // helps with smart defaults (e.g. hide bar on dialog/menu)
+  // Dialogue UI Widgets (new flexible system)
+  uiWidgets?: UIWidget[];
+  uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'freeform' | 'custom';
 };
 
 export type BackgroundSettings = {
@@ -372,6 +378,68 @@ export type Background = {
   settings: BackgroundSettings;
   isBuiltIn?: boolean;     // prevent delete for legacy gradients
 };
+
+// === Dialogue UI Widgets (Variant C hybrid: positionable widgets on canvas) ===
+export type UIWidgetType =
+  | 'dialogueBox'
+  | 'portrait'
+  | 'choiceButton'
+  | 'quickAction'
+  | 'intensityBar'
+  | 'textLabel'
+  | 'container';
+
+export interface UIWidget {
+  id: string;
+  type: UIWidgetType;
+  // Positioning (percentages, like buttons, relative to canvas)
+  layout: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    z?: number;
+  };
+  // Visual / asset reference
+  assetId?: string; // reference to UIAsset
+  style?: string;   // 'default' | 'important' | custom skin id
+  // For labels / text
+  text?: LocalizedString;
+  // Dynamic visibility (reuse Condition system)
+  visibleWhen?: Condition;
+  // Widget-specific data
+  data?: {
+    // portrait
+    speakerId?: string;
+    variant?: string; // e.g. 'neutral', 'angry', or driven by var
+    // dialogueBox
+    speakerName?: string;
+    textSource?: 'page' | 'custom';
+    // choiceButton
+    linkedButtonId?: string;
+    imageOnly?: boolean;
+    // intensityBar
+    valueVar?: string;
+    parts?: number;
+    colors?: string[];
+    // quickAction
+    actionType?: 'inventory' | 'map' | 'skills' | 'custom';
+    // container etc.
+  };
+}
+
+export type UIAsset = {
+  id: string;
+  name: LocalizedString;
+  type: 'buttonSkin' | 'portrait' | 'bar' | 'icon';
+  url: string; // public path e.g. /ui/button.png
+  nineSlice?: { top: number; right: number; bottom: number; left: number };
+  defaultWidth?: number;
+  defaultHeight?: number;
+  variants?: Record<string, string>; // e.g. { hover: '/ui/button_hover.png' }
+};
+
+// === End UI Widgets ===
 
 export type ProjectMeta = {
   name: string;
@@ -419,6 +487,9 @@ type StudioState = {
 
   // Backgrounds (гибкая система фонов сцены)
   backgrounds: Background[];
+
+  // UI Assets registry (skins for buttons, portraits, bars etc. for Dialogue UI)
+  uiAssets: UIAsset[];
 
   // === Playtest / Preview State ===
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
@@ -486,6 +557,18 @@ type StudioState = {
   updateBackground: (id: string, updates: Partial<Omit<Background, 'id'>>) => void;
   deleteBackground: (id: string) => void;
   getBackground: (id: string) => Background | undefined;
+
+  // === UI Assets & Widgets (Dialogue UI system) ===
+  addUIAsset: (asset: Omit<UIAsset, 'id'>) => void;
+  updateUIAsset: (id: string, updates: Partial<Omit<UIAsset, 'id'>>) => void;
+  deleteUIAsset: (id: string) => void;
+  getUIAsset: (id: string) => UIAsset | undefined;
+
+  addUIWidget: (pageId: string, widget: Omit<UIWidget, 'id'>) => void;
+  updateUIWidget: (pageId: string, widgetId: string, updates: Partial<Omit<UIWidget, 'id'>>) => void;
+  deleteUIWidget: (pageId: string, widgetId: string) => void;
+  // Optional: helper to apply a preset layout of widgets to a page
+  applyUILayoutPreset: (pageId: string, preset: StudioPage['uiLayoutPreset']) => void;
 
   // Live playtest value mutation (so editing endurance etc in sidebar during Playtest immediately affects backpack size, damage etc)
   setPlaytestVariableValue: (id: string, value: number | boolean | string) => void;
@@ -592,6 +675,8 @@ const createDefaultPage = (id: string): StudioPage => ({
   buttons: [],
   showTopResourceBar: true,
   sceneType: 'exploration',
+  uiWidgets: [],
+  uiLayoutPreset: 'freeform',
 });
 
 const DEFAULT_PROJECT_NAME = 'Табуреткино — Акт 1';
@@ -620,6 +705,8 @@ const createDefaultPages = (): StudioPage[] => [
         action: { type: 'goToPage', pageId: 'cave_01' },
       },
     ],
+    uiWidgets: [],
+    uiLayoutPreset: 'freeform',
   },
   {
     id: 'tavern_01',
@@ -633,6 +720,8 @@ const createDefaultPages = (): StudioPage[] => [
     buttons: [],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
     sceneType: 'dialog',
+    uiWidgets: [],
+    uiLayoutPreset: 'classic_vn',
   },
 ];
 
@@ -666,6 +755,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   variables: [],
 
   backgrounds: [],
+
+  uiAssets: [],
 
   playtestState: {
     variableValues: {},
@@ -739,7 +830,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   updatePage: (id, updates) => {
     set((state) => ({
-      pages: state.pages.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+      pages: state.pages.map((p) => {
+        if (p.id !== id) return p;
+        let next = { ...p, ...updates };
+
+        // Auto-seed default uiWidgets when a real speaker is chosen and none exist yet (Phase 1 migration)
+        const newSpeaker = updates.speaker ?? p.speaker;
+        if (newSpeaker && newSpeaker !== 'none' && (!next.uiWidgets || next.uiWidgets.length === 0)) {
+          next.uiWidgets = [
+            {
+              id: `w_dlg_${Date.now().toString(36)}`,
+              type: 'dialogueBox',
+              layout: { x: 16, y: 78, width: 68, height: 12, z: 20 },
+              style: 'default',
+            },
+            {
+              id: `w_spk_${Date.now().toString(36)}`,
+              type: 'textLabel',
+              layout: { x: 42, y: 58, width: 16, height: 3, z: 15 },
+              style: 'default',
+              data: { speakerId: newSpeaker },
+            },
+          ];
+          next.uiLayoutPreset = 'classic_vn';
+        }
+        return next;
+      }),
     }));
     get().saveToLocalStorage();
   },
@@ -1291,6 +1407,88 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     return get().backgrounds.find((b) => b.id === id);
   },
 
+  // === UI Assets & Widgets (Dialogue UI) ===
+  addUIAsset: (assetData) => {
+    const newAsset: UIAsset = {
+      ...assetData,
+      id: `uiasset_${Date.now().toString(36)}`,
+    };
+    set((state) => ({ uiAssets: [...state.uiAssets, newAsset] }));
+    get().saveToLocalStorage();
+  },
+  updateUIAsset: (id, updates) => {
+    set((state) => ({
+      uiAssets: state.uiAssets.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+    }));
+    get().saveToLocalStorage();
+  },
+  deleteUIAsset: (id) => {
+    set((state) => ({ uiAssets: state.uiAssets.filter((a) => a.id !== id) }));
+    get().saveToLocalStorage();
+  },
+  getUIAsset: (id) => {
+    return get().uiAssets.find((a) => a.id === id);
+  },
+
+  addUIWidget: (pageId, widgetData) => {
+    const newWidget: UIWidget = {
+      ...widgetData,
+      id: `uiw_${Date.now().toString(36)}`,
+    };
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? { ...p, uiWidgets: [...(p.uiWidgets || []), newWidget] }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+  updateUIWidget: (pageId, widgetId, updates) => {
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? {
+              ...p,
+              uiWidgets: (p.uiWidgets || []).map((w) =>
+                w.id === widgetId ? { ...w, ...updates } : w
+              ),
+            }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+  deleteUIWidget: (pageId, widgetId) => {
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? { ...p, uiWidgets: (p.uiWidgets || []).filter((w) => w.id !== widgetId) }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+  applyUILayoutPreset: (pageId, preset) => {
+    // For now: simple stub that resets to empty or basic defaults. Full presets in Phase 2/3.
+    const defaultWidgets: UIWidget[] = [];
+    if (preset === 'classic_vn') {
+      // Basic seeded positions (will be refined in rendering)
+      defaultWidgets.push(
+        { id: 'w_dlg', type: 'dialogueBox', layout: { x: 16, y: 72, width: 68, height: 18, z: 10 }, style: 'default' },
+        { id: 'w_port', type: 'portrait', layout: { x: 72, y: 35, width: 22, height: 42, z: 5 }, style: 'default' }
+      );
+    }
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? { ...p, uiLayoutPreset: preset, uiWidgets: defaultWidgets.length ? defaultWidgets : (p.uiWidgets || []) }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
   // === Playtest State ===
   resetPlaytestState: () => {
     const state = get();
@@ -1757,6 +1955,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       items: state.items,
       variables: state.variables,
       backgrounds: state.backgrounds,
+      uiAssets: state.uiAssets,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -1781,10 +1980,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const bgIdSet = new Set(loadedBackgrounds.map((b: any) => b.id));
 
       // Migrate legacy page.background (old string keys like 'forest') to '' or valid id
-      const migratedPages = parsed.pages.map((p: any) => ({
-        ...p,
-        background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
-      }));
+      // Also ensure uiWidgets array exists for new dialogue UI system (back-compat)
+      const migratedPages = parsed.pages.map((p: any) => {
+        let pg = {
+          ...p,
+          background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
+          uiWidgets: Array.isArray(p.uiWidgets) ? p.uiWidgets : (p.uiWidgets || []),
+          uiLayoutPreset: p.uiLayoutPreset || 'freeform',
+        };
+        // One-time seed defaults for legacy dialog pages that have speaker but no widgets yet
+        if (pg.speaker && pg.speaker !== 'none' && (!pg.uiWidgets || pg.uiWidgets.length === 0)) {
+          pg.uiWidgets = [
+            { id: `w_dlg_${Date.now().toString(36)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+            { id: `w_spk_${Date.now().toString(36)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
+          ];
+          pg.uiLayoutPreset = 'classic_vn';
+        }
+        return pg;
+      });
 
       set({
         meta: parsed.meta || createInitialMeta(),
@@ -1799,6 +2012,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         items: parsed.items || [],
         variables: parsed.variables || [],
         backgrounds: loadedBackgrounds,
+        uiAssets: parsed.uiAssets || [],
         startingInventory: parsed.startingInventory || {},
         // Canvas resolution (default to 16:9 1280x720 for new/legacy projects)
         canvasWidth: parsed.canvasWidth || 1280,
@@ -1824,6 +2038,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       items: state.items,
       variables: state.variables,
       backgrounds: state.backgrounds,
+      uiAssets: state.uiAssets,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -1855,10 +2070,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const importedBackgrounds = data.backgrounds || [];
       const bgIdSet = new Set(importedBackgrounds.map((b: any) => b.id));
 
-      const migratedPages = data.pages.map((p: any) => ({
-        ...p,
-        background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
-      }));
+      // Migration for uiWidgets + uiLayoutPreset + bg (dialogue UI + backgrounds)
+      const migratedPages = data.pages.map((p: any) => {
+        let pg = {
+          ...p,
+          background: bgIdSet.has(p.background) ? p.background : (p.background || ''),
+          uiWidgets: Array.isArray(p.uiWidgets) ? p.uiWidgets : (p.uiWidgets || []),
+          uiLayoutPreset: p.uiLayoutPreset || 'freeform',
+        };
+        if (pg.speaker && pg.speaker !== 'none' && (!pg.uiWidgets || pg.uiWidgets.length === 0)) {
+          pg.uiWidgets = [
+            { id: `w_dlg_${Date.now().toString(36)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+            { id: `w_spk_${Date.now().toString(36)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
+          ];
+          pg.uiLayoutPreset = 'classic_vn';
+        }
+        return pg;
+      });
 
       set({
         meta: data.meta || { ...createInitialMeta(), name: 'Импортированный проект' },
@@ -1873,6 +2101,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         items: data.items || [],
         variables: data.variables || [],
         backgrounds: importedBackgrounds,
+        uiAssets: data.uiAssets || [],
         startingInventory: data.startingInventory || {},
         canvasWidth: data.canvasWidth || 1280,
         canvasHeight: data.canvasHeight || 720,
@@ -1906,6 +2135,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       items: [],
       variables: [],
       backgrounds: [],
+      uiAssets: [],
       startingInventory: {},
       playtestState: {
         variableValues: {},

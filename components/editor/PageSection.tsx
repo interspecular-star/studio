@@ -5,6 +5,7 @@ import { Plus, Trash2, History, RotateCcw } from 'lucide-react';
 import { useStudioStore } from '@/lib/store';
 import ActionEditor from './ActionEditor';
 import ConditionEditor from './ConditionEditor';
+import type { UIWidget } from '@/lib/store';
 
 interface PageSectionProps {
   currentPage: any;
@@ -245,6 +246,108 @@ export default function PageSection({
               className="h-24 w-full resize-y rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
               placeholder={langTab === 'ru' ? 'Текст на русском...' : 'English text...'}
             />
+          </div>
+
+          {/* === ДИАЛОГ UI: WIDGETS (Phase 1) - позиционируемые элементы ===
+              Автоматически сидируются при выборе говорящего. Редактируйте % координаты здесь.
+              Позже: drag on canvas, ассеты, пресеты, conditions. */}
+          <div className="pt-1 border-t border-[var(--studio-border)] mt-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-[var(--studio-text-secondary)]">ДИАЛОГ UI — ВИДЖЕТЫ ({(currentPage?.uiWidgets || []).length})</label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    const { addUIWidget, applyUILayoutPreset } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    applyUILayoutPreset(currentPage.id, 'classic_vn');
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  Классика
+                </button>
+                <button
+                  onClick={() => {
+                    const { addUIWidget } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    addUIWidget(currentPage.id, {
+                      type: 'dialogueBox',
+                      layout: { x: 16, y: 78, width: 68, height: 12, z: 20 },
+                      style: 'default',
+                    });
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  + Текст
+                </button>
+                <button
+                  onClick={() => {
+                    const { addUIWidget } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    addUIWidget(currentPage.id, {
+                      type: 'textLabel',
+                      layout: { x: 42, y: 58, width: 16, height: 3, z: 15 },
+                      style: 'default',
+                      data: { speakerId: currentPage.speaker },
+                    });
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  + Имя
+                </button>
+              </div>
+            </div>
+
+            {(currentPage?.uiWidgets || []).length === 0 && (
+              <div className="text-[10px] text-[var(--studio-text-muted)] mb-2">Нет виджетов (выбери говорящего — добавятся автоматически)</div>
+            )}
+
+            <div className="space-y-2">
+              {(currentPage?.uiWidgets || []).map((w: any, idx: number) => (
+                <div key={w.id} className="rounded border border-[var(--studio-border)] bg-[#161310] p-2 text-[10px]">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-mono text-[var(--studio-accent)]">{w.type}</span>
+                    <button
+                      onClick={() => {
+                        const store = useStudioStore.getState();
+                        if (currentPage) store.deleteUIWidget(currentPage.id, w.id);
+                      }}
+                      className="text-[var(--studio-danger)] opacity-70 hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {/* Layout editor (manual % for Phase 1; later canvas drag) */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {(['x', 'y', 'width', 'height'] as const).map((k) => (
+                      <div key={k}>
+                        <div className="text-[9px] text-[var(--studio-text-muted)]">{k}</div>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min={0}
+                          max={k === 'x' || k === 'y' ? 95 : 80}
+                          value={w.layout[k] ?? 10}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (isNaN(val) || !currentPage) return;
+                            const store = useStudioStore.getState();
+                            store.updateUIWidget(currentPage.id, w.id, {
+                              layout: { ...w.layout, [k]: Math.max(2, Math.min(95, val)) },
+                            });
+                          }}
+                          className="w-full bg-[#1C1814] border border-[var(--studio-border)] px-1 py-0.5 text-center font-mono"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-[var(--studio-text-muted)] mt-0.5">Z: {w.layout.z ?? 0} (слой)</div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">
+              Виджеты видны на холсте. Меняй % — позиция обновляется сразу. (Позже drag&amp;drop + ассеты)
+            </p>
           </div>
 
           {/* Per-scene Top Resource Bar visibility (ported + extended) */}
