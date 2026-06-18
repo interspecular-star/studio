@@ -1502,6 +1502,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: `w_port_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 40, width: 18, height: 35, z: 5 }, style: 'default' },
         { id: `w_choice1_${Date.now()}`, type: 'choiceButton', layout: { x: 15, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
         { id: `w_choice2_${Date.now()}`, type: 'choiceButton', layout: { x: 55, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
+        { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 15, width: 6, height: 6, z: 50 }, data: { actionType: 'inventory' } },
       ];
     } else if (preset === 'freeform') {
       defaultWidgets = [];
