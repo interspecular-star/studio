@@ -520,6 +520,20 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     dialogText = dialogText.substring(0, typewriterProgress[widget.id]);
                   }
 
+                  // Simple shake for dialogue if 'angry' variant active (playtest feedback)
+                  let shakeX = 0;
+                  let shakeY = 0;
+                  if (isPlaytest) {
+                    const portraitW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'portrait');
+                    const pOverride = portraitW ? playtestState.widgetOverrides[portraitW.id] : null;
+                    const activeV = (pOverride?.data?.variant || portraitW?.data?.variant || '');
+                    if (activeV === 'angry') {
+                      const t = Date.now() / 40;
+                      shakeX = Math.sin(t) * 1.5;
+                      shakeY = Math.cos(t * 1.3) * 0.8;
+                    }
+                  }
+
                   // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red] etc (simple whole-text for colors)
                   let textFill = '#EDE4D4';
                   const hasBold = /\*\*.*\*\*/.test(dialogText);
@@ -537,8 +551,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   return (
                     <>
                       <Rect
-                        x={0}
-                        y={0}
+                        x={0 + shakeX}
+                        y={0 + shakeY}
                         width={wW}
                         height={boxH}
                         cornerRadius={10}
@@ -551,16 +565,16 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       {speakerName && (
                         <>
                           <Rect
-                            x={innerPad - 4}
-                            y={nameY - 1}
+                            x={innerPad - 4 + shakeX}
+                            y={nameY - 1 + shakeY}
                             width={Math.min(wW - innerPad * 2 + 8, 120)}
                             height={12}
                             fill="rgba(0,0,0,0.4)"
                             cornerRadius={2}
                           />
                           <Text
-                            x={innerPad}
-                            y={nameY}
+                            x={innerPad + shakeX}
+                            y={nameY + shakeY}
                             width={wW - innerPad * 2}
                             text={speakerName}
                             fontSize={9}
@@ -570,8 +584,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         </>
                       )}
                       <Text
-                        x={innerPad}
-                        y={textStartY}
+                        x={innerPad + shakeX}
+                        y={textStartY + shakeY}
                         width={wW - innerPad * 2}
                         height={boxH - textStartY - 8}
                         text={dialogText}
