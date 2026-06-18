@@ -2,7 +2,7 @@
 
 **Variant C: Hybrid Canvas Widgets Approach**
 
-**Status:** In Progress (Phases 1-4 advancing: full widget types, editor with z-order/text/conditions, assets, markup, animations, action triggers, presets with left bar, demo content)  
+**Status:** Advanced (Phases 1-4 largely complete: widgets, editor, assets, dynamics/overrides, typewriter, shake, markup with colors/pauses, multiple portraits, full demo preset, playtest feedback. Phase 5 partial.)  
 **Date:** Current  
 **Author:** Grok (based on discussion)
 
