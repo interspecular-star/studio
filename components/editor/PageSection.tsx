@@ -50,7 +50,7 @@ export default function PageSection({
   variables,
   items,
 }: PageSectionProps) {
-  const { backgrounds } = useStudioStore();
+  const { backgrounds, selectedWidgetId: currentSelectedWidgetId } = useStudioStore();
   const [collapsed, setCollapsed] = useState(false);
 
   if (!currentPage) return null;
@@ -386,10 +386,10 @@ export default function PageSection({
 
             {/* Selected Widget Inspector */}
             {(() => {
-              const st = useStudioStore.getState();
-              const selW = (currentPage?.uiWidgets || []).find((ww: any) => ww.id === st.selectedWidgetId);
+              const selW = (currentPage?.uiWidgets || []).find((ww: any) => ww.id === currentSelectedWidgetId);
               if (!selW || !currentPage) return null;
               const w = selW;
+              const st = useStudioStore.getState();
 
               const updateW = (updates: any) => { st.updateUIWidget(currentPage.id, w.id, updates); };
 
