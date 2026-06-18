@@ -878,11 +878,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   onMouseUp={() => setPressedWidgetId(null)}
                   onClick={(e) => {
                     e.cancelBubble = true;
-                    if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
-                      const linked = currentPage.buttons.find((b: any) => b.id === (widget.data || {}).linkedButtonId);
-                      if (linked) {
-                        useStudioStore.getState().executeAction(linked.action);
+                    if (isPlaytestMode && widget.type === 'choiceButton') {
+                      const linkedId = (widget.data || {}).linkedButtonId;
+                      if (linkedId) {
+                        const linked = currentPage.buttons.find((b: any) => b.id === linkedId);
+                        if (linked) {
+                          useStudioStore.getState().executeAction(linked.action);
+                          return;
+                        }
                       }
+                      // Fallback for demo: lower intensity
+                      useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'quickAction') {
@@ -900,9 +906,16 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }}
                   onTap={(e) => {
                     e.cancelBubble = true;
-                    if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
-                      const linked = currentPage.buttons.find((b: any) => b.id === (widget.data || {}).linkedButtonId);
-                      if (linked) useStudioStore.getState().executeAction(linked.action);
+                    if (isPlaytestMode && widget.type === 'choiceButton') {
+                      const linkedId = (widget.data || {}).linkedButtonId;
+                      if (linkedId) {
+                        const linked = currentPage.buttons.find((b: any) => b.id === linkedId);
+                        if (linked) {
+                          useStudioStore.getState().executeAction(linked.action);
+                          return;
+                        }
+                      }
+                      useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'quickAction') {
