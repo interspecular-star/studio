@@ -431,7 +431,9 @@ export interface UIWidget {
     actionType?: 'inventory' | 'map' | 'skills' | 'custom';
     // demo choice extra
     setIntensity?: number;
-    // container etc.
+    // container
+    title?: string;
+    // etc.
   };
 }
 

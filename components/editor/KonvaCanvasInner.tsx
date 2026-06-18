@@ -835,17 +835,31 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                 }
 
                 if (widget.type === 'container') {
+                  const data = widget.data || {};
                   return (
-                    <Rect
-                      x={0}
-                      y={0}
-                      width={wW}
-                      height={wH}
-                      fill="rgba(30,25,20,0.7)"
-                      stroke="#3a3020"
-                      strokeWidth={1.5}
-                      cornerRadius={4}
-                    />
+                    <>
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={wW}
+                        height={wH}
+                        fill="rgba(30,25,20,0.7)"
+                        stroke="#3a3020"
+                        strokeWidth={1.5}
+                        cornerRadius={4}
+                      />
+                      {data.title && (
+                        <Text
+                          x={2}
+                          y={2}
+                          width={wW - 4}
+                          text={data.title}
+                          fontSize={8}
+                          fill="#C5A46E"
+                          fontStyle="500"
+                        />
+                      )}
+                    </>
                   );
                 }
 

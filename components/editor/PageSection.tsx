@@ -569,6 +569,12 @@ export default function PageSection({
                       </select>
                     </div>
                   )}
+                  {w.type === 'container' && (
+                    <div>
+                      <label className="text-[10px]">Заголовок (опц.)</label>
+                      <input value={w.data?.title || ''} onChange={e=>updateW({data:{...(w.data||{}), title: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Левая панель" />
+                    </div>
+                  )}
                   {w.type === 'dialogueBox' && (
                     <div>
                       <label className="text-[10px]">Имя говорящего (оверрайд)</label>
