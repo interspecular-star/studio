@@ -2,7 +2,7 @@
 
 **Variant C: Hybrid Canvas Widgets Approach**
 
-**Status:** In Progress (Phases 1-3 largely implemented: data, basic+advanced widgets, editor, assets, dynamics stubs, render with images/variants/bars/actions)  
+**Status:** In Progress (Phases 1-4 advancing: full widget types, editor with z-order/text/conditions, assets, markup, animations, action triggers, presets with left bar, demo content)  
 **Date:** Current  
 **Author:** Grok (based on discussion)
 
