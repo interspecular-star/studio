@@ -530,8 +530,15 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Speaker ID</label>
                       <input value={w.data?.speakerId || ''} onChange={e=>updateW({data:{... (w.data||{}), speakerId: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
-                      <label className="text-[10px] mt-1 block">Variant (e.g. neutral, angry)</label>
-                      <input value={w.data?.variant || ''} onChange={e=>updateW({data:{... (w.data||{}), variant: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="default" />
+                      <label className="text-[10px] mt-1 block">Variant</label>
+                      <select value={w.data?.variant || 'default'} onChange={e=>updateW({data:{... (w.data||{}), variant: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                        <option value="default">default</option>
+                        <option value="neutral">neutral</option>
+                        <option value="angry">angry</option>
+                        <option value="happy">happy</option>
+                        <option value="sad">sad</option>
+                      </select>
+                      <div className="text-[9px] text-[var(--studio-text-muted)] mt-0.5">Или введи свой</div>
                     </div>
                   )}
                   {w.type === 'choiceButton' && (
