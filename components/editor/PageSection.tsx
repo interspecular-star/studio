@@ -363,9 +363,11 @@ export default function PageSection({
 
             <div className="space-y-2">
               {[...(currentPage?.uiWidgets || [])]
-                .sort((a:any, b:any) => (b.layout.z||0) - (a.layout.z||0)) // higher z first (top layers)
+                .sort((a:any, b:any) => (b.layout.z||0) - (a.layout.z||0))
                 .map((w: any) => {
-                const isSel = useStudioStore.getState().selectedWidgetId === w.id;
+                const st = useStudioStore.getState();
+                const isSel = st.selectedWidgetId === w.id;
+                const isDyn = st.mode === 'playtest' && !!st.playtestState.widgetOverrides[w.id];
                 return (
                 <div
                   key={w.id}
@@ -377,7 +379,7 @@ export default function PageSection({
                   className={`rounded border px-2 py-2 text-[10px] cursor-pointer ${isSel ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]' : 'border-[var(--studio-border)] bg-[#161310] hover:border-[var(--studio-border-strong)]'}`}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-mono text-[var(--studio-accent)]">{w.type} <span className="text-[8px] opacity-60">z:{w.layout.z??0}</span></span>
+                    <span className="font-mono text-[var(--studio-accent)]">{w.type} <span className="text-[8px] opacity-60">z:{w.layout.z??0}</span>{st.mode==='playtest' && st.playtestState.widgetOverrides[w.id] ? ' (dyn)' : ''}</span>
                     <button
                       onClick={() => {
                         const store = useStudioStore.getState();
