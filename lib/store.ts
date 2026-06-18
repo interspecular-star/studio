@@ -357,7 +357,7 @@ export type StudioPage = {
   sceneType?: 'exploration' | 'dialog' | 'combat' | 'menu'; // helps with smart defaults (e.g. hide bar on dialog/menu)
   // Dialogue UI Widgets (new flexible system)
   uiWidgets?: UIWidget[];
-  uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'freeform' | 'custom';
+  uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'left_bar' | 'freeform' | 'custom';
 };
 
 export type BackgroundSettings = {
@@ -1503,6 +1503,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: `w_choice1_${Date.now()}`, type: 'choiceButton', layout: { x: 15, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
         { id: `w_choice2_${Date.now()}`, type: 'choiceButton', layout: { x: 55, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
         { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 15, width: 6, height: 6, z: 50 }, data: { actionType: 'inventory' } },
+      ];
+    } else if (preset === 'left_bar') {
+      defaultWidgets = [
+        { id: `w_cont_${Date.now()}`, type: 'container', layout: { x: 1, y: 10, width: 10, height: 80, z: 1 } },
+        { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 15, width: 8, height: 8, z: 10 }, data: { actionType: 'inventory' } },
+        { id: `w_qmap_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 28, width: 8, height: 8, z: 10 }, data: { actionType: 'map' } },
+        { id: `w_qsk_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 41, width: 8, height: 8, z: 10 }, data: { actionType: 'skills' } },
       ];
     } else if (preset === 'freeform') {
       defaultWidgets = [];
