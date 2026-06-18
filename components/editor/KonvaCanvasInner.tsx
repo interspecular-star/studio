@@ -32,6 +32,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     snapEnabled,
     mode,
     playtestState,
+    executeAction,
   } = useStudioStore();
 
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
@@ -465,6 +466,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                 }
 
                 if (widget.type === 'choiceButton') {
+                  const data = widget.data || {};
+                  const linkedBtn = data.linkedButtonId ? currentPage.buttons.find((b: any) => b.id === data.linkedButtonId) : null;
+                  const btnText = linkedBtn ? linkedBtn.text.ru : (widget.text?.ru || 'Choice');
+                  const isLinked = !!linkedBtn;
                   return (
                     <>
                       <Rect
@@ -473,11 +478,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         width={wW}
                         height={wH}
                         cornerRadius={5}
-                        fill="rgba(80,65,45,0.85)"
-                        stroke={isSelected ? '#E8D4A0' : '#8a7655'}
-                        strokeWidth={isSelected ? 2 : 1}
+                        fill={isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)'}
+                        stroke={isSelected ? '#E8D4A0' : (isLinked ? '#C5A46E' : '#8a7655')}
+                        strokeWidth={isSelected ? 2.5 : (isLinked ? 1.5 : 1)}
                       />
-                      <Text x={2} y={wH / 2 - 6} width={wW} text={widget.text?.ru || 'Choice'} fontSize={11} fill="#EDE4D4" align="center" />
+                      <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill="#EDE4D4" align="center" />
                     </>
                   );
                 }
@@ -527,6 +532,13 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }}
                   onClick={(e) => {
                     e.cancelBubble = true;
+                    if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
+                      const linked = currentPage.buttons.find((b: any) => b.id === (widget.data || {}).linkedButtonId);
+                      if (linked) {
+                        useStudioStore.getState().executeAction(linked.action);
+                      }
+                      return;
+                    }
                     if (!isPlaytestMode) {
                       selectWidget(widget.id);
                       selectButton(null);
@@ -534,6 +546,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }}
                   onTap={(e) => {
                     e.cancelBubble = true;
+                    if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
+                      const linked = currentPage.buttons.find((b: any) => b.id === (widget.data || {}).linkedButtonId);
+                      if (linked) useStudioStore.getState().executeAction(linked.action);
+                      return;
+                    }
                     if (!isPlaytestMode) {
                       selectWidget(widget.id);
                       selectButton(null);
