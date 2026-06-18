@@ -488,6 +488,14 @@ export default function PageSection({
                     </select>
                   </div>
 
+                  {/* General text for applicable widgets */}
+                  {(w.type === 'textLabel' || w.type === 'choiceButton') && (
+                    <div>
+                      <label className="text-[10px] text-[var(--studio-text-secondary)]">Текст (РУ)</label>
+                      <input value={w.text?.ru || ''} onChange={e => updateW({ text: { ...(w.text||{ru:'',en:''}), ru: e.target.value } })} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                    </div>
+                  )}
+
                   {w.type === 'portrait' && (
                     <div>
                       <label className="text-[10px]">Speaker ID</label>
