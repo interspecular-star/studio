@@ -120,6 +120,27 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     });
   }, [currentPage?.uiWidgets, (useStudioStore.getState().uiAssets || []).length]);
 
+  // Simple animation for intensity bars (lerp towards target)
+  useEffect(() => {
+    const intensityWidgets = (currentPage?.uiWidgets || []).filter((w: any) => w.type === 'intensityBar' && w.data?.valueVar);
+    if (intensityWidgets.length === 0) return;
+
+    const interval = setInterval(() => {
+      setAnimValues(prev => {
+        const next = { ...prev };
+        intensityWidgets.forEach((w: any) => {
+          const varId = w.data.valueVar;
+          const target = Number(playtestState.variableValues[varId] ?? 50);
+          const current = Number(prev[w.id] ?? target);
+          const diff = target - current;
+          next[w.id] = Math.abs(diff) < 1 ? target : current + diff * 0.2;
+        });
+        return next;
+      });
+    }, 50);
+    return () => clearInterval(interval);
+  }, [currentPage?.uiWidgets, playtestState.variableValues]);
+
   const stageRef = useRef<StageType>(null);
 
   // Interactive states for buttons (hover / pressed)
@@ -129,6 +150,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   // For widgets (Phase 2 drag support)
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
   const [pressedWidgetId, setPressedWidgetId] = useState<string | null>(null);
+
+  // Animated values for some widgets (e.g. intensity bar)
+  const [animValues, setAnimValues] = useState<Record<string, number>>({});
 
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
@@ -542,6 +566,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     const v = useStudioStore.getState().variables.find((vv: any) => vv.id === varId);
                     const live = playtestState.variableValues[varId];
                     val = typeof live === 'number' ? live : (v?.defaultValue as number ?? 50);
+                  }
+                  // Use animated value if available for smooth transitions
+                  const animKey = widget.id;
+                  if (animValues[animKey] !== undefined) {
+                    val = Number(animValues[animKey]);
                   }
                   const parts = Math.max(1, Math.min(5, data.parts || 3));
                   const clamped = Math.max(0, Math.min(100, val));
