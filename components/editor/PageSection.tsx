@@ -427,6 +427,8 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Speaker ID</label>
                       <input value={w.data?.speakerId || ''} onChange={e=>updateW({data:{... (w.data||{}), speakerId: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                      <label className="text-[10px] mt-1 block">Variant (e.g. neutral, angry)</label>
+                      <input value={w.data?.variant || ''} onChange={e=>updateW({data:{... (w.data||{}), variant: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="default" />
                     </div>
                   )}
                   {w.type === 'choiceButton' && (

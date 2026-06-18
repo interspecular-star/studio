@@ -95,18 +95,23 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     });
   }, [currentPage?.buttons]);
 
-  // Load widget asset images (portraits, button skins for choice etc)
+  // Load widget asset images (portraits, button skins for choice etc) + variants
   useEffect(() => {
     const assets = useStudioStore.getState().uiAssets || [];
-    const wAssets = (currentPage?.uiWidgets || [])
-      .map((w: any) => w.assetId)
-      .filter((id: any): id is string => !!id);
-    wAssets.forEach((aid: string) => {
-      const asset = assets.find((a: any) => a.id === aid);
+    (currentPage?.uiWidgets || []).forEach((w: any) => {
+      if (!w.assetId) return;
+      const asset = assets.find((a: any) => a.id === w.assetId);
       if (!asset?.url) return;
-      let src = asset.url.trim().replace(/\\/g, '/');
+
+      const variants = asset.variants || {};
+      const activeVariant = w.data?.variant || 'default';
+      const variantUrl = variants[activeVariant] || asset.url;
+
+      let src = variantUrl.trim().replace(/\\/g, '/');
       if (src && !src.startsWith('http') && !src.startsWith('/')) src = '/' + src;
+
       if (widgetImages[src]) return;
+
       const img = new window.Image();
       img.crossOrigin = 'anonymous';
       img.src = src;
@@ -431,7 +436,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const spId = widget.data?.speakerId || currentPage?.speaker || '';
                   const label = speakerNames[spId] || spId || 'Speaker';
                   const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
-                  let imgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
+                  const variants = asset?.variants || {};
+                  const activeVariant = widget.data?.variant || 'default';
+                  const variantUrl = variants[activeVariant] || asset?.url;
+                  let imgSrc = variantUrl ? variantUrl.trim().replace(/\\/g, '/') : null;
                   if (imgSrc && !imgSrc.startsWith('http') && !imgSrc.startsWith('/')) imgSrc = '/' + imgSrc;
                   const wImg = imgSrc ? widgetImages[imgSrc] : null;
 
