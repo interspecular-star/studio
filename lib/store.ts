@@ -729,7 +729,11 @@ const createDefaultPages = (): StudioPage[] => [
     buttons: [],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
     sceneType: 'dialog',
-    uiWidgets: [],
+    uiWidgets: [
+      { id: 'w_dlg1', type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+      { id: 'w_port1', type: 'portrait', layout: { x: 75, y: 30, width: 20, height: 40, z: 5 }, data: { speakerId: 'mila' } },
+      { id: 'w_q1', type: 'quickAction', layout: { x: 2, y: 15, width: 7, height: 7, z: 30 }, data: { actionType: 'inventory' } },
+    ],
     uiLayoutPreset: 'classic_vn',
   },
 ];
