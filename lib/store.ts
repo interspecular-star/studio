@@ -725,8 +725,8 @@ const createDefaultPages = (): StudioPage[] => [
     background: '',
     speaker: 'mila',
     text: {
-      ru: 'Ого, Слэй... Давно не заходил. Выглядишь, будто тебя переехал грузовик.',
-      en: 'Well, well, Slay... Haven\'t seen you in a while. You look like you got hit by a truck.',
+      ru: 'Ого, Слэй... Давно не заходил. Выглядишь, будто тебя переехал грузовик. **Что случилось?** [red]Ты в порядке?[/red]',
+      en: 'Well, well, Slay... Haven\'t seen you in a while. You look like you got hit by a truck. **What happened?** [red]Are you okay?[/red]',
     },
     buttons: [
       {
@@ -747,11 +747,17 @@ const createDefaultPages = (): StudioPage[] => [
         layout: { x: 10, y: 92, width: 20, height: 5, style: 'important' },
         action: { type: 'setIntensity', value: 85 },
       },
+      {
+        id: 'btn_dramatic',
+        text: { ru: 'Драматический текст', en: 'Dramatic text' },
+        layout: { x: 32, y: 92, width: 20, height: 5, style: 'default' },
+        action: { type: 'setWidgetProperty', pageId: 'tavern_01', widgetId: 'w_dlg1', key: 'data', value: { textSource: 'custom', speakerName: '???'} },
+      },
     ],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
     sceneType: 'dialog',
     uiWidgets: [
-      { id: 'w_dlg1', type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+      { id: 'w_dlg1', type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default', data: { textSource: 'page' } },
       { id: 'w_port1', type: 'portrait', layout: { x: 75, y: 30, width: 20, height: 40, z: 5 }, data: { speakerId: 'mila' } },
       { id: 'w_q1', type: 'quickAction', layout: { x: 2, y: 15, width: 7, height: 7, z: 30 }, data: { actionType: 'inventory' } },
     ],
