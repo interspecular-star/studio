@@ -466,11 +466,18 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
 
-                  // Basic markup support: **bold** -> bold, *italic* -> italic (simple, whole text style for now)
+                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red] etc (simple whole-text for colors)
+                  let textFill = '#EDE4D4';
                   const hasBold = /\*\*.*\*\*/.test(dialogText);
                   const hasItalic = /\*.*\*/.test(dialogText) && !hasBold;
                   if (hasBold) dialogText = dialogText.replace(/\*\*(.*?)\*\*/g, '$1');
                   if (hasItalic) dialogText = dialogText.replace(/\*(.*?)\*/g, '$1');
+                  const colorMatch = dialogText.match(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/);
+                  if (colorMatch) {
+                    const color = colorMatch[1];
+                    dialogText = dialogText.replace(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/g, '$2');
+                    textFill = color === 'red' ? '#ff6666' : color === 'blue' ? '#66aaff' : color === 'green' ? '#66ff66' : '#ffff66';
+                  }
                   const fontStyle = hasBold ? 'bold' : (hasItalic ? 'italic' : '500');
 
                   return (
@@ -515,7 +522,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         height={boxH - textStartY - 8}
                         text={dialogText}
                         fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
-                        fill="#EDE4D4"
+                        fill={textFill}
                         lineHeight={1.32}
                         wrap="word"
                         fontStyle={fontStyle}
