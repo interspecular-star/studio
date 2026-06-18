@@ -563,7 +563,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       x={-3}
                       y={-3}
                       width={wW + 6}
-                      height={wH + (widget.type === 'dialogueBox' ? Math.max(48, wH) + 6 : wH + 6)}
+                      height={wH + 6}
                       cornerRadius={8}
                       stroke={isSelected ? '#C5A46E' : '#8a7655'}
                       strokeWidth={1}

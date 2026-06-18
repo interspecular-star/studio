@@ -1479,6 +1479,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           ? { ...p, uiWidgets: (p.uiWidgets || []).filter((w) => w.id !== widgetId) }
           : p
       ),
+      // clear selection if we deleted the selected widget
+      selectedWidgetId: state.selectedWidgetId === widgetId ? null : state.selectedWidgetId,
     }));
     get().saveToLocalStorage();
   },
