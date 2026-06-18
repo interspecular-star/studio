@@ -194,8 +194,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     // Reset progress if text changed
     const resetNeeded: string[] = [];
     dialogueWidgets.forEach((w: any) => {
+      const overrideT = isPlaytest ? playtestState.widgetOverrides[w.id]?.text : null;
       const textSource = w.data?.textSource || 'page';
-      const fullText = textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || '');
+      const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
       const currentProg = typewriterProgress[w.id] || 0;
       if (currentProg > fullText.length) {
         resetNeeded.push(w.id);
@@ -214,8 +215,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
         const next = { ...prev };
         let changed = false;
         dialogueWidgets.forEach((w: any) => {
+          const overrideT = isPlaytest ? playtestState.widgetOverrides[w.id]?.text : null;
           const textSource = w.data?.textSource || 'page';
-          const fullText = textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || '');
+          const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
           const current = prev[w.id] || 0;
           if (current < fullText.length) {
             let speed = 3;
@@ -518,9 +520,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
                   const textSource = widget.data?.textSource || 'page';
-                  const effectiveText = (isPlaytest && playtestState.widgetOverrides[widget.id]?.text) || widget.text;
-                  let dialogText = textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : (currentPage?.text?.ru || '');
-                  if (textSource === 'custom' && !effectiveText?.ru) {
+                  const overrideText = isPlaytest ? playtestState.widgetOverrides[widget.id]?.text : null;
+                  const effectiveText = overrideText || widget.text;
+                  let dialogText = overrideText?.ru || (textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : (currentPage?.text?.ru || ''));
+                  if (textSource === 'custom' && !overrideText?.ru && !effectiveText?.ru) {
                     dialogText = 'Ты... **предатель**! [red]Убирайся отсюда![/red]';
                   }
                   const boxH = Math.max(48, wH);
@@ -557,10 +560,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     }
                   }
 
-                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red], [pause] stripped for display
+                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red], [pause] stripped, [shake] applies shake
                   let textFill = '#EDE4D4';
                   const hasBold = /\*\*.*\*\*/.test(dialogText);
                   const hasItalic = /\*.*\*/.test(dialogText) && !hasBold;
+                  const hasShake = /\[shake\]/.test(dialogText);
                   if (hasBold) dialogText = dialogText.replace(/\*\*(.*?)\*\*/g, '$1');
                   if (hasItalic) dialogText = dialogText.replace(/\*(.*?)\*/g, '$1');
                   const colorMatch = dialogText.match(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/);
@@ -569,8 +573,15 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     dialogText = dialogText.replace(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/g, '$2');
                     textFill = color === 'red' ? '#ff6666' : color === 'blue' ? '#66aaff' : color === 'green' ? '#66ff66' : '#ffff66';
                   }
-                  dialogText = dialogText.replace(/\[pause\]/g, ''); // strip pauses
+                  dialogText = dialogText.replace(/\[pause\]/g, '').replace(/\[shake\]/g, '').replace(/\[\/shake\]/g, ''); // strip
                   const fontStyle = hasBold ? 'bold' : (hasItalic ? 'italic' : '500');
+
+                  // Apply shake if [shake] was present
+                  if (hasShake && isPlaytest) {
+                    const t = Date.now() / 30;
+                    shakeX += Math.sin(t) * 2;
+                    shakeY += Math.cos(t * 0.8) * 1;
+                  }
 
                   return (
                     <>

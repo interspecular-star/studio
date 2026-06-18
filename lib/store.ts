@@ -751,7 +751,7 @@ const createDefaultPages = (): StudioPage[] => [
         id: 'btn_dramatic',
         text: { ru: 'Драматический текст', en: 'Dramatic text' },
         layout: { x: 32, y: 92, width: 20, height: 5, style: 'default' },
-        action: { type: 'setWidgetProperty', pageId: 'tavern_01', widgetId: 'w_dlg1', key: 'data', value: { textSource: 'custom', speakerName: '???' } },
+        action: { type: 'setWidgetProperty', pageId: 'tavern_01', widgetId: 'w_dlg1', key: 'text', value: { ru: 'Ты... **предатель**! [red]Убирайся отсюда![/red]', en: 'You... **traitor**! [red]Get out of here![/red]' } },
       },
     ],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
