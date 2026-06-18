@@ -553,6 +553,40 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   );
                 }
 
+                if (widget.type === 'quickAction') {
+                  const data = widget.data || {};
+                  const actionType = data.actionType || 'custom';
+                  let label = actionType === 'inventory' ? 'И' : 
+                             actionType === 'map' ? 'К' : 
+                             actionType === 'skills' ? 'С' : '?';
+                  const isActive = !isPlaytestMode || true; // always visible for now
+
+                  return (
+                    <Group>
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={wW}
+                        height={wH}
+                        cornerRadius={4}
+                        fill={isHovered ? 'rgba(80,65,45,0.95)' : 'rgba(55,45,32,0.85)'}
+                        stroke="#534B40"
+                        strokeWidth={1}
+                      />
+                      <Text
+                        x={0}
+                        y={wH / 2 - 6}
+                        width={wW}
+                        text={label}
+                        fontSize={Math.min(14, wH * 0.7)}
+                        fill="#C5A46E"
+                        align="center"
+                        fontStyle="500"
+                      />
+                    </Group>
+                  );
+                }
+
                 // Fallback
                 return (
                   <Rect x={0} y={0} width={wW} height={wH} fill="#222" stroke="#555" />
@@ -605,6 +639,14 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       }
                       return;
                     }
+                    if (isPlaytestMode && widget.type === 'quickAction') {
+                      const at = (widget.data || {}).actionType;
+                      if (at === 'inventory') {
+                        useStudioStore.getState().openInventory();
+                      }
+                      // map/skills can be extended later with custom actions
+                      return;
+                    }
                     if (!isPlaytestMode) {
                       selectWidget(widget.id);
                       selectButton(null);
@@ -615,6 +657,13 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
                       const linked = currentPage.buttons.find((b: any) => b.id === (widget.data || {}).linkedButtonId);
                       if (linked) useStudioStore.getState().executeAction(linked.action);
+                      return;
+                    }
+                    if (isPlaytestMode && widget.type === 'quickAction') {
+                      const at = (widget.data || {}).actionType;
+                      if (at === 'inventory') {
+                        useStudioStore.getState().openInventory();
+                      }
                       return;
                     }
                     if (!isPlaytestMode) {
