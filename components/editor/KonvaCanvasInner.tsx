@@ -601,6 +601,21 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   );
                 }
 
+                if (widget.type === 'container') {
+                  return (
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={wW}
+                      height={wH}
+                      fill="rgba(40,35,28,0.6)"
+                      stroke="#534B40"
+                      strokeWidth={1}
+                      cornerRadius={3}
+                    />
+                  );
+                }
+
                 // Fallback
                 return (
                   <Rect x={0} y={0} width={wW} height={wH} fill="#222" stroke="#555" />

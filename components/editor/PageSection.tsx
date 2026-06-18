@@ -331,6 +331,19 @@ export default function PageSection({
                 >
                   + Быстр.дейст.
                 </button>
+                <button
+                  onClick={() => {
+                    const { addUIWidget } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    addUIWidget(currentPage.id, {
+                      type: 'container',
+                      layout: { x: 1, y: 12, width: 12, height: 70, z: 1 },
+                    });
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  + Контейнер
+                </button>
               </div>
             </div>
 
