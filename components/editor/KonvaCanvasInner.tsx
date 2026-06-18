@@ -218,7 +218,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
           const fullText = textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || '');
           const current = prev[w.id] || 0;
           if (current < fullText.length) {
-            next[w.id] = Math.min(fullText.length, current + 3);
+            let speed = 3;
+            const remaining = fullText.substring(current);
+            if (remaining.startsWith('...')) speed = 1; // slow for pause
+            // faster if high intensity
+            const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
+            if (intW?.data?.valueVar) {
+              const live = playtestState.variableValues[intW.data.valueVar];
+              const intensity = typeof live === 'number' ? live : 0;
+              if (intensity > 70) speed += 2;
+            }
+            next[w.id] = Math.min(fullText.length, current + speed);
             changed = true;
           }
         });
