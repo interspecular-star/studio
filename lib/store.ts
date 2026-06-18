@@ -741,6 +741,12 @@ const createDefaultPages = (): StudioPage[] => [
         layout: { x: 40, y: 85, width: 25, height: 8, style: 'default' },
         action: { type: 'setPortraitVariant', variant: 'neutral' },
       },
+      {
+        id: 'btn_int_high',
+        text: { ru: 'Поднять накал', en: 'Raise intensity' },
+        layout: { x: 10, y: 92, width: 20, height: 5, style: 'important' },
+        action: { type: 'setIntensity', value: 85 },
+      },
     ],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
     sceneType: 'dialog',
