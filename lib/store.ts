@@ -2022,7 +2022,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         break;
       }
       case 'setPortraitVariant': {
-        const targetWidgetId = action.widgetId || 'auto-portrait'; // if no id, we can target first portrait later in render
+        let targetWidgetId = action.widgetId;
+        if (!targetWidgetId) {
+          // auto target first portrait widget on current page
+          const page = state.pages.find(p => p.id === state.selectedPageId);
+          const portraitW = (page?.uiWidgets || []).find((w: any) => w.type === 'portrait');
+          targetWidgetId = portraitW ? portraitW.id : 'auto-portrait';
+        }
         set((s) => ({
           playtestState: {
             ...s.playtestState,
