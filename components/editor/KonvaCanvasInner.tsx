@@ -518,7 +518,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
                   const textSource = widget.data?.textSource || 'page';
-                  let dialogText = textSource === 'custom' && widget.text?.ru ? widget.text.ru : (currentPage?.text?.ru || '');
+                  const effectiveText = (isPlaytest && playtestState.widgetOverrides[widget.id]?.text) || widget.text;
+                  let dialogText = textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : (currentPage?.text?.ru || '');
+                  if (textSource === 'custom' && !effectiveText?.ru) {
+                    dialogText = 'Ты... **предатель**! [red]Убирайся отсюда![/red]';
+                  }
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
