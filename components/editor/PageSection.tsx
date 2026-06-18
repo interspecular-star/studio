@@ -571,6 +571,11 @@ export default function PageSection({
                       {w.data?.textSource === 'custom' && (
                         <input value={w.text?.ru || ''} onChange={e=>updateW({text: { ...(w.text||{ru:'',en:''}), ru: e.target.value }})} className="w-full text-xs mt-1 px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Текст диалога" />
                       )}
+                      <label className="text-[10px] mt-1 block">Стиль</label>
+                      <select value={w.style || 'default'} onChange={e=>updateW({style: e.target.value})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                        <option value="default">Обычный</option>
+                        <option value="important">Важный</option>
+                      </select>
                     </div>
                   )}
 
