@@ -157,6 +157,26 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     ? currentPage.uiWidgets
     : getDefaultDialogueWidgets();
 
+  // Filter widgets by visibleWhen (same logic as buttons). In editor always show for authoring.
+  const visibleWidgets = pageWidgets.filter((widget: UIWidget) => {
+    if (!widget.visibleWhen) return true;
+    if (!isPlaytest) return true; // always visible in editor
+
+    const getVarValue = (variableId: string) => {
+      const live = playtestState.variableValues[variableId];
+      if (live !== undefined) return live;
+      const v = useStudioStore.getState().variables.find((vv: any) => vv.id === variableId);
+      return v?.defaultValue;
+    };
+
+    return evaluateCondition(
+      widget.visibleWhen,
+      useStudioStore.getState().variables,
+      useStudioStore.getState().items,
+      getVarValue
+    );
+  });
+
   const handleButtonDragEnd = (buttonId: string, e: any) => {
     // Save snapshot before applying the change (only for canvas drags)
     useStudioStore.getState().saveCanvasSnapshot();
@@ -358,7 +378,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               Draggable + selectable like buttons. Uses snapping.
               Positions update live via moveUIWidget / update.
           */}
-          {pageWidgets
+          {visibleWidgets
             .slice()
             .sort((a, b) => ((a.layout.z ?? 0) - (b.layout.z ?? 0)) || 0)
             .map((widget) => {
