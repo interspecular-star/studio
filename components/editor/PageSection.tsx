@@ -484,6 +484,12 @@ export default function PageSection({
                       </select>
                     </div>
                   )}
+                  {w.type === 'dialogueBox' && (
+                    <div>
+                      <label className="text-[10px]">Имя говорящего (оверрайд)</label>
+                      <input value={w.data?.speakerName || ''} onChange={e=>updateW({data:{...(w.data||{}), speakerName: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="из страницы" />
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-[var(--studio-border)]">
                     <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />

@@ -403,6 +403,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const dialogText = currentPage?.text?.ru || '';
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
+                  const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
+                  const nameY = 4;
+                  const textStartY = speakerName ? 18 : 10;
                   return (
                     <>
                       <Rect
@@ -417,11 +420,22 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         shadowColor="rgba(0,0,0,0.4)"
                         shadowBlur={isSelected ? 8 : 0}
                       />
+                      {speakerName && (
+                        <Text
+                          x={innerPad}
+                          y={nameY}
+                          width={wW - innerPad * 2}
+                          text={speakerName}
+                          fontSize={9}
+                          fill="#C5A46E"
+                          fontStyle="500"
+                        />
+                      )}
                       <Text
                         x={innerPad}
-                        y={10}
+                        y={textStartY}
                         width={wW - innerPad * 2}
-                        height={boxH - 18}
+                        height={boxH - textStartY - 8}
                         text={dialogText}
                         fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
                         fill="#EDE4D4"
