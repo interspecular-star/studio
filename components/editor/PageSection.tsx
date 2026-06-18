@@ -317,6 +317,20 @@ export default function PageSection({
                 >
                   + Накал
                 </button>
+                <button
+                  onClick={() => {
+                    const { addUIWidget } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    addUIWidget(currentPage.id, {
+                      type: 'quickAction',
+                      layout: { x: 5, y: 20 + Math.random()*10, width: 8, height: 8, z: 50 },
+                      data: { actionType: 'inventory' }
+                    });
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  + Быстр.дейст.
+                </button>
               </div>
             </div>
 
@@ -457,6 +471,17 @@ export default function PageSection({
                       <input value={w.data?.valueVar || ''} onChange={e=>updateW({data:{...(w.data||{}), valueVar: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="souls" />
                       <label className="text-[10px] mt-1 block">Parts (1-5)</label>
                       <input type="number" value={w.data?.parts || 3} onChange={e=>updateW({data:{...(w.data||{}), parts: parseInt(e.target.value)||3 }})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                    </div>
+                  )}
+                  {w.type === 'quickAction' && (
+                    <div>
+                      <label className="text-[10px]">Тип действия</label>
+                      <select value={w.data?.actionType || 'custom'} onChange={e=>updateW({data:{...(w.data||{}), actionType: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                        <option value="inventory">Инвентарь</option>
+                        <option value="map">Карта</option>
+                        <option value="skills">Навыки</option>
+                        <option value="custom">Другое</option>
+                      </select>
                     </div>
                   )}
 
