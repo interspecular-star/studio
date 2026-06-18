@@ -455,15 +455,25 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         shadowBlur={isSelected ? 8 : 0}
                       />
                       {speakerName && (
-                        <Text
-                          x={innerPad}
-                          y={nameY}
-                          width={wW - innerPad * 2}
-                          text={speakerName}
-                          fontSize={9}
-                          fill="#C5A46E"
-                          fontStyle="500"
-                        />
+                        <>
+                          <Rect
+                            x={innerPad - 4}
+                            y={nameY - 1}
+                            width={Math.min(wW - innerPad * 2 + 8, 120)}
+                            height={12}
+                            fill="rgba(0,0,0,0.4)"
+                            cornerRadius={2}
+                          />
+                          <Text
+                            x={innerPad}
+                            y={nameY}
+                            width={wW - innerPad * 2}
+                            text={speakerName}
+                            fontSize={9}
+                            fill="#C5A46E"
+                            fontStyle="500"
+                          />
+                        </>
                       )}
                       <Text
                         x={innerPad}
@@ -538,7 +548,15 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const cImg = cImgSrc ? widgetImages[cImgSrc] : null;
 
                   if (cImg) {
-                    return <KonvaImage image={cImg} width={wW} height={wH} />;
+                    if (data.imageOnly) {
+                      return <KonvaImage image={cImg} width={wW} height={wH} />;
+                    }
+                    return (
+                      <>
+                        <KonvaImage image={cImg} width={wW} height={wH} />
+                        <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill="#EDE4D4" align="center" />
+                      </>
+                    );
                   }
 
                   return (
