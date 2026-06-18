@@ -533,6 +533,14 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Имя говорящего (оверрайд)</label>
                       <input value={w.data?.speakerName || ''} onChange={e=>updateW({data:{...(w.data||{}), speakerName: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="из страницы" />
+                      <label className="text-[10px] mt-1 block">Источник текста</label>
+                      <select value={w.data?.textSource || 'page'} onChange={e=>updateW({data:{...(w.data||{}), textSource: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                        <option value="page">Из страницы</option>
+                        <option value="custom">Свой текст виджета</option>
+                      </select>
+                      {w.data?.textSource === 'custom' && (
+                        <input value={w.text?.ru || ''} onChange={e=>updateW({text: { ...(w.text||{ru:'',en:''}), ru: e.target.value }})} className="w-full text-xs mt-1 px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Текст диалога" />
+                      )}
                     </div>
                   )}
 

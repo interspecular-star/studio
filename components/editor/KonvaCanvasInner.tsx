@@ -401,7 +401,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               // Common wrapper for all widget types — adds drag/select in editor
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
-                  const dialogText = currentPage?.text?.ru || '';
+                  const textSource = widget.data?.textSource || 'page';
+                  const dialogText = textSource === 'custom' && widget.text?.ru ? widget.text.ru : (currentPage?.text?.ru || '');
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
