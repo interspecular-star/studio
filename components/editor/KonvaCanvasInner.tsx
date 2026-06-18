@@ -478,6 +478,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const linkedBtn = data.linkedButtonId ? currentPage.buttons.find((b: any) => b.id === data.linkedButtonId) : null;
                   const btnText = linkedBtn ? linkedBtn.text.ru : (widget.text?.ru || 'Choice');
                   const isLinked = !!linkedBtn;
+                  const hoverFill = isHovered ? 'rgba(72,62,48,0.95)' : (isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)');
                   return (
                     <>
                       <Rect
@@ -486,9 +487,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         width={wW}
                         height={wH}
                         cornerRadius={5}
-                        fill={isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)'}
+                        fill={hoverFill}
                         stroke={isSelected ? '#E8D4A0' : (isLinked ? '#C5A46E' : '#8a7655')}
-                        strokeWidth={isSelected ? 2.5 : (isLinked ? 1.5 : 1)}
+                        strokeWidth={isSelected ? 2.5 : (isLinked ? 1.8 : 1)}
                       />
                       <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill="#EDE4D4" align="center" />
                     </>
