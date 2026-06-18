@@ -505,6 +505,8 @@ type StudioState = {
     isInventoryOpen: boolean;
     // For Top Resource Bar avatar evolution (auto changes over time based on state, no player input)
     playerAvatar?: string; // 'default' | 'wounded' | 'veteran' | ...
+    // Temporary overrides for UI widgets during playtest (dynamic changes via actions, reset on page/exit)
+    widgetOverrides: Record<string, Partial<UIWidget>>;
   };
 
   // Actions
@@ -778,6 +780,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     equippedSlots: {},
     isInventoryOpen: false,
     playerAvatar: 'default',
+    widgetOverrides: {},
   },
 
   // Canvas-only history (for button dragging on the canvas)
@@ -1587,6 +1590,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         equippedSlots: {},
         isInventoryOpen: false,
         playerAvatar: 'default',
+        widgetOverrides: {},
       },
       snappingGuide: null,
     });
@@ -2003,33 +2007,36 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         break;
       }
       case 'setWidgetProperty': {
-        // Simple: update the widget on the target page (for demo; in real would use overrides)
         set((s) => ({
-          pages: s.pages.map(p => {
-            if (p.id !== action.pageId) return p;
-            return {
-              ...p,
-              uiWidgets: (p.uiWidgets || []).map(w =>
-                w.id === action.widgetId ? { ...w, [action.key]: action.value } : w
-              )
-            };
-          })
+          playtestState: {
+            ...s.playtestState,
+            widgetOverrides: {
+              ...s.playtestState.widgetOverrides,
+              [action.widgetId]: {
+                ...(s.playtestState.widgetOverrides[action.widgetId] || {}),
+                [action.key]: action.value,
+              },
+            },
+          },
         }));
         break;
       }
       case 'setPortraitVariant': {
+        const targetWidgetId = action.widgetId || 'auto-portrait'; // if no id, we can target first portrait later in render
         set((s) => ({
-          pages: s.pages.map(p => {
-            if (action.pageId && p.id !== action.pageId) return p;
-            return {
-              ...p,
-              uiWidgets: (p.uiWidgets || []).map(w =>
-                (!action.widgetId || w.id === action.widgetId) && w.type === 'portrait'
-                  ? { ...w, data: { ...(w.data || {}), variant: action.variant } }
-                  : w
-              )
-            };
-          })
+          playtestState: {
+            ...s.playtestState,
+            widgetOverrides: {
+              ...s.playtestState.widgetOverrides,
+              [targetWidgetId]: {
+                ...(s.playtestState.widgetOverrides[targetWidgetId] || {}),
+                data: {
+                  ...((s.playtestState.widgetOverrides[targetWidgetId] || {}).data || {}),
+                  variant: action.variant,
+                },
+              },
+            },
+          },
         }));
         break;
       }
@@ -2051,11 +2058,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
     set((s) => ({
       playtestState: {
+        ...s.playtestState,
         variableValues: currentValues,
-        equippedItemIds: s.playtestState.equippedItemIds,
-        equippedSlots: s.playtestState.equippedSlots,
-        isInventoryOpen: s.playtestState.isInventoryOpen,
-        playerAvatar: s.playtestState.playerAvatar ?? 'default',
       },
     }));
   },
@@ -2261,6 +2265,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         equippedSlots: {},
         isInventoryOpen: false,
         playerAvatar: 'default',
+        widgetOverrides: {},
       },
       canvasWidth: 1280,
       canvasHeight: 720,

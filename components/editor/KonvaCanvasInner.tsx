@@ -188,8 +188,22 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     ? currentPage.uiWidgets
     : getDefaultDialogueWidgets();
 
+  // In playtest, apply temporary overrides from playtestState (dynamics without mutating base project)
+  const effectiveWidgets = isPlaytest
+    ? pageWidgets.map((w: UIWidget) => {
+        const override = playtestState.widgetOverrides[w.id] || (w.type === 'portrait' ? playtestState.widgetOverrides['auto-portrait'] : null);
+        if (!override) return w;
+        return {
+          ...w,
+          ...override,
+          data: { ...(w.data || {}), ...(override.data || {}) },
+          layout: { ...(w.layout || {}), ...(override.layout || {}) },
+        } as UIWidget;
+      })
+    : pageWidgets;
+
   // Filter widgets by visibleWhen (same logic as buttons). In editor always show for authoring.
-  const visibleWidgets = pageWidgets.filter((widget: UIWidget) => {
+  const visibleWidgets = effectiveWidgets.filter((widget: UIWidget) => {
     if (!widget.visibleWhen) return true;
     if (!isPlaytest) return true; // always visible in editor
 
