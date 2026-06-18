@@ -683,9 +683,14 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   let label = actionType === 'inventory' ? 'И' : 
                              actionType === 'map' ? 'К' : 
                              actionType === 'skills' ? 'С' : '?';
-                  const isActive = !isPlaytestMode || true; // always visible for now
-
                   const isPressed = pressedWidgetId === widget.id;
+                  const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                  let qImgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
+                  if (qImgSrc && !qImgSrc.startsWith('http') && !qImgSrc.startsWith('/')) qImgSrc = '/' + qImgSrc;
+                  const qImg = qImgSrc ? widgetImages[qImgSrc] : null;
+                  if (qImg) {
+                    return <KonvaImage image={qImg} width={wW} height={wH} opacity={isPressed ? 0.7 : 1} />;
+                  }
                   return (
                     <Group>
                       <Rect
