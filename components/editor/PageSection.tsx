@@ -439,10 +439,18 @@ export default function PageSection({
 
             {/* Selected Widget Inspector */}
             {(() => {
-              const selW = (currentPage?.uiWidgets || []).find((ww: any) => ww.id === currentSelectedWidgetId);
+              let selW = (currentPage?.uiWidgets || []).find((ww: any) => ww.id === currentSelectedWidgetId);
+              const st = useStudioStore.getState();
+              if (st.mode === 'playtest' && selW && st.playtestState.widgetOverrides[selW.id]) {
+                const ov = st.playtestState.widgetOverrides[selW.id];
+                selW = {
+                  ...selW,
+                  ...ov,
+                  data: { ...(selW.data || {}), ...(ov.data || {}) },
+                };
+              }
               if (!selW || !currentPage) return null;
               const w = selW;
-              const st = useStudioStore.getState();
 
               const updateW = (updates: any) => { st.updateUIWidget(currentPage.id, w.id, updates); };
 
