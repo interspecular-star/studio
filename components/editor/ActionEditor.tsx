@@ -26,6 +26,8 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
     else if (newType === 'giveResource') newAction = { type: 'giveResource', resource: 'coins', amount: 10 };
     else if (newType === 'removeResource') newAction = { type: 'removeResource', resource: 'coins', amount: 10 };
     else if (newType === 'openInventory') newAction = { type: 'openInventory' };
+    else if (newType === 'setPortraitVariant') newAction = { type: 'setPortraitVariant', variant: 'angry' };
+    else if (newType === 'setIntensity') newAction = { type: 'setIntensity', value: 80 };
 
     onChange(newAction);
   };
@@ -57,6 +59,10 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
         </optgroup>
         <optgroup label="Интерфейс">
           <option value="openInventory">Открыть инвентарь</option>
+        </optgroup>
+        <optgroup label="UI Виджеты (диалог)">
+          <option value="setPortraitVariant">Сменить вариант портрета</option>
+          <option value="setIntensity">Установить накал</option>
         </optgroup>
       </select>
 
@@ -99,6 +105,19 @@ export default function ActionEditor({ action, onChange, variables, items }: Act
         <p className="text-xs text-[var(--studio-text-muted)] italic">
           Откроет модальное окно инвентаря с манекеном и ячейками.
         </p>
+      )}
+
+      {type === 'setPortraitVariant' && (
+        <input
+          className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm"
+          placeholder="variant (angry, happy...)"
+          value={action.variant || ''}
+          onChange={(e) => onChange({ ...action, variant: e.target.value })}
+        />
+      )}
+
+      {type === 'setIntensity' && (
+        <input type="number" value={action.value ?? 50} onChange={(e) => onChange({ ...action, value: parseInt(e.target.value) || 0 })} className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm" />
       )}
     </div>
   );
