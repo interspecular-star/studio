@@ -834,10 +834,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       y={0}
                       width={wW}
                       height={wH}
-                      fill="rgba(40,35,28,0.6)"
-                      stroke="#534B40"
-                      strokeWidth={1}
-                      cornerRadius={3}
+                      fill="rgba(30,25,20,0.7)"
+                      stroke="#3a3020"
+                      strokeWidth={1.5}
+                      cornerRadius={4}
                     />
                   );
                 }
