@@ -450,7 +450,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
                 if (widget.type === 'textLabel' || widget.type === 'portrait') {
                   const spId = widget.data?.speakerId || currentPage?.speaker || '';
-                  const label = speakerNames[spId] || spId || 'Speaker';
+                  const defaultLabel = speakerNames[spId] || spId || 'Speaker';
+                  const label = (widget.type === 'textLabel' && widget.text?.ru) ? widget.text.ru : defaultLabel;
                   const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
                   const variants = asset?.variants || {};
                   const activeVariant = widget.data?.variant || 'default';
