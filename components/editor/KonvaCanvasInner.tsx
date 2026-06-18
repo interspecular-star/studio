@@ -520,17 +520,26 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     dialogText = dialogText.substring(0, typewriterProgress[widget.id]);
                   }
 
-                  // Simple shake for dialogue if 'angry' variant active (playtest feedback)
+                  // Simple shake for dialogue if 'angry' variant or high intensity (playtest feedback)
                   let shakeX = 0;
                   let shakeY = 0;
                   if (isPlaytest) {
                     const portraitW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'portrait');
                     const pOverride = portraitW ? playtestState.widgetOverrides[portraitW.id] : null;
                     const activeV = (pOverride?.data?.variant || portraitW?.data?.variant || '');
-                    if (activeV === 'angry') {
+                    // intensity driven shake
+                    let intensity = 0;
+                    const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
+                    if (intW?.data?.valueVar) {
+                      const v = useStudioStore.getState().variables.find((vv: any) => vv.id === intW.data!.valueVar);
+                      const live = playtestState.variableValues[intW.data!.valueVar];
+                      intensity = typeof live === 'number' ? live : (v?.defaultValue as number ?? 0);
+                    }
+                    if (activeV === 'angry' || intensity > 60) {
+                      const amp = activeV === 'angry' ? 1.5 : (intensity - 60) / 30;
                       const t = Date.now() / 40;
-                      shakeX = Math.sin(t) * 1.5;
-                      shakeY = Math.cos(t * 1.3) * 0.8;
+                      shakeX = Math.sin(t) * amp;
+                      shakeY = Math.cos(t * 1.3) * amp * 0.6;
                     }
                   }
 
