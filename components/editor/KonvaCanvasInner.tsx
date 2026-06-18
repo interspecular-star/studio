@@ -141,6 +141,21 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     return () => clearInterval(interval);
   }, [currentPage?.uiWidgets, playtestState.variableValues]);
 
+  // Detect portrait variant changes in playtest for swap animation
+  useEffect(() => {
+    if (!isPlaytest) return;
+    (currentPage?.uiWidgets || []).forEach((w: any) => {
+      if (w.type !== 'portrait') return;
+      const override = playtestState.widgetOverrides[w.id] || {};
+      const currentVariant = (override.data?.variant || w.data?.variant || 'default') as string;
+      const prev = prevPortraitVariantsRef.current[w.id];
+      if (prev && prev !== currentVariant) {
+        setPortraitSwapAnim(prevAnim => ({ ...prevAnim, [w.id]: Date.now() }));
+      }
+      prevPortraitVariantsRef.current[w.id] = currentVariant;
+    });
+  }, [playtestState.widgetOverrides, currentPage?.uiWidgets, mode]);
+
   const stageRef = useRef<StageType>(null);
 
   // Interactive states for buttons (hover / pressed)
@@ -153,6 +168,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
   // Animated values for some widgets (e.g. intensity bar)
   const [animValues, setAnimValues] = useState<Record<string, number>>({});
+
+  // For portrait swap animation
+  const prevPortraitVariantsRef = useRef<Record<string, string>>({});
+  const [portraitSwapAnim, setPortraitSwapAnim] = useState<Record<string, number>>({}); // widgetId -> timestamp of swap
 
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
@@ -518,7 +537,24 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const wImg = imgSrc ? widgetImages[imgSrc] : null;
 
                   if (wImg && widget.type === 'portrait') {
-                    return <KonvaImage image={wImg} width={wW} height={wH} />;
+                    let pOpacity = 1;
+                    let pScale = 1;
+                    const swapTime = portraitSwapAnim[widget.id];
+                    if (swapTime && (Date.now() - swapTime < 350)) {
+                      const t = Math.min(1, (Date.now() - swapTime) / 350);
+                      pOpacity = 0.3 + 0.7 * t;
+                      pScale = 0.85 + 0.15 * t;
+                    }
+                    return <KonvaImage 
+                      image={wImg} 
+                      width={wW} 
+                      height={wH} 
+                      opacity={pOpacity}
+                      scaleX={pScale}
+                      scaleY={pScale}
+                      x={(wW - wW * pScale) / 2}
+                      y={(wH - wH * pScale) / 2}
+                    />;
                   }
                   return (
                     <>
