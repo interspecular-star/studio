@@ -173,11 +173,60 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   const prevPortraitVariantsRef = useRef<Record<string, string>>({});
   const [portraitSwapAnim, setPortraitSwapAnim] = useState<Record<string, number>>({}); // widgetId -> timestamp of swap
 
+  // Typewriter progress for dialogueBox in playtest (char count per widget)
+  const [typewriterProgress, setTypewriterProgress] = useState<Record<string, number>>({});
+
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
 
   const isPlaytest = mode === 'playtest';
   const bgSettings = bgDef?.settings || { scale: 1, offsetX: 0, offsetY: 0, brightness: 1, opacity: 1, fitMode: 'cover', parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false } };
+
+  // Typewriter effect for dialogueBox text in playtest
+  useEffect(() => {
+    if (!isPlaytest) {
+      setTypewriterProgress({});
+      return;
+    }
+    const dialogueWidgets = (currentPage?.uiWidgets || []).filter((w: any) => w.type === 'dialogueBox');
+    if (dialogueWidgets.length === 0) return;
+
+    // Reset progress if text changed
+    const resetNeeded: string[] = [];
+    dialogueWidgets.forEach((w: any) => {
+      const textSource = w.data?.textSource || 'page';
+      const fullText = textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || '');
+      const currentProg = typewriterProgress[w.id] || 0;
+      if (currentProg > fullText.length) {
+        resetNeeded.push(w.id);
+      }
+    });
+    if (resetNeeded.length > 0) {
+      setTypewriterProgress(prev => {
+        const next = { ...prev };
+        resetNeeded.forEach(id => { next[id] = 0; });
+        return next;
+      });
+    }
+
+    const interval = setInterval(() => {
+      setTypewriterProgress(prev => {
+        const next = { ...prev };
+        let changed = false;
+        dialogueWidgets.forEach((w: any) => {
+          const textSource = w.data?.textSource || 'page';
+          const fullText = textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || '');
+          const current = prev[w.id] || 0;
+          if (current < fullText.length) {
+            next[w.id] = Math.min(fullText.length, current + 3);
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 60);
+    return () => clearInterval(interval);
+  }, [isPlaytest, currentPage?.uiWidgets, currentPage?.text?.ru, currentPage?.id, playtestState]);
 
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
 
@@ -465,6 +514,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
+
+                  // Typewriter in playtest
+                  if (isPlaytest && typewriterProgress[widget.id] !== undefined) {
+                    dialogText = dialogText.substring(0, typewriterProgress[widget.id]);
+                  }
 
                   // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red] etc (simple whole-text for colors)
                   let textFill = '#EDE4D4';
