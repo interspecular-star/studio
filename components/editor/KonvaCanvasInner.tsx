@@ -792,6 +792,20 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       listening={false}
                     />
                   )}
+                  {/* Visual indicator for dynamic override in playtest */}
+                  {isPlaytest && playtestState.widgetOverrides[widget.id] && (
+                    <Rect
+                      x={-1}
+                      y={-1}
+                      width={wW + 2}
+                      height={wH + 2}
+                      cornerRadius={4}
+                      stroke="#22c55e"
+                      strokeWidth={1.5}
+                      dash={[2, 2]}
+                      listening={false}
+                    />
+                  )}
                   {renderWidgetContent()}
                 </Group>
               );
