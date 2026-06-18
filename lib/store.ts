@@ -728,7 +728,20 @@ const createDefaultPages = (): StudioPage[] => [
       ru: 'Ого, Слэй... Давно не заходил. Выглядишь, будто тебя переехал грузовик.',
       en: 'Well, well, Slay... Haven\'t seen you in a while. You look like you got hit by a truck.',
     },
-    buttons: [],
+    buttons: [
+      {
+        id: 'btn_angry',
+        text: { ru: 'Разозлить Милу', en: 'Make Mila angry' },
+        layout: { x: 70, y: 85, width: 25, height: 8, style: 'danger' },
+        action: { type: 'setPortraitVariant', variant: 'angry' },
+      },
+      {
+        id: 'btn_neutral',
+        text: { ru: 'Успокоить', en: 'Calm down' },
+        layout: { x: 40, y: 85, width: 25, height: 8, style: 'default' },
+        action: { type: 'setPortraitVariant', variant: 'neutral' },
+      },
+    ],
     showTopResourceBar: false, // пример: диалоговая/социальная сцена — бар скрыт, чтобы не отвлекать
     sceneType: 'dialog',
     uiWidgets: [
