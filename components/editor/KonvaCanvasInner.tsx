@@ -495,6 +495,52 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   );
                 }
 
+                if (widget.type === 'intensityBar') {
+                  const data = widget.data || {};
+                  const varId = data.valueVar;
+                  let val = 50;
+                  if (varId) {
+                    const v = useStudioStore.getState().variables.find((vv: any) => vv.id === varId);
+                    const live = playtestState.variableValues[varId];
+                    val = typeof live === 'number' ? live : (v?.defaultValue as number ?? 50);
+                  }
+                  const parts = Math.max(1, Math.min(5, data.parts || 3));
+                  const clamped = Math.max(0, Math.min(100, val));
+                  const partWidth = wW / parts;
+                  const filledParts = Math.floor((clamped / 100) * parts);
+
+                  return (
+                    <Group>
+                      {Array.from({ length: parts }).map((_, i) => {
+                        const isFilled = i < filledParts;
+                        const colors = data.colors || ['#4b2e1e', '#8a5a3a', '#c27a4a'];
+                        const color = isFilled ? (colors[i % colors.length] || '#c27a4a') : '#2a221c';
+                        return (
+                          <Rect
+                            key={i}
+                            x={i * partWidth}
+                            y={0}
+                            width={partWidth - 1}
+                            height={wH}
+                            fill={color}
+                            stroke="#534B40"
+                            strokeWidth={0.5}
+                          />
+                        );
+                      })}
+                      <Text
+                        x={0}
+                        y={wH / 2 - 5}
+                        width={wW}
+                        text={`${Math.round(clamped)}`}
+                        fontSize={9}
+                        fill="#EDE4D4"
+                        align="center"
+                      />
+                    </Group>
+                  );
+                }
+
                 // Fallback
                 return (
                   <Rect x={0} y={0} width={wW} height={wH} fill="#222" stroke="#555" />

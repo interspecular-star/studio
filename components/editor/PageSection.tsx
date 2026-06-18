@@ -303,6 +303,20 @@ export default function PageSection({
                 >
                   + Имя
                 </button>
+                <button
+                  onClick={() => {
+                    const { addUIWidget } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    addUIWidget(currentPage.id, {
+                      type: 'intensityBar',
+                      layout: { x: 10, y: 5, width: 30, height: 4, z: 40 },
+                      data: { valueVar: 'souls', parts: 3 }
+                    });
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  + Накал
+                </button>
               </div>
             </div>
 
@@ -435,6 +449,14 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Linked button ID</label>
                       <input value={w.data?.linkedButtonId || ''} onChange={e=>updateW({data:{...(w.data||{}), linkedButtonId:e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                    </div>
+                  )}
+                  {w.type === 'intensityBar' && (
+                    <div>
+                      <label className="text-[10px]">Value variable ID</label>
+                      <input value={w.data?.valueVar || ''} onChange={e=>updateW({data:{...(w.data||{}), valueVar: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="souls" />
+                      <label className="text-[10px] mt-1 block">Parts (1-5)</label>
+                      <input type="number" value={w.data?.parts || 3} onChange={e=>updateW({data:{...(w.data||{}), parts: parseInt(e.target.value)||3 }})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
                     </div>
                   )}
 
