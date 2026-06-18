@@ -352,7 +352,9 @@ export default function PageSection({
             )}
 
             <div className="space-y-2">
-              {(currentPage?.uiWidgets || []).map((w: any) => {
+              {[...(currentPage?.uiWidgets || [])]
+                .sort((a:any, b:any) => (b.layout.z||0) - (a.layout.z||0)) // higher z first (top layers)
+                .map((w: any) => {
                 const isSel = useStudioStore.getState().selectedWidgetId === w.id;
                 return (
                 <div
@@ -365,7 +367,7 @@ export default function PageSection({
                   className={`rounded border px-2 py-2 text-[10px] cursor-pointer ${isSel ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]' : 'border-[var(--studio-border)] bg-[#161310] hover:border-[var(--studio-border-strong)]'}`}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-mono text-[var(--studio-accent)]">{w.type}</span>
+                    <span className="font-mono text-[var(--studio-accent)]">{w.type} <span className="text-[8px] opacity-60">z:{w.layout.z??0}</span></span>
                     <button
                       onClick={() => {
                         const store = useStudioStore.getState();
