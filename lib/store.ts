@@ -1483,14 +1483,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
   applyUILayoutPreset: (pageId, preset) => {
-    // For now: simple stub that resets to empty or basic defaults. Full presets in Phase 2/3.
-    const defaultWidgets: UIWidget[] = [];
+    let defaultWidgets: UIWidget[] = [];
     if (preset === 'classic_vn') {
-      // Basic seeded positions (will be refined in rendering)
-      defaultWidgets.push(
-        { id: 'w_dlg', type: 'dialogueBox', layout: { x: 16, y: 72, width: 68, height: 18, z: 10 }, style: 'default' },
-        { id: 'w_port', type: 'portrait', layout: { x: 72, y: 35, width: 22, height: 42, z: 5 }, style: 'default' }
-      );
+      defaultWidgets = [
+        { id: `w_dlg_${Date.now()}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+        { id: `w_spk_${Date.now()}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default' },
+      ];
+    } else if (preset === 'bottom_bar') {
+      defaultWidgets = [
+        { id: `w_bar_${Date.now()}`, type: 'dialogueBox', layout: { x: 10, y: 82, width: 80, height: 14, z: 10 }, style: 'default' },
+        { id: `w_port_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 40, width: 18, height: 35, z: 5 }, style: 'default' },
+        { id: `w_choice1_${Date.now()}`, type: 'choiceButton', layout: { x: 15, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
+        { id: `w_choice2_${Date.now()}`, type: 'choiceButton', layout: { x: 55, y: 92, width: 30, height: 6, z: 30 }, style: 'default' },
+      ];
+    } else if (preset === 'freeform') {
+      defaultWidgets = [];
     }
     set((state) => ({
       pages: state.pages.map((p) =>

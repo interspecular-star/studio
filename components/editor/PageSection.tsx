@@ -256,13 +256,23 @@ export default function PageSection({
               <div className="flex gap-1">
                 <button
                   onClick={() => {
-                    const { addUIWidget, applyUILayoutPreset } = useStudioStore.getState();
+                    const { applyUILayoutPreset } = useStudioStore.getState();
                     if (!currentPage) return;
                     applyUILayoutPreset(currentPage.id, 'classic_vn');
                   }}
                   className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
                 >
                   Классика
+                </button>
+                <button
+                  onClick={() => {
+                    const { applyUILayoutPreset } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    applyUILayoutPreset(currentPage.id, 'bottom_bar');
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  Нижняя панель
                 </button>
                 <button
                   onClick={() => {
