@@ -312,7 +312,12 @@ export type ButtonAction =
   | { type: 'removeResource'; resource: 'coins' | 'gasoline' | 'gems'; amount: number }
 
   // Инвентарь (модальное окно)
-  | { type: 'openInventory' };
+  | { type: 'openInventory' }
+
+  // Dialogue UI widget dynamics (Phase 3+)
+  | { type: 'setWidgetProperty'; pageId: string; widgetId: string; key: string; value: any }
+  | { type: 'setPortraitVariant'; pageId?: string; widgetId?: string; variant: string }
+  | { type: 'setIntensity'; value: number | 'delta'; delta?: number };
 
 export type StudioButton = {
   id: string;
@@ -1983,6 +1988,48 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             isInventoryOpen: true,
           },
         }));
+        break;
+      }
+      case 'setWidgetProperty': {
+        // Simple: update the widget on the target page (for demo; in real would use overrides)
+        set((s) => ({
+          pages: s.pages.map(p => {
+            if (p.id !== action.pageId) return p;
+            return {
+              ...p,
+              uiWidgets: (p.uiWidgets || []).map(w =>
+                w.id === action.widgetId ? { ...w, [action.key]: action.value } : w
+              )
+            };
+          })
+        }));
+        break;
+      }
+      case 'setPortraitVariant': {
+        set((s) => ({
+          pages: s.pages.map(p => {
+            if (action.pageId && p.id !== action.pageId) return p;
+            return {
+              ...p,
+              uiWidgets: (p.uiWidgets || []).map(w =>
+                (!action.widgetId || w.id === action.widgetId) && w.type === 'portrait'
+                  ? { ...w, data: { ...(w.data || {}), variant: action.variant } }
+                  : w
+              )
+            };
+          })
+        }));
+        break;
+      }
+      case 'setIntensity': {
+        // For demo: if there's an intensity var, mutate it
+        const intensityVar = state.variables.find(v => v.name.includes('intensity') || v.name === 'souls');
+        if (intensityVar) {
+          let newVal = typeof currentValues[intensityVar.id] === 'number' ? (currentValues[intensityVar.id] as number) : (intensityVar.defaultValue as number || 0);
+          if (action.value === 'delta' && action.delta) newVal += action.delta;
+          else if (typeof action.value === 'number') newVal = action.value;
+          currentValues[intensityVar.id] = Math.max(0, Math.min(100, newVal));
+        }
         break;
       }
       default:
