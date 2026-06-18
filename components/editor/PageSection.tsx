@@ -454,6 +454,28 @@ export default function PageSection({
                         </div>
                       ))}
                     </div>
+                    {/* Z-order controls */}
+                    <div className="flex gap-1 mt-1 text-[9px]">
+                      <button onClick={() => {
+                        const allZ = (currentPage?.uiWidgets || []).map((ww:any)=>ww.layout.z||0);
+                        const maxZ = Math.max(0, ...allZ);
+                        updateW({ layout: { ...w.layout, z: maxZ + 10 } });
+                      }} className="px-1 py-0.5 border border-[var(--studio-border)] rounded hover:bg-[var(--studio-bg-elevated)]">На передний</button>
+                      <button onClick={() => {
+                        const allZ = (currentPage?.uiWidgets || []).map((ww:any)=>ww.layout.z||0).filter((zz:number)=>zz < (w.layout.z||0));
+                        const nextZ = allZ.length ? Math.max(...allZ) + 1 : (w.layout.z||0) - 1;
+                        updateW({ layout: { ...w.layout, z: Math.max(0, nextZ) } });
+                      }} className="px-1 py-0.5 border border-[var(--studio-border)] rounded hover:bg-[var(--studio-bg-elevated)]">Вверх</button>
+                      <button onClick={() => {
+                        const allZ = (currentPage?.uiWidgets || []).map((ww:any)=>ww.layout.z||0).filter((zz:number)=>zz > (w.layout.z||0));
+                        const nextZ = allZ.length ? Math.min(...allZ) - 1 : (w.layout.z||0) + 1;
+                        updateW({ layout: { ...w.layout, z: Math.max(0, nextZ) } });
+                      }} className="px-1 py-0.5 border border-[var(--studio-border)] rounded hover:bg-[var(--studio-bg-elevated)]">Вниз</button>
+                      <button onClick={() => {
+                        const minZ = Math.min(0, ... (currentPage?.uiWidgets || []).map((ww:any)=>ww.layout.z||0));
+                        updateW({ layout: { ...w.layout, z: minZ - 10 } });
+                      }} className="px-1 py-0.5 border border-[var(--studio-border)] rounded hover:bg-[var(--studio-bg-elevated)]">На задний</button>
+                    </div>
                   </div>
 
                   <div>
