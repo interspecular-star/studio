@@ -222,7 +222,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
           if (current < fullText.length) {
             let speed = 3;
             const remaining = fullText.substring(current);
-            if (remaining.startsWith('...')) speed = 1; // slow for pause
+            if (remaining.startsWith('...') || remaining.startsWith('[pause]')) speed = 0.5; // slow for pause
             // faster if high intensity
             const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
             if (intW?.data?.valueVar) {
