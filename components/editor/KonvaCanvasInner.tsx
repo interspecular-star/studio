@@ -479,6 +479,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const btnText = linkedBtn ? linkedBtn.text.ru : (widget.text?.ru || 'Choice');
                   const isLinked = !!linkedBtn;
                   const hoverFill = isHovered ? 'rgba(72,62,48,0.95)' : (isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)');
+
+                  // If asset image for this choice widget, draw it (like button images)
+                  const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                  let cImgSrc = asset?.url ? asset.url.trim().replace(/\\/g,'/') : null;
+                  if (cImgSrc && !cImgSrc.startsWith('http') && !cImgSrc.startsWith('/')) cImgSrc = '/' + cImgSrc;
+                  const cImg = cImgSrc ? widgetImages[cImgSrc] : null;
+
+                  if (cImg) {
+                    return <KonvaImage image={cImg} width={wW} height={wH} />;
+                  }
+
                   return (
                     <>
                       <Rect
