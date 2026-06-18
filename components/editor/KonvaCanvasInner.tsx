@@ -128,6 +128,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
   // For widgets (Phase 2 drag support)
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
+  const [pressedWidgetId, setPressedWidgetId] = useState<string | null>(null);
 
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
@@ -492,7 +493,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const linkedBtn = data.linkedButtonId ? currentPage.buttons.find((b: any) => b.id === data.linkedButtonId) : null;
                   const btnText = linkedBtn ? linkedBtn.text.ru : (widget.text?.ru || 'Choice');
                   const isLinked = !!linkedBtn;
-                  const hoverFill = isHovered ? 'rgba(72,62,48,0.95)' : (isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)');
+                  const isPressed = pressedWidgetId === widget.id;
+                  const hoverFill = isPressed ? 'rgba(48,38,28,0.98)' : (isHovered ? 'rgba(72,62,48,0.95)' : (isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)'));
 
                   // If asset image for this choice widget, draw it (like button images)
                   const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
@@ -575,6 +577,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                              actionType === 'skills' ? 'С' : '?';
                   const isActive = !isPlaytestMode || true; // always visible for now
 
+                  const isPressed = pressedWidgetId === widget.id;
                   return (
                     <Group>
                       <Rect
@@ -583,7 +586,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         width={wW}
                         height={wH}
                         cornerRadius={4}
-                        fill={isHovered ? 'rgba(80,65,45,0.95)' : 'rgba(55,45,32,0.85)'}
+                        fill={isPressed ? 'rgba(40,35,25,0.98)' : (isHovered ? 'rgba(80,65,45,0.95)' : 'rgba(55,45,32,0.85)')}
                         stroke="#534B40"
                         strokeWidth={1}
                       />
@@ -629,7 +632,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   y={wY}
                   draggable={!isPlaytestMode}
                   onMouseEnter={() => setHoveredWidgetId(widget.id)}
-                  onMouseLeave={() => setHoveredWidgetId(null)}
+                  onMouseLeave={() => { setHoveredWidgetId(null); setPressedWidgetId(null); }}
                   onDragMove={(e) => {
                     if (isPlaytestMode) return;
                     const node = e.target;
@@ -659,6 +662,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     if (isPlaytestMode) return;
                     handleWidgetDragEnd(widget.id, e);
                   }}
+                  onMouseDown={() => setPressedWidgetId(widget.id)}
+                  onMouseUp={() => setPressedWidgetId(null)}
                   onClick={(e) => {
                     e.cancelBubble = true;
                     if (isPlaytestMode && widget.type === 'choiceButton' && (widget.data?.linkedButtonId)) {
