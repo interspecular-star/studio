@@ -429,6 +429,8 @@ export interface UIWidget {
     colors?: string[];
     // quickAction
     actionType?: 'inventory' | 'map' | 'skills' | 'custom';
+    // demo choice extra
+    setIntensity?: number;
     // container etc.
   };
 }
@@ -1553,8 +1555,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 18, width: 7, height: 7, z: 10 }, data: { actionType: 'inventory' } },
         { id: `w_qsk_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 30, width: 7, height: 7, z: 10 }, data: { actionType: 'skills' } },
         { id: `w_int_${Date.now()}`, type: 'intensityBar', layout: { x: 12, y: 5, width: 25, height: 3.5, z: 30 }, data: { valueVar: 'souls', parts: 3 } },
-        { id: `w_ch1_${Date.now()}`, type: 'choiceButton', layout: { x: 20, y: 92, width: 28, height: 6, z: 25 }, style: 'default', text: { ru: 'Согласиться', en: 'Agree' }, data: { linkedButtonId: '' } },
-        { id: `w_ch2_${Date.now()}`, type: 'choiceButton', layout: { x: 52, y: 92, width: 28, height: 6, z: 25 }, style: 'important', text: { ru: 'Отказаться', en: 'Refuse' }, data: { linkedButtonId: '' } },
+        { id: `w_ch1_${Date.now()}`, type: 'choiceButton', layout: { x: 20, y: 92, width: 28, height: 6, z: 25 }, style: 'default', text: { ru: 'Согласиться', en: 'Agree' }, data: { linkedButtonId: '', setIntensity: 40 } },
+        { id: `w_ch2_${Date.now()}`, type: 'choiceButton', layout: { x: 52, y: 92, width: 28, height: 6, z: 25 }, style: 'important', text: { ru: 'Отказаться', en: 'Refuse' }, data: { linkedButtonId: '', setIntensity: 80 } },
       ];
     } else if (preset === 'freeform') {
       defaultWidgets = [];

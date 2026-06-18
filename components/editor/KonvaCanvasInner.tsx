@@ -905,8 +905,13 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           return;
                         }
                       }
-                      // Fallback for demo: lower intensity
-                      useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
+                      // Fallback for demo: use data or lower intensity
+                      const chData = widget.data || {};
+                      if (chData.setIntensity !== undefined) {
+                        useStudioStore.getState().executeAction({ type: 'setIntensity', value: chData.setIntensity });
+                      } else {
+                        useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
+                      }
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'quickAction') {
@@ -933,7 +938,13 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           return;
                         }
                       }
-                      useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
+                      // Fallback for demo: use data or lower intensity
+                      const chData = widget.data || {};
+                      if (chData.setIntensity !== undefined) {
+                        useStudioStore.getState().executeAction({ type: 'setIntensity', value: chData.setIntensity });
+                      } else {
+                        useStudioStore.getState().executeAction({ type: 'setIntensity', value: 30 });
+                      }
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'quickAction') {
