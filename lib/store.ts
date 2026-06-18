@@ -1546,7 +1546,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     } else if (preset === 'full_dialogue_demo') {
       defaultWidgets = [
         { id: `w_dlg_${Date.now()}`, type: 'dialogueBox', layout: { x: 15, y: 70, width: 70, height: 20, z: 20 }, style: 'default' },
-        { id: `w_port_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'mila', variant: 'neutral' } },
+        { id: `w_port1_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'mila', variant: 'neutral' } },
+        { id: `w_port2_${Date.now()}`, type: 'portrait', layout: { x: 2, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'slay', variant: 'default' } },
         { id: `w_cont_${Date.now()}`, type: 'container', layout: { x: 1, y: 12, width: 10, height: 75, z: 1 } },
         { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 18, width: 7, height: 7, z: 10 }, data: { actionType: 'inventory' } },
         { id: `w_qsk_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 30, width: 7, height: 7, z: 10 }, data: { actionType: 'skills' } },
