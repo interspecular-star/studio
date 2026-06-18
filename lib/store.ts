@@ -357,7 +357,7 @@ export type StudioPage = {
   sceneType?: 'exploration' | 'dialog' | 'combat' | 'menu'; // helps with smart defaults (e.g. hide bar on dialog/menu)
   // Dialogue UI Widgets (new flexible system)
   uiWidgets?: UIWidget[];
-  uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'left_bar' | 'freeform' | 'custom';
+  uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'left_bar' | 'full_dialogue_demo' | 'freeform' | 'custom';
 };
 
 export type BackgroundSettings = {
@@ -1530,6 +1530,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 15, width: 8, height: 8, z: 10 }, data: { actionType: 'inventory' } },
         { id: `w_qmap_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 28, width: 8, height: 8, z: 10 }, data: { actionType: 'map' } },
         { id: `w_qsk_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 41, width: 8, height: 8, z: 10 }, data: { actionType: 'skills' } },
+      ];
+    } else if (preset === 'full_dialogue_demo') {
+      defaultWidgets = [
+        { id: `w_dlg_${Date.now()}`, type: 'dialogueBox', layout: { x: 15, y: 70, width: 70, height: 20, z: 20 }, style: 'default' },
+        { id: `w_port_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'mila', variant: 'neutral' } },
+        { id: `w_cont_${Date.now()}`, type: 'container', layout: { x: 1, y: 12, width: 10, height: 75, z: 1 } },
+        { id: `w_qinv_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 18, width: 7, height: 7, z: 10 }, data: { actionType: 'inventory' } },
+        { id: `w_qsk_${Date.now()}`, type: 'quickAction', layout: { x: 2, y: 30, width: 7, height: 7, z: 10 }, data: { actionType: 'skills' } },
+        { id: `w_int_${Date.now()}`, type: 'intensityBar', layout: { x: 12, y: 5, width: 25, height: 3.5, z: 30 }, data: { valueVar: 'souls', parts: 3 } },
+        { id: `w_ch1_${Date.now()}`, type: 'choiceButton', layout: { x: 20, y: 92, width: 28, height: 6, z: 25 }, style: 'default', data: { linkedButtonId: '' } },
+        { id: `w_ch2_${Date.now()}`, type: 'choiceButton', layout: { x: 52, y: 92, width: 28, height: 6, z: 25 }, style: 'important', data: { linkedButtonId: '' } },
       ];
     } else if (preset === 'freeform') {
       defaultWidgets = [];

@@ -286,6 +286,16 @@ export default function PageSection({
                 </button>
                 <button
                   onClick={() => {
+                    const { applyUILayoutPreset } = useStudioStore.getState();
+                    if (!currentPage) return;
+                    applyUILayoutPreset(currentPage.id, 'full_dialogue_demo');
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                >
+                  Полный демо
+                </button>
+                <button
+                  onClick={() => {
                     const { addUIWidget } = useStudioStore.getState();
                     if (!currentPage) return;
                     addUIWidget(currentPage.id, {
