@@ -553,7 +553,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     }
                   }
 
-                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red] etc (simple whole-text for colors)
+                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red], [pause] stripped for display
                   let textFill = '#EDE4D4';
                   const hasBold = /\*\*.*\*\*/.test(dialogText);
                   const hasItalic = /\*.*\*/.test(dialogText) && !hasBold;
@@ -565,6 +565,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     dialogText = dialogText.replace(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/g, '$2');
                     textFill = color === 'red' ? '#ff6666' : color === 'blue' ? '#66aaff' : color === 'green' ? '#66ff66' : '#ffff66';
                   }
+                  dialogText = dialogText.replace(/\[pause\]/g, ''); // strip pauses
                   const fontStyle = hasBold ? 'bold' : (hasItalic ? 'italic' : '500');
 
                   return (
