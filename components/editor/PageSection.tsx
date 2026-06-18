@@ -248,9 +248,8 @@ export default function PageSection({
             />
           </div>
 
-          {/* === ДИАЛОГ UI: WIDGETS (Phase 1) - позиционируемые элементы ===
-              Автоматически сидируются при выборе говорящего. Редактируйте % координаты здесь.
-              Позже: drag on canvas, ассеты, пресеты, conditions. */}
+          {/* === ДИАЛОГ UI: ВИДЖЕТЫ ===
+              Перетаскивай на холсте. Выбери в списке — редактируй в инспекторе ниже. */}
           <div className="pt-1 border-t border-[var(--studio-border)] mt-2">
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-[var(--studio-text-secondary)]">ДИАЛОГ UI — ВИДЖЕТЫ ({(currentPage?.uiWidgets || []).length})</label>
@@ -374,9 +373,67 @@ export default function PageSection({
                 );
               })}
             </div>
-            <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">
-              Виджеты видны на холсте. Меняй % — позиция обновляется сразу. (Позже drag&amp;drop + ассеты)
-            </p>
+
+            {/* Selected Widget Inspector */}
+            {(() => {
+              const st = useStudioStore.getState();
+              const selW = (currentPage?.uiWidgets || []).find((ww: any) => ww.id === st.selectedWidgetId);
+              if (!selW || !currentPage) return null;
+              const w = selW;
+
+              const updateW = (updates: any) => { st.updateUIWidget(currentPage.id, w.id, updates); };
+
+              return (
+                <div className="mt-2 space-y-3 rounded-xl border border-[var(--studio-accent)]/40 bg-[var(--studio-bg-elevated)] p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-[var(--studio-accent)]">ВИДЖЕТ: {w.type.toUpperCase()}</span>
+                    <button onClick={() => st.deleteUIWidget(currentPage.id, w.id)} className="text-[var(--studio-danger)] text-xs hover:underline">Удалить</button>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] mb-1 text-[var(--studio-text-secondary)]">РАЗМЕРЫ (%)</div>
+                    <div className="grid grid-cols-5 gap-1">
+                      {(['x','y','width','height','z'] as const).map((k) => (
+                        <div key={k}>
+                          <div className="text-[9px] text-[var(--studio-text-muted)]">{k}</div>
+                          <input type="number" step="0.5" value={w.layout[k] ?? (k==='z' ? 0 : 10)} onChange={(e) => {
+                            const v = parseFloat(e.target.value); if (isNaN(v)) return;
+                            updateW({ layout: { ...w.layout, [k]: v } });
+                          }} className="w-full bg-[#1C1814] border border-[var(--studio-border)] px-1 py-0.5 text-center text-xs font-mono" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-[var(--studio-text-secondary)]">АССЕТ</label>
+                    <select value={w.assetId || ''} onChange={e => updateW({ assetId: e.target.value || undefined })} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                      <option value="">— нет —</option>
+                      {(st.uiAssets || []).map((a: any) => <option key={a.id} value={a.id}>{a.name.ru}</option>)}
+                    </select>
+                  </div>
+
+                  {w.type === 'portrait' && (
+                    <div>
+                      <label className="text-[10px]">Speaker ID</label>
+                      <input value={w.data?.speakerId || ''} onChange={e=>updateW({data:{... (w.data||{}), speakerId: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                    </div>
+                  )}
+                  {w.type === 'choiceButton' && (
+                    <div>
+                      <label className="text-[10px]">Linked button ID</label>
+                      <input value={w.data?.linkedButtonId || ''} onChange={e=>updateW({data:{...(w.data||{}), linkedButtonId:e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-[var(--studio-border)]">
+                    <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">Выбери виджет в списке выше или на холсте. Перетаскивание работает на canvas.</p>
           </div>
 
           {/* Per-scene Top Resource Bar visibility (ported + extended) */}
