@@ -531,6 +531,13 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
+                  const boxStyle = widget.style || 'default';
+                  let boxFill = "rgba(33, 29, 24, 0.94)";
+                  let boxStroke = isSelected ? '#C5A46E' : '#534B40';
+                  if (boxStyle === 'important') {
+                    boxFill = "rgba(40, 30, 20, 0.96)";
+                    boxStroke = isSelected ? '#E8D4A0' : '#8a7655';
+                  }
 
                   // Typewriter in playtest
                   if (isPlaytest && typewriterProgress[widget.id] !== undefined) {
@@ -591,8 +598,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         width={wW}
                         height={boxH}
                         cornerRadius={10}
-                        fill="rgba(33, 29, 24, 0.94)"
-                        stroke={isSelected ? '#C5A46E' : '#534B40'}
+                        fill={boxFill}
+                        stroke={boxStroke}
                         strokeWidth={isSelected ? 2.5 : 1.5}
                         shadowColor="rgba(0,0,0,0.4)"
                         shadowBlur={isSelected ? 8 : 0}
