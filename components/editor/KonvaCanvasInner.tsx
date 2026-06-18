@@ -402,12 +402,20 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
                   const textSource = widget.data?.textSource || 'page';
-                  const dialogText = textSource === 'custom' && widget.text?.ru ? widget.text.ru : (currentPage?.text?.ru || '');
+                  let dialogText = textSource === 'custom' && widget.text?.ru ? widget.text.ru : (currentPage?.text?.ru || '');
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
+
+                  // Basic markup support: **bold** -> bold, *italic* -> italic (simple, whole text style for now)
+                  const hasBold = /\*\*.*\*\*/.test(dialogText);
+                  const hasItalic = /\*.*\*/.test(dialogText) && !hasBold;
+                  if (hasBold) dialogText = dialogText.replace(/\*\*(.*?)\*\*/g, '$1');
+                  if (hasItalic) dialogText = dialogText.replace(/\*(.*?)\*/g, '$1');
+                  const fontStyle = hasBold ? 'bold' : (hasItalic ? 'italic' : '500');
+
                   return (
                     <>
                       <Rect
@@ -443,6 +451,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         fill="#EDE4D4"
                         lineHeight={1.32}
                         wrap="word"
+                        fontStyle={fontStyle}
                       />
                     </>
                   );
