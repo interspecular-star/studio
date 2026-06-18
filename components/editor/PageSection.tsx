@@ -538,6 +538,9 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Linked button ID</label>
                       <input value={w.data?.linkedButtonId || ''} onChange={e=>updateW({data:{...(w.data||{}), linkedButtonId:e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
+                      <label className="text-[10px] mt-1 block flex items-center">
+                        <input type="checkbox" checked={!!w.data?.imageOnly} onChange={e=>updateW({data:{...(w.data||{}), imageOnly: e.target.checked}})} className="mr-1" /> Image only (no text)
+                      </label>
                     </div>
                   )}
                   {w.type === 'intensityBar' && (
