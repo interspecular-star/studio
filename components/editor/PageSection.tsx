@@ -839,6 +839,7 @@ export default function PageSection({
                     onChange={(newAction) => updateSelectedButton({ action: newAction })}
                     variables={variables}
                     items={items}
+                    widgets={currentPage?.uiWidgets || []}
                   />
                 </div>
               </div>
