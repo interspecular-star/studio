@@ -176,6 +176,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
   // Typewriter progress for dialogueBox in playtest (char count per widget)
   const [typewriterProgress, setTypewriterProgress] = useState<Record<string, number>>({});
+  // Pause timestamps: widgetId -> Date.now() value when the pause ends (set when [pause] tag is encountered)
+  const typewriterPausedRef = useRef<Record<string, number>>({});
 
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
@@ -187,15 +189,16 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   useEffect(() => {
     if (!isPlaytest) {
       setTypewriterProgress({});
+      typewriterPausedRef.current = {};
       return;
     }
     const dialogueWidgets = (currentPage?.uiWidgets || []).filter((w: any) => w.type === 'dialogueBox');
     if (dialogueWidgets.length === 0) return;
 
-    // Reset progress if text changed
+    // Reset progress (and pause) when text length shrinks (text was changed)
     const resetNeeded: string[] = [];
     dialogueWidgets.forEach((w: any) => {
-      const overrideT = isPlaytest ? playtestState.widgetOverrides[w.id]?.text : null;
+      const overrideT = playtestState.widgetOverrides[w.id]?.text ?? null;
       const textSource = w.data?.textSource || 'page';
       const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
       const currentProg = typewriterProgress[w.id] || 0;
@@ -206,25 +209,46 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     if (resetNeeded.length > 0) {
       setTypewriterProgress(prev => {
         const next = { ...prev };
-        resetNeeded.forEach(id => { next[id] = 0; });
+        resetNeeded.forEach(id => {
+          next[id] = 0;
+          typewriterPausedRef.current[id] = 0;
+        });
         return next;
       });
     }
 
+    const PAUSE_TAG = '[pause]';
+    const PAUSE_TAG_LEN = PAUSE_TAG.length;
+    const PAUSE_DURATION_MS = 450;
+
     const interval = setInterval(() => {
+      const now = Date.now();
       setTypewriterProgress(prev => {
         const next = { ...prev };
         let changed = false;
         dialogueWidgets.forEach((w: any) => {
-          const overrideT = isPlaytest ? playtestState.widgetOverrides[w.id]?.text : null;
+          // Skip widget if currently in a [pause] hold
+          const resumeAt = typewriterPausedRef.current[w.id] || 0;
+          if (now < resumeAt) return;
+
+          const overrideT = playtestState.widgetOverrides[w.id]?.text ?? null;
           const textSource = w.data?.textSource || 'page';
           const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
           const current = prev[w.id] || 0;
           if (current < fullText.length) {
-            let speed = 3;
             const remaining = fullText.substring(current);
-            if (remaining.startsWith('...') || remaining.startsWith('[pause]')) speed = 0.5; // slow for pause
-            // faster if high intensity
+
+            // [pause] tag: skip past it and hold for PAUSE_DURATION_MS
+            if (remaining.startsWith(PAUSE_TAG)) {
+              next[w.id] = current + PAUSE_TAG_LEN;
+              typewriterPausedRef.current[w.id] = now + PAUSE_DURATION_MS;
+              changed = true;
+              return;
+            }
+
+            // Speed: base 3 chars/tick, slower on ellipsis, faster at high intensity
+            let speed = 3;
+            if (remaining.startsWith('...')) speed = 0.8;
             const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
             if (intW?.data?.valueVar) {
               const live = playtestState.variableValues[intW.data.valueVar];
