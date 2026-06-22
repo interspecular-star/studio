@@ -46,6 +46,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     speakers,
     advanceDialogueLine,
     dialogueTheme,
+    copySelectedToWidgetClipboard,
+    pasteFromWidgetClipboard,
+    duplicateSelected,
   } = useStudioStore();
   const theme = dialogueTheme || DIALOGUE_THEME_PRESETS.darkFantasy;
 
@@ -219,6 +222,27 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     }, 16); // one frame so refs are populated after render
     return () => clearTimeout(t);
   }, [currentPage?.id, isPlaytest]);
+
+  // Ctrl+C / Ctrl+V / Ctrl+D keyboard shortcuts (editor only)
+  useEffect(() => {
+    if (isPlaytest) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === 'c') {
+        copySelectedToWidgetClipboard();
+      } else if (e.key === 'v') {
+        pasteFromWidgetClipboard(true);
+      } else if (e.key === 'd') {
+        e.preventDefault();
+        duplicateSelected();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isPlaytest, copySelectedToWidgetClipboard, pasteFromWidgetClipboard, duplicateSelected]);
 
   // Typewriter effect for dialogueBox text in playtest
   useEffect(() => {

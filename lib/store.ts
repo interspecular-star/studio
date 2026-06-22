@@ -530,6 +530,9 @@ type StudioState = {
   // Simple internal clipboard for coordinates
   coordinateClipboard: { x: number; y: number; width: number; height: number } | null;
 
+  // Widget/button clipboard for Ctrl+C / Ctrl+V / Ctrl+D
+  widgetClipboard: { kind: 'widget'; item: UIWidget } | { kind: 'button'; item: StudioButton } | null;
+
   // Guides for visual alignment (project-level, percentages 0-100)
   guides: {
     horizontal: number[]; // vertical lines (affect X position)
@@ -653,6 +656,11 @@ type StudioState = {
 
   // === Dialogue Theme ===
   updateDialogueTheme: (updates: Partial<DialogueTheme>) => void;
+
+  // === Widget Clipboard (Ctrl+C/V/D) ===
+  copySelectedToWidgetClipboard: () => void;
+  pasteFromWidgetClipboard: (offset?: boolean) => void;
+  duplicateSelected: () => void;
 
   // === Dialogue Lines (очередь реплик внутри страницы) ===
   addDialogueLine: (pageId: string, line?: Partial<Omit<DialogueLine, 'id'>>) => void;
@@ -875,6 +883,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   selectedPageId: 'intro_01',
   selectedButtonId: null,
   selectedWidgetId: null,
+  widgetClipboard: null,
 
   // Guides start empty
   guides: {
@@ -1603,6 +1612,75 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   updateDialogueTheme: (updates) => {
     set((state) => ({ dialogueTheme: { ...state.dialogueTheme, ...updates } }));
     get().saveToLocalStorage();
+  },
+
+  copySelectedToWidgetClipboard: () => {
+    const state = get();
+    const page = state.pages.find((p) => p.id === state.selectedPageId);
+    if (!page) return;
+    if (state.selectedWidgetId) {
+      const widget = (page.uiWidgets || []).find((w) => w.id === state.selectedWidgetId);
+      if (widget) set({ widgetClipboard: { kind: 'widget', item: { ...widget } } });
+    } else if (state.selectedButtonId) {
+      const button = page.buttons.find((b) => b.id === state.selectedButtonId);
+      if (button) set({ widgetClipboard: { kind: 'button', item: { ...button } } });
+    }
+  },
+
+  pasteFromWidgetClipboard: (offset = true) => {
+    const state = get();
+    const { widgetClipboard, selectedPageId } = state;
+    if (!widgetClipboard || !selectedPageId) return;
+    const dx = offset ? 2 : 0;
+    const dy = offset ? 2 : 0;
+    const newId = Date.now().toString(36);
+    if (widgetClipboard.kind === 'widget') {
+      const src = widgetClipboard.item;
+      const newWidget: UIWidget = {
+        ...src,
+        id: `uiw_${newId}`,
+        layout: {
+          ...src.layout,
+          x: Math.min(98, src.layout.x + dx),
+          y: Math.min(98, src.layout.y + dy),
+        },
+      };
+      set((s) => ({
+        pages: s.pages.map((p) =>
+          p.id === selectedPageId
+            ? { ...p, uiWidgets: [...(p.uiWidgets || []), newWidget] }
+            : p
+        ),
+        selectedWidgetId: newWidget.id,
+        selectedButtonId: null,
+      }));
+    } else {
+      const src = widgetClipboard.item;
+      const newButton: StudioButton = {
+        ...src,
+        id: `btn_${newId}`,
+        layout: {
+          ...src.layout,
+          x: Math.min(98, src.layout.x + dx),
+          y: Math.min(98, src.layout.y + dy),
+        },
+      };
+      set((s) => ({
+        pages: s.pages.map((p) =>
+          p.id === selectedPageId
+            ? { ...p, buttons: [...p.buttons, newButton] }
+            : p
+        ),
+        selectedButtonId: newButton.id,
+        selectedWidgetId: null,
+      }));
+    }
+    get().saveToLocalStorage();
+  },
+
+  duplicateSelected: () => {
+    get().copySelectedToWidgetClipboard();
+    get().pasteFromWidgetClipboard(false); // на месте, без смещения
   },
 
   addUIWidget: (pageId, widgetData) => {
