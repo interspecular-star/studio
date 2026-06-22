@@ -2164,6 +2164,19 @@ export default function SlayStudio() {
                                 className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
                               />
                               <div className="text-[9px] text-[var(--studio-text-muted)]">ID: <span className="font-mono">{spk.id}</span> (неизменяемый)</div>
+                              <div>
+                                <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Портрет (asset)</label>
+                                <select
+                                  value={spk.portraitAssetId || ''}
+                                  onChange={(e) => updateSpeaker(spk.id, { portraitAssetId: e.target.value || undefined })}
+                                  className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                                >
+                                  <option value="">— не задан —</option>
+                                  {uiAssets.map((a: any) => (
+                                    <option key={a.id} value={a.id}>{a.name || a.id}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                           )}
                         </div>

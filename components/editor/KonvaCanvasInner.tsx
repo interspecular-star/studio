@@ -109,27 +109,30 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   // Load widget asset images (portraits, button skins for choice etc) + variants
   useEffect(() => {
     const assets = useStudioStore.getState().uiAssets || [];
+    const speakersState = useStudioStore.getState().speakers || [];
     (currentPage?.uiWidgets || []).forEach((w: any) => {
-      if (!w.assetId) return;
-      const asset = assets.find((a: any) => a.id === w.assetId);
+      // Resolve asset: explicit widget.assetId OR speaker.portraitAssetId fallback
+      const spk = (!w.assetId && w.data?.speakerId) ? speakersState.find((s: any) => s.id === w.data.speakerId) : null;
+      const assetId = w.assetId || spk?.portraitAssetId;
+      if (!assetId) return;
+      const asset = assets.find((a: any) => a.id === assetId);
       if (!asset?.url) return;
 
-      const variants = asset.variants || {};
-      const activeVariant = w.data?.variant || 'default';
-      const variantUrl = variants[activeVariant] || asset.url;
-
-      let src = variantUrl.trim().replace(/\\/g, '/');
-      if (src && !src.startsWith('http') && !src.startsWith('/')) src = '/' + src;
-
-      if (widgetImages[src]) return;
-
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      img.src = src;
-      img.onload = () => setWidgetImages(prev => ({ ...prev, [src]: img }));
-      img.onerror = () => console.warn('Widget asset image load failed:', src);
+      // Preload base url + all variant urls so they're ready for any variant switch
+      const urlsToLoad = [asset.url, ...Object.values(asset.variants || {}) as string[]];
+      urlsToLoad.forEach((url) => {
+        if (!url) return;
+        let src = (url as string).trim().replace(/\\/g, '/');
+        if (src && !src.startsWith('http') && !src.startsWith('/')) src = '/' + src;
+        if (widgetImages[src]) return;
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = src;
+        img.onload = () => setWidgetImages(prev => ({ ...prev, [src]: img }));
+        img.onerror = () => console.warn('Widget asset image load failed:', src);
+      });
     });
-  }, [currentPage?.uiWidgets, (useStudioStore.getState().uiAssets || []).length]);
+  }, [currentPage?.uiWidgets, (useStudioStore.getState().uiAssets || []).length, (useStudioStore.getState().speakers || []).length]);
 
   // Simple animation for intensity bars (lerp towards target)
   useEffect(() => {
@@ -735,9 +738,19 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const spId = widget.data?.speakerId || currentPage?.speaker || '';
                   const defaultLabel = getSpeakerName(spId) || 'Speaker';
                   const label = (widget.type === 'textLabel' && widget.text?.ru) ? widget.text.ru : defaultLabel;
-                  const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                  // Asset: explicit widget.assetId → speaker.portraitAssetId → null (placeholder)
+                  const portraitSpk = (widget.type === 'portrait' && !widget.assetId && widget.data?.speakerId)
+                    ? (useStudioStore.getState().speakers || []).find((s: any) => s.id === widget.data?.speakerId)
+                    : null;
+                  const resolvedAssetId = widget.assetId || portraitSpk?.portraitAssetId || null;
+                  const asset = resolvedAssetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === resolvedAssetId) : null;
                   const variants = asset?.variants || {};
-                  const activeVariant = widget.data?.variant || 'default';
+                  // Variant: dialogue line portraitVariant (if this widget's speaker is active) → widget default
+                  const activeSpeakerForVariant = dlCurrentLine?.speaker || currentPage?.speaker || '';
+                  const lineVariant = (widget.type === 'portrait' && widget.data?.speakerId && widget.data.speakerId === activeSpeakerForVariant)
+                    ? (dlCurrentLine?.portraitVariant || null)
+                    : null;
+                  const activeVariant = lineVariant || widget.data?.variant || 'default';
                   const variantUrl = variants[activeVariant] || asset?.url;
                   let imgSrc = variantUrl ? variantUrl.trim().replace(/\\/g, '/') : null;
                   if (imgSrc && !imgSrc.startsWith('http') && !imgSrc.startsWith('/')) imgSrc = '/' + imgSrc;

@@ -8,6 +8,7 @@ export type LocalizedString = {
 export type Speaker = {
   id: string;
   displayName: LocalizedString;
+  portraitAssetId?: string; // id из uiAssets — базовый портрет этого персонажа
 };
 
 export type DialogueLine = {
@@ -1528,7 +1529,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   addSpeaker: (speakerData) => {
     const id = speakerData.id || `spk_${Date.now().toString(36)}`;
-    const newSpeaker: Speaker = { displayName: speakerData.displayName, id };
+    const newSpeaker: Speaker = { displayName: speakerData.displayName, id, ...(speakerData.portraitAssetId ? { portraitAssetId: speakerData.portraitAssetId } : {}) };
     set((state) => ({ speakers: [...state.speakers, newSpeaker] }));
     get().saveToLocalStorage();
   },
