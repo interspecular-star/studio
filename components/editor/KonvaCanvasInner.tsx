@@ -49,6 +49,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     copySelectedToWidgetClipboard,
     pasteFromWidgetClipboard,
     duplicateSelected,
+    deleteUIWidget,
+    deleteButton,
+    undoCanvas,
+    redoCanvas,
   } = useStudioStore();
   const theme = dialogueTheme || DIALOGUE_THEME_PRESETS.darkFantasy;
 
@@ -223,26 +227,48 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     return () => clearTimeout(t);
   }, [currentPage?.id, isPlaytest]);
 
-  // Ctrl+C / Ctrl+V / Ctrl+D keyboard shortcuts (editor only)
+  // Keyboard shortcuts (editor only): Ctrl+C/V/D, Ctrl+Z/Y, Delete
   useEffect(() => {
     if (isPlaytest) return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
-      if (!e.ctrlKey && !e.metaKey) return;
-      if (e.key === 'c') {
-        copySelectedToWidgetClipboard();
-      } else if (e.key === 'v') {
-        pasteFromWidgetClipboard(true);
-      } else if (e.key === 'd') {
-        e.preventDefault();
-        duplicateSelected();
+
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      if (ctrl) {
+        if (e.key === 'c') {
+          copySelectedToWidgetClipboard();
+        } else if (e.key === 'v') {
+          pasteFromWidgetClipboard(true);
+        } else if (e.key === 'd') {
+          e.preventDefault();
+          duplicateSelected();
+        } else if (e.key === 'z') {
+          e.preventDefault();
+          undoCanvas();
+        } else if (e.key === 'y') {
+          e.preventDefault();
+          redoCanvas();
+        }
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const state = useStudioStore.getState();
+        const pageId = state.selectedPageId;
+        if (!pageId) return;
+        if (state.selectedWidgetId) {
+          deleteUIWidget(pageId, state.selectedWidgetId);
+        } else if (state.selectedButtonId) {
+          deleteButton(pageId, state.selectedButtonId);
+        }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isPlaytest, copySelectedToWidgetClipboard, pasteFromWidgetClipboard, duplicateSelected]);
+  }, [isPlaytest, copySelectedToWidgetClipboard, pasteFromWidgetClipboard, duplicateSelected, deleteUIWidget, deleteButton, undoCanvas, redoCanvas]);
 
   // Typewriter effect for dialogueBox text in playtest
   useEffect(() => {
