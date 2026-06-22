@@ -465,7 +465,7 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
   // Размер рюкзака теперь полностью динамический от Выносливости (см. backpackSize ниже)
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
+    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80">
       <div 
         className="w-[920px] max-w-[95vw] rounded-2xl border border-[var(--studio-border)] bg-[#1C1814] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -817,8 +817,8 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
         {contextMenu && (
           <>
             <div className="absolute inset-0 z-[115]" onClick={closeContextMenu} />
-            <div 
-              className="absolute z-[120] bg-[#1C1814] border border-[var(--studio-border)] rounded-lg shadow-xl py-1 min-w-[160px]"
+            <div
+              className="fixed z-[200] bg-[#1C1814] border border-[var(--studio-border)] rounded-lg shadow-xl py-1 min-w-[160px]"
               style={{
                 left: Math.min(contextMenu.x, window.innerWidth - 200),
                 top: Math.min(contextMenu.y, window.innerHeight - 180),

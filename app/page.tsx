@@ -701,6 +701,11 @@ export default function SlayStudio() {
                 )}
 
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+
+                {/* Inventory modal: absolute so it fills the game canvas, not the viewport */}
+                {playtestState.isInventoryOpen && (
+                  <InventoryModal onClose={() => {}} />
+                )}
               </div>
             ) : (
               /* Editor: full CanvasWithRulers + guides at the chosen logical size. */
@@ -2338,10 +2343,6 @@ export default function SlayStudio() {
         </div>
       </div>
 
-      {/* Inventory modal at root level so fixed positioning is never clipped */}
-      {mode === 'playtest' && playtestState.isInventoryOpen && (
-        <InventoryModal onClose={() => {}} />
-      )}
     </div>
   );
 }
