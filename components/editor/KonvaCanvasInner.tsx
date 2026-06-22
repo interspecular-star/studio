@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Transformer, Shape } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
 import Konva from 'konva';
 
@@ -1036,6 +1036,100 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           fontStyle="500"
                         />
                       )}
+                    </>
+                  );
+                }
+
+                if (widget.type === 'speechBubble') {
+                  const tailDir = widget.data?.tailDirection || 'bottom';
+                  const tailSize = Math.round(Math.min(wW * 0.14, wH * 0.28, 18));
+                  const r = Math.min(theme.boxCornerRadius, wW * 0.25, wH * 0.25);
+                  const cx = wW / 2;
+                  const my = wH / 2;
+                  const sbStroke = isSelected ? theme.nameTagColor : theme.boxStroke;
+
+                  // Body area offset by tail
+                  let textOffsetX = 0, textOffsetY = 0, textMaxW = wW, textMaxH = wH;
+                  if (tailDir === 'bottom') { textMaxH = wH - tailSize; }
+                  else if (tailDir === 'left') { textOffsetX = tailSize; textMaxW = wW - tailSize; }
+                  else if (tailDir === 'right') { textMaxW = wW - tailSize; }
+
+                  const innerPad = 7;
+                  const sbFontSize = Math.max(9, Math.min(13, Math.round(height / 58)));
+                  const sbRawText = (widget.text?.ru) || dlCurrentLine?.text?.ru || currentPage?.text?.ru || '';
+                  const sbSegments = parseRichText(sbRawText);
+                  const { words: sbWords } = layoutRichText(sbSegments, {
+                    maxWidth: textMaxW - innerPad * 2,
+                    fontSize: sbFontSize,
+                    lineHeightMultiplier: 1.3,
+                    defaultColor: theme.textColor,
+                  });
+
+                  return (
+                    <>
+                      <Shape
+                        sceneFunc={(ctx: any) => {
+                          ctx.beginPath();
+                          if (tailDir === 'bottom') {
+                            const bH = wH - tailSize;
+                            ctx.moveTo(r, 0);
+                            ctx.lineTo(wW - r, 0); ctx.arcTo(wW, 0, wW, r, r);
+                            ctx.lineTo(wW, bH - r); ctx.arcTo(wW, bH, wW - r, bH, r);
+                            ctx.lineTo(cx + tailSize * 0.55, bH);
+                            ctx.lineTo(cx, wH);
+                            ctx.lineTo(cx - tailSize * 0.55, bH);
+                            ctx.lineTo(r, bH); ctx.arcTo(0, bH, 0, bH - r, r);
+                            ctx.lineTo(0, r); ctx.arcTo(0, 0, r, 0, r);
+                          } else if (tailDir === 'left') {
+                            const bX = tailSize;
+                            ctx.moveTo(bX + r, 0);
+                            ctx.lineTo(wW - r, 0); ctx.arcTo(wW, 0, wW, r, r);
+                            ctx.lineTo(wW, wH - r); ctx.arcTo(wW, wH, wW - r, wH, r);
+                            ctx.lineTo(bX + r, wH); ctx.arcTo(bX, wH, bX, wH - r, r);
+                            ctx.lineTo(bX, my + tailSize * 0.5);
+                            ctx.lineTo(0, my);
+                            ctx.lineTo(bX, my - tailSize * 0.5);
+                            ctx.lineTo(bX, r); ctx.arcTo(bX, 0, bX + r, 0, r);
+                          } else if (tailDir === 'right') {
+                            const bW = wW - tailSize;
+                            ctx.moveTo(r, 0);
+                            ctx.lineTo(bW - r, 0); ctx.arcTo(bW, 0, bW, r, r);
+                            ctx.lineTo(bW, my - tailSize * 0.5);
+                            ctx.lineTo(wW, my);
+                            ctx.lineTo(bW, my + tailSize * 0.5);
+                            ctx.lineTo(bW, wH - r); ctx.arcTo(bW, wH, bW - r, wH, r);
+                            ctx.lineTo(r, wH); ctx.arcTo(0, wH, 0, wH - r, r);
+                            ctx.lineTo(0, r); ctx.arcTo(0, 0, r, 0, r);
+                          } else {
+                            ctx.moveTo(r, 0);
+                            ctx.lineTo(wW - r, 0); ctx.arcTo(wW, 0, wW, r, r);
+                            ctx.lineTo(wW, wH - r); ctx.arcTo(wW, wH, wW - r, wH, r);
+                            ctx.lineTo(r, wH); ctx.arcTo(0, wH, 0, wH - r, r);
+                            ctx.lineTo(0, r); ctx.arcTo(0, 0, r, 0, r);
+                          }
+                          ctx.closePath();
+                          ctx.fillStyle = theme.boxFill;
+                          ctx.fill();
+                          ctx.strokeStyle = sbStroke;
+                          ctx.lineWidth = isSelected ? 2 : 1.5;
+                          ctx.stroke();
+                        }}
+                        width={wW}
+                        height={wH}
+                      />
+                      <Group x={textOffsetX + innerPad} y={textOffsetY + innerPad}>
+                        {sbWords.map((word, idx) => (
+                          <Text
+                            key={idx}
+                            x={word.x} y={word.y}
+                            text={word.text}
+                            fontSize={word.size}
+                            fill={word.color}
+                            fontFamily={theme.fontFamily}
+                            fontStyle={word.bold && word.italic ? 'bold italic' : word.bold ? 'bold' : word.italic ? 'italic' : 'normal'}
+                          />
+                        ))}
+                      </Group>
                     </>
                   );
                 }

@@ -455,7 +455,8 @@ export type UIWidgetType =
   | 'quickAction'
   | 'intensityBar'
   | 'textLabel'
-  | 'container';
+  | 'container'
+  | 'speechBubble';
 
 export interface UIWidget {
   id: string;
@@ -496,6 +497,8 @@ export interface UIWidget {
     setIntensity?: number;
     // container
     title?: string;
+    // speechBubble
+    tailDirection?: 'bottom' | 'left' | 'right' | 'none';
     // etc.
   };
 }

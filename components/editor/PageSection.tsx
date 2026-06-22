@@ -267,6 +267,7 @@ export default function PageSection({
               <button title="Добавить бар накала" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'intensityBar', layout: { x: 10, y: 5, width: 30, height: 4, z: 40 }, data: { valueVar: 'souls', parts: 3 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Накал</button>
               <button title="Добавить быстрое действие" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'quickAction', layout: { x: 5, y: 20, width: 8, height: 8, z: 50 }, data: { actionType: 'inventory' } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Действие</button>
               <button title="Добавить контейнер" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'container', layout: { x: 1, y: 12, width: 12, height: 70, z: 1 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Контейнер</button>
+              <button title="Добавить речевой пузырь" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'speechBubble', layout: { x: 25, y: 40, width: 40, height: 18, z: 25 }, data: { tailDirection: 'bottom' } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Пузырь</button>
             </div>
 
             {(currentPage?.uiWidgets || []).length === 0 && (
@@ -475,6 +476,23 @@ export default function PageSection({
                     <div>
                       <label className="text-[10px]">Заголовок (опц.)</label>
                       <input value={w.data?.title || ''} onChange={e=>updateW({data:{...(w.data||{}), title: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Левая панель" />
+                    </div>
+                  )}
+                  {w.type === 'speechBubble' && (
+                    <div className="space-y-1.5">
+                      <div>
+                        <label className="text-[10px] block">Хвостик</label>
+                        <select value={w.data?.tailDirection || 'bottom'} onChange={e=>updateW({data:{...(w.data||{}), tailDirection: e.target.value as any}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                          <option value="bottom">↓ Снизу</option>
+                          <option value="left">← Слева</option>
+                          <option value="right">→ Справа</option>
+                          <option value="none">— Нет</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] block">Текст (переопределить)</label>
+                        <textarea value={w.text?.ru || ''} onChange={e=>updateW({text:{...(w.text||{ru:'',en:''}), ru: e.target.value}})} rows={2} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)] resize-none" placeholder="пусто = текст страницы" />
+                      </div>
                     </div>
                   )}
                   {w.type === 'dialogueBox' && (() => {
