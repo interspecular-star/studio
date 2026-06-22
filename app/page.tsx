@@ -116,10 +116,11 @@ export default function SlayStudio() {
 
   const currentPage = useCurrentPage();
 
-  // Keep editingPageId in sync when switching pages
+  // Keep editingPageId in sync when switching pages; auto-switch to page tab
   useEffect(() => {
     if (currentPage) {
       setEditingPageId(currentPage.id);
+      setRightTab('page');
     }
   }, [currentPage?.id]);
 
@@ -170,6 +171,8 @@ export default function SlayStudio() {
 
   const [speakersCollapsed, setSpeakersCollapsed] = useState(false);
   const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
+
+  const [rightTab, setRightTab] = useState<'page' | 'world'>('page');
 
   // For Top Resource Bar testing in playtest (force show/hide regardless of page flag)
   // HUD visibility override for testing in Playtest.
@@ -750,6 +753,20 @@ export default function SlayStudio() {
                 <PlaytestStatePanel />
               ) : (
                 <>
+                  {/* Tab bar */}
+                  <div className="flex shrink-0 border-b border-[var(--studio-border)]">
+                    <button
+                      onClick={() => setRightTab('page')}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${rightTab === 'page' ? '-mb-px border-b-2 border-[var(--studio-accent)] text-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+                    >СТРАНИЦА</button>
+                    <button
+                      onClick={() => setRightTab('world')}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${rightTab === 'world' ? '-mb-px border-b-2 border-[var(--studio-accent)] text-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+                    >МИР</button>
+                  </div>
+
+                  {/* === МИР tab: project-level registries === */}
+                  {rightTab === 'world' && (
                   <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* === ХАРАКТЕРИСТИКИ (постоянный блок) === */}
             <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
@@ -2149,7 +2166,13 @@ export default function SlayStudio() {
                 </>
               )}
             </div>
+                  </div>
+                  )}
 
+                  {/* === СТРАНИЦА tab: current page properties === */}
+                  {rightTab === 'page' && (
+                  <>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <PageSection
               currentPage={currentPage}
               renamePage={renamePage}
@@ -2171,15 +2194,7 @@ export default function SlayStudio() {
               variables={variables}
               items={items}
             />
-                </div>
-          {/* This hint is dialog-oriented. Hide it on pure game pages (speaker=none / no dialog) */}
-          {(currentPage?.speaker && currentPage.speaker !== 'none') && (
-            <div className="border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
-              Перетаскивай кнопки прямо на холсте
-            </div>
-          )}
-
-          {/* === GUIDES PANEL (Variant A) - only show when there are guides */}
+          {/* === GUIDES PANEL - only show when there are guides */}
           {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (
           <div className="border-t border-[var(--studio-border)] mt-6 pt-5">
             <div className="mb-3 flex items-center justify-between">
@@ -2310,6 +2325,15 @@ export default function SlayStudio() {
             </button>
           </div>
           )}
+                  </div>
+                  {/* hint — outside scroll area, inside page tab */}
+                  {(currentPage?.speaker && currentPage.speaker !== 'none') && (
+                    <div className="shrink-0 border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
+                      Перетаскивай кнопки прямо на холсте
+                    </div>
+                  )}
+                  </>
+                  )}
                 </>
               )}
             </>
