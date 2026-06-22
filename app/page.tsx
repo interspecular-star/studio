@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier } from '@/lib/store';
+import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
@@ -108,6 +108,10 @@ export default function SlayStudio() {
     backgroundsCollapsed,
     toggleBackgroundsCollapsed,
     setPlaytestVariableValue,
+    speakers,
+    addSpeaker,
+    updateSpeaker,
+    deleteSpeaker,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -163,6 +167,9 @@ export default function SlayStudio() {
   const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
 
   const [uiAssetsCollapsed, setUiAssetsCollapsed] = useState(false);
+
+  const [speakersCollapsed, setSpeakersCollapsed] = useState(false);
+  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
 
   // For Top Resource Bar testing in playtest (force show/hide regardless of page flag)
   // HUD visibility override for testing in Playtest.
@@ -2060,6 +2067,85 @@ export default function SlayStudio() {
                     })}
                   </div>
                   <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">Ассеты для портретов, скинов кнопок. Позже: 9-slice, варианты hover.</p>
+                </>
+              )}
+            </div>
+
+            {/* === ПЕРСОНАЖИ (speakers registry) === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <button
+                onClick={() => setSpeakersCollapsed(!speakersCollapsed)}
+                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
+              >
+                <span>ПЕРСОНАЖИ</span>
+                <span className="text-xs">{speakersCollapsed ? '▶' : '▼'}</span>
+              </button>
+
+              {!speakersCollapsed && (
+                <>
+                  <button
+                    onClick={() => {
+                      const nameRu = prompt('Имя персонажа (РУ):', 'Новый персонаж');
+                      if (!nameRu) return;
+                      const nameEn = prompt('Имя персонажа (EN):', nameRu) || nameRu;
+                      const rawId = prompt('ID (латиница, без пробелов):', nameRu.toLowerCase().replace(/\s+/g, '_')) || '';
+                      const id = rawId.trim().replace(/[^a-z0-9_]/gi, '_') || `spk_${Date.now().toString(36)}`;
+                      addSpeaker({ id, displayName: { ru: nameRu, en: nameEn } });
+                      setTimeout(() => setEditingSpeakerId(id), 0);
+                    }}
+                    className="text-[10px] px-2 py-1 rounded bg-[var(--studio-accent)] text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full mb-2"
+                  >
+                    + Добавить персонажа
+                  </button>
+
+                  {speakers.length === 0 && (
+                    <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет персонажей. Добавь, чтобы выбирать в диалогах.</p>
+                  )}
+
+                  <div className="space-y-1.5 max-h-48 overflow-auto text-xs">
+                    {speakers.map((spk: Speaker) => {
+                      const isEd = editingSpeakerId === spk.id;
+                      return (
+                        <div key={spk.id} className={`rounded border p-1.5 ${isEd ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}>
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => setEditingSpeakerId(isEd ? null : spk.id)}
+                              className="truncate flex-1 text-left hover:underline"
+                            >
+                              {spk.displayName.ru} <span className="text-[9px] opacity-60 font-mono">({spk.id})</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Удалить персонажа «${spk.displayName.ru}»?`)) {
+                                  deleteSpeaker(spk.id);
+                                  if (isEd) setEditingSpeakerId(null);
+                                }
+                              }}
+                              className="text-red-400 px-1"
+                            >×</button>
+                          </div>
+                          {isEd && (
+                            <div className="mt-1 space-y-1 border-t pt-1">
+                              <input
+                                value={spk.displayName.ru}
+                                placeholder="Имя (РУ)"
+                                onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, ru: e.target.value } })}
+                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                              />
+                              <input
+                                value={spk.displayName.en}
+                                placeholder="Имя (EN)"
+                                onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, en: e.target.value } })}
+                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                              />
+                              <div className="text-[9px] text-[var(--studio-text-muted)]">ID: <span className="font-mono">{spk.id}</span> (неизменяемый)</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
             </div>

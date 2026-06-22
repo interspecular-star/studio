@@ -5,6 +5,11 @@ export type LocalizedString = {
   en: string;
 };
 
+export type Speaker = {
+  id: string;
+  displayName: LocalizedString;
+};
+
 export type ItemType = 
   | 'weapon' 
   | 'armor' 
@@ -500,6 +505,9 @@ type StudioState = {
   // UI Assets registry (skins for buttons, portraits, bars etc. for Dialogue UI)
   uiAssets: UIAsset[];
 
+  // Speakers (персонажи) registry — source of truth for speaker names shown in dialogue
+  speakers: Speaker[];
+
   // === Playtest / Preview State ===
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
   playtestState: {
@@ -576,6 +584,11 @@ type StudioState = {
   updateUIAsset: (id: string, updates: Partial<Omit<UIAsset, 'id'>>) => void;
   deleteUIAsset: (id: string) => void;
   getUIAsset: (id: string) => UIAsset | undefined;
+
+  // === Speakers (Персонажи) ===
+  addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
+  updateSpeaker: (id: string, updates: Partial<Omit<Speaker, 'id'>>) => void;
+  deleteSpeaker: (id: string) => void;
 
   addUIWidget: (pageId: string, widget: Omit<UIWidget, 'id'>) => void;
   updateUIWidget: (pageId: string, widgetId: string, updates: Partial<Omit<UIWidget, 'id'>>) => void;
@@ -776,6 +789,15 @@ const createInitialMeta = (): ProjectMeta => ({
   schemaVersion: '1.0.0',
 });
 
+const createDefaultSpeakers = (): Speaker[] => [
+  { id: 'narrator', displayName: { ru: 'Рассказчик', en: 'Narrator' } },
+  { id: 'slay',     displayName: { ru: 'Слэй',       en: 'Slay'     } },
+  { id: 'mila',     displayName: { ru: 'Мила',       en: 'Mila'     } },
+  { id: 'zyrk',     displayName: { ru: 'Зырк',       en: 'Zyrk'     } },
+  { id: 'zosya',    displayName: { ru: 'Зося',       en: 'Zosya'    } },
+  { id: 'burmil',   displayName: { ru: 'Бурмил',     en: 'Burmil'   } },
+];
+
 export const useStudioStore = create<StudioState>((set, get) => ({
   meta: createInitialMeta(),
   pages: createDefaultPages(),
@@ -803,6 +825,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   backgrounds: [],
 
   uiAssets: [],
+
+  speakers: createDefaultSpeakers(),
 
   playtestState: {
     variableValues: {},
@@ -1485,6 +1509,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     return get().uiAssets.find((a) => a.id === id);
   },
 
+  addSpeaker: (speakerData) => {
+    const id = speakerData.id || `spk_${Date.now().toString(36)}`;
+    const newSpeaker: Speaker = { displayName: speakerData.displayName, id };
+    set((state) => ({ speakers: [...state.speakers, newSpeaker] }));
+    get().saveToLocalStorage();
+  },
+  updateSpeaker: (id, updates) => {
+    set((state) => ({
+      speakers: state.speakers.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+    }));
+    get().saveToLocalStorage();
+  },
+  deleteSpeaker: (id) => {
+    set((state) => ({ speakers: state.speakers.filter((s) => s.id !== id) }));
+    get().saveToLocalStorage();
+  },
+
   addUIWidget: (pageId, widgetData) => {
     const newWidget: UIWidget = {
       ...widgetData,
@@ -2123,6 +2164,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       variables: state.variables,
       backgrounds: state.backgrounds,
       uiAssets: state.uiAssets,
+      speakers: state.speakers,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -2181,6 +2223,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         variables: parsed.variables || [],
         backgrounds: loadedBackgrounds,
         uiAssets: parsed.uiAssets || [],
+        speakers: parsed.speakers || createDefaultSpeakers(),
         startingInventory: parsed.startingInventory || {},
         // Canvas resolution (default to 16:9 1280x720 for new/legacy projects)
         canvasWidth: parsed.canvasWidth || 1280,
@@ -2207,6 +2250,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       variables: state.variables,
       backgrounds: state.backgrounds,
       uiAssets: state.uiAssets,
+      speakers: state.speakers,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -2271,6 +2315,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         variables: data.variables || [],
         backgrounds: importedBackgrounds,
         uiAssets: data.uiAssets || [],
+        speakers: data.speakers || createDefaultSpeakers(),
         startingInventory: data.startingInventory || {},
         canvasWidth: data.canvasWidth || 1280,
         canvasHeight: data.canvasHeight || 720,
@@ -2306,6 +2351,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       variables: [],
       backgrounds: [],
       uiAssets: [],
+      speakers: createDefaultSpeakers(),
       startingInventory: {},
       playtestState: {
         variableValues: {},

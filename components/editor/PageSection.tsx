@@ -50,7 +50,7 @@ export default function PageSection({
   variables,
   items,
 }: PageSectionProps) {
-  const { backgrounds, selectedWidgetId: currentSelectedWidgetId } = useStudioStore();
+  const { backgrounds, selectedWidgetId: currentSelectedWidgetId, speakers } = useStudioStore();
   const [collapsed, setCollapsed] = useState(false);
 
   if (!currentPage) return null;
@@ -206,12 +206,9 @@ export default function PageSection({
               className="w-full rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
             >
               <option value="none">Нет диалога / Игровой режим</option>
-              <option value="narrator">Рассказчик</option>
-              <option value="slay">Слэй</option>
-              <option value="mila">Мила</option>
-              <option value="zyrk">Зырк</option>
-              <option value="zosya">Зося</option>
-              <option value="burmil">Бурмил</option>
+              {speakers.map((s) => (
+                <option key={s.id} value={s.id}>{s.displayName.ru}</option>
+              ))}
             </select>
           </div>
 

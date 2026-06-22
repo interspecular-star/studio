@@ -34,6 +34,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     mode,
     playtestState,
     executeAction,
+    speakers,
   } = useStudioStore();
 
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
@@ -413,14 +414,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     }
   };
 
-  const speakerNames: Record<string, string> = {
-    narrator: 'Рассказчик',
-    slay: 'Слэй',
-    mila: 'Мила',
-    zyrk: 'Зырк',
-    zosya: 'Зося',
-    burmil: 'Бурмил',
-  };
+  const getSpeakerName = (id: string) =>
+    speakers.find((s) => s.id === id)?.displayName.ru || id || '';
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-[var(--studio-border-strong)] shadow-2xl">
@@ -554,7 +549,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
-                  const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
+                  const speakerName = widget.data?.speakerName || (currentPage?.speaker && getSpeakerName(currentPage.speaker)) || '';
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
                   const boxStyle = widget.style || 'default';
@@ -665,7 +660,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
                 if (widget.type === 'textLabel' || widget.type === 'portrait') {
                   const spId = widget.data?.speakerId || currentPage?.speaker || '';
-                  const defaultLabel = speakerNames[spId] || spId || 'Speaker';
+                  const defaultLabel = getSpeakerName(spId) || 'Speaker';
                   const label = (widget.type === 'textLabel' && widget.text?.ru) ? widget.text.ru : defaultLabel;
                   const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
                   const variants = asset?.variants || {};
