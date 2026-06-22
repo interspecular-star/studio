@@ -7,6 +7,7 @@ import type { Stage as StageType } from 'konva/lib/Stage';
 import { useStudioStore, type UIWidget } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
+import { parseRichText, layoutRichText } from '@/lib/richText';
 
 // No more built-in gradient themes (user removed all built-ins)
 
@@ -522,10 +523,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const textSource = widget.data?.textSource || 'page';
                   const overrideText = isPlaytest ? playtestState.widgetOverrides[widget.id]?.text : null;
                   const effectiveText = overrideText || widget.text;
-                  let dialogText = overrideText?.ru || (textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : (currentPage?.text?.ru || ''));
-                  if (textSource === 'custom' && !overrideText?.ru && !effectiveText?.ru) {
-                    dialogText = 'Ты... **предатель**! [red]Убирайся отсюда![/red]';
-                  }
+                  // Priority: dynamic override > custom widget text > page text
+                  const rawText = overrideText?.ru
+                    || (textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : null)
+                    || currentPage?.text?.ru || '';
+
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
                   const speakerName = widget.data?.speakerName || (currentPage?.speaker && speakerNames[currentPage.speaker]) || '';
@@ -539,19 +541,21 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     boxStroke = isSelected ? '#E8D4A0' : '#8a7655';
                   }
 
-                  // Typewriter in playtest
-                  if (isPlaytest && typewriterProgress[widget.id] !== undefined) {
-                    dialogText = dialogText.substring(0, typewriterProgress[widget.id]);
-                  }
+                  // Typewriter: slice raw text by raw-char progress (markup chars count toward progress)
+                  const partialRaw = (isPlaytest && typewriterProgress[widget.id] !== undefined)
+                    ? rawText.substring(0, typewriterProgress[widget.id])
+                    : rawText;
 
-                  // Simple shake for dialogue if 'angry' variant or high intensity (playtest feedback)
+                  // Detect [shake] before parsing so we can apply it at box level
+                  const hasShakeTag = /\[shake\]/.test(partialRaw);
+
+                  // Shake: angry variant, high intensity, or explicit [shake] tag
                   let shakeX = 0;
                   let shakeY = 0;
                   if (isPlaytest) {
                     const portraitW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'portrait');
                     const pOverride = portraitW ? playtestState.widgetOverrides[portraitW.id] : null;
-                    const activeV = (pOverride?.data?.variant || portraitW?.data?.variant || '');
-                    // intensity driven shake
+                    const activeV = pOverride?.data?.variant || portraitW?.data?.variant || '';
                     let intensity = 0;
                     const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
                     if (intW?.data?.valueVar) {
@@ -565,36 +569,28 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       shakeX = Math.sin(t) * amp;
                       shakeY = Math.cos(t * 1.3) * amp * 0.6;
                     }
+                    if (hasShakeTag) {
+                      const t = Date.now() / 30;
+                      shakeX += Math.sin(t) * 2;
+                      shakeY += Math.cos(t * 0.8) * 1;
+                    }
                   }
 
-                  // Basic markup support: **bold** -> bold, *italic* -> italic, [red]text[/red], [pause] stripped, [shake] applies shake
-                  let textFill = '#EDE4D4';
-                  const hasBold = /\*\*.*\*\*/.test(dialogText);
-                  const hasItalic = /\*.*\*/.test(dialogText) && !hasBold;
-                  const hasShake = /\[shake\]/.test(dialogText);
-                  if (hasBold) dialogText = dialogText.replace(/\*\*(.*?)\*\*/g, '$1');
-                  if (hasItalic) dialogText = dialogText.replace(/\*(.*?)\*/g, '$1');
-                  const colorMatch = dialogText.match(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/);
-                  if (colorMatch) {
-                    const color = colorMatch[1];
-                    dialogText = dialogText.replace(/\[(red|blue|green|yellow)\](.*?)\[\/\1\]/g, '$2');
-                    textFill = color === 'red' ? '#ff6666' : color === 'blue' ? '#66aaff' : color === 'green' ? '#66ff66' : '#ffff66';
-                  }
-                  dialogText = dialogText.replace(/\[pause\]/g, '').replace(/\[shake\]/g, '').replace(/\[\/shake\]/g, ''); // strip
-                  const fontStyle = hasBold ? 'bold' : (hasItalic ? 'italic' : '500');
-
-                  // Apply shake if [shake] was present
-                  if (hasShake && isPlaytest) {
-                    const t = Date.now() / 30;
-                    shakeX += Math.sin(t) * 2;
-                    shakeY += Math.cos(t * 0.8) * 1;
-                  }
+                  // Rich text: parse markup into segments, lay out into positioned words
+                  const richFontSize = Math.max(11, Math.min(15, Math.round(height / 52)));
+                  const richSegments = parseRichText(partialRaw);
+                  const { words: richWords } = layoutRichText(richSegments, {
+                    maxWidth: wW - innerPad * 2,
+                    fontSize: richFontSize,
+                    lineHeightMultiplier: 1.32,
+                    defaultColor: '#EDE4D4',
+                  });
 
                   return (
                     <>
                       <Rect
-                        x={0 + shakeX}
-                        y={0 + shakeY}
+                        x={shakeX}
+                        y={shakeY}
                         width={wW}
                         height={boxH}
                         cornerRadius={10}
@@ -625,18 +621,20 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           />
                         </>
                       )}
-                      <Text
-                        x={innerPad + shakeX}
-                        y={textStartY + shakeY}
-                        width={wW - innerPad * 2}
-                        height={boxH - textStartY - 8}
-                        text={dialogText}
-                        fontSize={Math.max(11, Math.min(15, Math.round(height / 52)))}
-                        fill={textFill}
-                        lineHeight={1.32}
-                        wrap="word"
-                        fontStyle={fontStyle}
-                      />
+                      {/* Rich text: each token rendered with its own style and color */}
+                      <Group x={innerPad + shakeX} y={textStartY + shakeY}>
+                        {richWords.map((word, idx) => (
+                          <Text
+                            key={idx}
+                            x={word.x}
+                            y={word.y}
+                            text={word.text}
+                            fontSize={richFontSize}
+                            fill={word.color}
+                            fontStyle={word.bold ? 'bold' : (word.italic ? 'italic' : '500')}
+                          />
+                        ))}
+                      </Group>
                     </>
                   );
                 }
