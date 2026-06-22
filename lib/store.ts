@@ -11,6 +11,54 @@ export type Speaker = {
   portraitAssetId?: string; // id из uiAssets — базовый портрет этого персонажа
 };
 
+export type DialogueTheme = {
+  boxFill: string;
+  boxStroke: string;
+  boxCornerRadius: number;
+  textColor: string;
+  nameTagColor: string;
+  fontFamily: string;
+};
+
+export const DIALOGUE_THEME_PRESETS: Record<string, DialogueTheme & { label: string }> = {
+  darkFantasy: {
+    label: 'Dark Fantasy',
+    boxFill: 'rgba(33,29,24,0.94)',
+    boxStroke: '#534B40',
+    boxCornerRadius: 10,
+    textColor: '#EDE4D4',
+    nameTagColor: '#C5A46E',
+    fontFamily: 'Arial',
+  },
+  lightScroll: {
+    label: 'Light Scroll',
+    boxFill: 'rgba(245,235,210,0.96)',
+    boxStroke: '#8B6914',
+    boxCornerRadius: 6,
+    textColor: '#2a1a0a',
+    nameTagColor: '#7a5010',
+    fontFamily: 'Georgia',
+  },
+  cyberpunk: {
+    label: 'Cyberpunk',
+    boxFill: 'rgba(0,8,24,0.95)',
+    boxStroke: '#00ffcc',
+    boxCornerRadius: 2,
+    textColor: '#d0fff8',
+    nameTagColor: '#ff3366',
+    fontFamily: 'Arial',
+  },
+  cleanWhite: {
+    label: 'Clean White',
+    boxFill: 'rgba(255,255,255,0.96)',
+    boxStroke: '#cccccc',
+    boxCornerRadius: 8,
+    textColor: '#111111',
+    nameTagColor: '#555555',
+    fontFamily: 'Arial',
+  },
+};
+
 export type DialogueLine = {
   id: string;
   text: LocalizedString;
@@ -518,6 +566,9 @@ type StudioState = {
   // Speakers (персонажи) registry — source of truth for speaker names shown in dialogue
   speakers: Speaker[];
 
+  // Global visual theme for dialogue widgets
+  dialogueTheme: DialogueTheme;
+
   // === Playtest / Preview State ===
   // Это состояние меняется, когда пользователь кликает по кнопкам на холсте
   playtestState: {
@@ -599,6 +650,9 @@ type StudioState = {
   addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
   updateSpeaker: (id: string, updates: Partial<Omit<Speaker, 'id'>>) => void;
   deleteSpeaker: (id: string) => void;
+
+  // === Dialogue Theme ===
+  updateDialogueTheme: (updates: Partial<DialogueTheme>) => void;
 
   // === Dialogue Lines (очередь реплик внутри страницы) ===
   addDialogueLine: (pageId: string, line?: Partial<Omit<DialogueLine, 'id'>>) => void;
@@ -844,6 +898,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   uiAssets: [],
 
   speakers: createDefaultSpeakers(),
+
+  dialogueTheme: { ...DIALOGUE_THEME_PRESETS.darkFantasy },
 
   playtestState: {
     variableValues: {},
@@ -1541,6 +1597,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
   deleteSpeaker: (id) => {
     set((state) => ({ speakers: state.speakers.filter((s) => s.id !== id) }));
+    get().saveToLocalStorage();
+  },
+
+  updateDialogueTheme: (updates) => {
+    set((state) => ({ dialogueTheme: { ...state.dialogueTheme, ...updates } }));
     get().saveToLocalStorage();
   },
 
@@ -2259,6 +2320,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       backgrounds: state.backgrounds,
       uiAssets: state.uiAssets,
       speakers: state.speakers,
+      dialogueTheme: state.dialogueTheme,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -2318,6 +2380,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         backgrounds: loadedBackgrounds,
         uiAssets: parsed.uiAssets || [],
         speakers: parsed.speakers || createDefaultSpeakers(),
+        dialogueTheme: parsed.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: parsed.startingInventory || {},
         // Canvas resolution (default to 16:9 1280x720 for new/legacy projects)
         canvasWidth: parsed.canvasWidth || 1280,
@@ -2345,6 +2408,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       backgrounds: state.backgrounds,
       uiAssets: state.uiAssets,
       speakers: state.speakers,
+      dialogueTheme: state.dialogueTheme,
       startingInventory: state.startingInventory,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
@@ -2410,6 +2474,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         backgrounds: importedBackgrounds,
         uiAssets: data.uiAssets || [],
         speakers: data.speakers || createDefaultSpeakers(),
+        dialogueTheme: data.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: data.startingInventory || {},
         canvasWidth: data.canvasWidth || 1280,
         canvasHeight: data.canvasHeight || 720,

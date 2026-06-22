@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker, type StudioPage } from '@/lib/store';
+import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker, type StudioPage, DIALOGUE_THEME_PRESETS } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
@@ -113,6 +113,8 @@ export default function SlayStudio() {
     updateSpeaker,
     deleteSpeaker,
     duplicatePage,
+    dialogueTheme,
+    updateDialogueTheme,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -2185,6 +2187,79 @@ export default function SlayStudio() {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* === ТЕМА ДИАЛОГА === */}
+            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+              <div className="text-sm font-medium text-[var(--studio-text-secondary)] mb-2">ТЕМА ДИАЛОГА</div>
+
+              {/* Пресеты */}
+              <div className="flex flex-wrap gap-1 mb-3">
+                {Object.entries(DIALOGUE_THEME_PRESETS).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      const { label, ...themeValues } = preset;
+                      updateDialogueTheme(themeValues);
+                    }}
+                    className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-accent)] hover:text-[#1C1814] transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Color pickers */}
+              <div className="space-y-1.5">
+                {([
+                  ['boxFill', 'Фон бокса'],
+                  ['boxStroke', 'Рамка'],
+                  ['textColor', 'Текст'],
+                  ['nameTagColor', 'Акцент / имя'],
+                ] as [keyof typeof dialogueTheme, string][]).map(([key, label]) => (
+                  <div key={key} className="flex items-center justify-between gap-2">
+                    <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">{label}</label>
+                    <input
+                      type="color"
+                      value={(() => {
+                        const v = dialogueTheme[key] as string;
+                        const hex = v.match(/#[0-9a-fA-F]{3,8}/);
+                        return hex ? hex[0].slice(0, 7) : '#888888';
+                      })()}
+                      onChange={(e) => updateDialogueTheme({ [key]: e.target.value })}
+                      className="w-7 h-5 cursor-pointer rounded border border-[var(--studio-border)] p-0"
+                    />
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">Скруглние</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      value={dialogueTheme.boxCornerRadius}
+                      onChange={(e) => updateDialogueTheme({ boxCornerRadius: Number(e.target.value) })}
+                      className="w-16"
+                    />
+                    <span className="text-[9px] w-4 text-right">{dialogueTheme.boxCornerRadius}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">Шрифт</label>
+                  <select
+                    value={dialogueTheme.fontFamily}
+                    onChange={(e) => updateDialogueTheme({ fontFamily: e.target.value })}
+                    className="text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                  >
+                    {['Arial', 'Georgia', 'Verdana', 'Courier New', 'Times New Roman', 'Trebuchet MS'].map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
                   </div>
                   )}

@@ -5,7 +5,7 @@ import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Transformer } fro
 import type { Stage as StageType } from 'konva/lib/Stage';
 import Konva from 'konva';
 
-import { useStudioStore, type UIWidget } from '@/lib/store';
+import { useStudioStore, type UIWidget, DIALOGUE_THEME_PRESETS } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
 import { parseRichText, layoutRichText, advanceTypewriter } from '@/lib/richText';
@@ -45,7 +45,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     executeAction,
     speakers,
     advanceDialogueLine,
+    dialogueTheme,
   } = useStudioStore();
+  const theme = dialogueTheme || DIALOGUE_THEME_PRESETS.darkFantasy;
 
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
 
@@ -620,11 +622,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
                   const boxStyle = widget.style || 'default';
-                  let boxFill = "rgba(33, 29, 24, 0.94)";
-                  let boxStroke = isSelected ? '#C5A46E' : '#534B40';
+                  let boxFill = theme.boxFill;
+                  let boxStroke = isSelected ? theme.nameTagColor : theme.boxStroke;
                   if (boxStyle === 'important') {
-                    boxFill = "rgba(40, 30, 20, 0.96)";
-                    boxStroke = isSelected ? '#E8D4A0' : '#8a7655';
+                    boxStroke = isSelected ? theme.textColor : theme.nameTagColor;
                   }
 
                   // Typewriter: slice raw text by raw-char progress; trim any dangling '[' so markup never renders as literal text
@@ -669,7 +670,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     maxWidth: wW - innerPad * 2,
                     fontSize: richFontSize,
                     lineHeightMultiplier: 1.32,
-                    defaultColor: '#EDE4D4',
+                    defaultColor: theme.textColor,
                   });
 
                   return (
@@ -679,7 +680,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         y={shakeY}
                         width={wW}
                         height={boxH}
-                        cornerRadius={10}
+                        cornerRadius={theme.boxCornerRadius}
                         fill={boxFill}
                         stroke={boxStroke}
                         strokeWidth={isSelected ? 2.5 : 1.5}
@@ -702,8 +703,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                             width={wW - innerPad * 2}
                             text={speakerName}
                             fontSize={9}
-                            fill="#C5A46E"
+                            fill={theme.nameTagColor}
                             fontStyle="500"
+                            fontFamily={theme.fontFamily}
                           />
                         </>
                       )}
@@ -723,6 +725,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                               word.italic ? 'italic' :
                               'normal'
                             }
+                            fontFamily={theme.fontFamily}
                           />
                         ))}
                       </Group>
@@ -802,7 +805,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         height={wH}
                         cornerRadius={4}
                         fill="rgba(0,0,0,0.55)"
-                        stroke={isSelected ? '#C5A46E' : '#534B40'}
+                        stroke={isSelected ? theme.nameTagColor : theme.boxStroke}
                         strokeWidth={isSelected ? 2 : 1}
                       />
                       <Text
@@ -813,8 +816,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         text={label}
                         fontSize={Math.max(9, Math.min(12, Math.round(wH * 0.45)))}
                         align="center"
-                        fill="#C5A46E"
+                        fill={theme.nameTagColor}
                         fontStyle="500"
+                        fontFamily={theme.fontFamily}
                       />
                     </>
                   );
@@ -841,7 +845,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     return (
                       <>
                         <KonvaImage image={cImg} width={wW} height={wH} />
-                        <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill="#EDE4D4" align="center" />
+                        <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill={theme.textColor} align="center" fontFamily={theme.fontFamily} />
                       </>
                     );
                   }
@@ -855,10 +859,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         height={wH}
                         cornerRadius={5}
                         fill={hoverFill}
-                        stroke={isSelected ? '#E8D4A0' : (isLinked ? '#C5A46E' : '#8a7655')}
+                        stroke={isSelected ? theme.textColor : (isLinked ? theme.nameTagColor : theme.boxStroke)}
                         strokeWidth={isSelected ? 2.5 : (isLinked ? 1.8 : 1)}
                       />
-                      <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill="#EDE4D4" align="center" />
+                      <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill={theme.textColor} align="center" fontFamily={theme.fontFamily} />
                     </>
                   );
                 }
