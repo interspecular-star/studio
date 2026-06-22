@@ -1,12 +1,21 @@
 // Rich text parser and layout engine for dialogue boxes.
-// Supports: **bold**, *italic*, [red/blue/green/yellow]text[/...], [pause] (stripped), [shake] (stripped, applied at box level).
-// Tags can be nested: **[red]bold red[/red]**.
+// Supported markup:
+//   **bold**                — жирный
+//   *italic*                — курсив
+//   [red]...[/red]          — цвет (именованный: red/blue/green/yellow/purple/orange/white/gray/gold)
+//   [color:#HEX]...[/color] — произвольный hex-цвет
+//   [size:N]...[/size]      — размер шрифта (px)
+//   [pause]                 — пауза typewriter ~450ms (удаляется из текста)
+//   [shake]                 — тряска диалогового блока (удаляется, применяется на уровне box)
+//   [wave]                  — волновая анимация букв (удаляется, применяется в рендерере)
+// Теги можно комбинировать: **[red]жирный красный[/red]**
 
 export type TextSegment = {
   text: string;
   bold: boolean;
   italic: boolean;
   color: string | null;
+  size: number | null; // null = использовать дефолтный fontSize
 };
 
 export type RenderedWord = {
@@ -16,30 +25,39 @@ export type RenderedWord = {
   bold: boolean;
   italic: boolean;
   color: string;
+  size: number; // итоговый размер шрифта для этого слова
 };
 
 const COLOR_MAP: Record<string, string> = {
-  red: '#ff6666',
-  blue: '#66aaff',
-  green: '#66ff66',
+  red:    '#ff6666',
+  blue:   '#66aaff',
+  green:  '#66ff66',
   yellow: '#ffff66',
+  purple: '#cc88ff',
+  orange: '#ffaa44',
+  white:  '#ffffff',
+  gray:   '#aaaaaa',
+  gold:   '#C5A46E',
 };
 
 export function parseRichText(raw: string): TextSegment[] {
   const cleaned = raw
     .replace(/\[pause\]/g, '')
     .replace(/\[shake\]/g, '')
-    .replace(/\[\/shake\]/g, '');
+    .replace(/\[\/shake\]/g, '')
+    .replace(/\[wave\]/g, '')
+    .replace(/\[\/wave\]/g, '');
 
   const segments: TextSegment[] = [];
   let current = '';
   let bold = false;
   let italic = false;
   let color: string | null = null;
+  let size: number | null = null;
 
   const flush = () => {
     if (current) {
-      segments.push({ text: current, bold, italic, color });
+      segments.push({ text: current, bold, italic, color, size });
       current = '';
     }
   };
@@ -53,15 +71,47 @@ export function parseRichText(raw: string): TextSegment[] {
       i += 2;
       continue;
     }
-    // * italic toggle (single star only)
-    if (cleaned[i] === '*') {
+    // * italic toggle (single star, not double)
+    if (cleaned[i] === '*' && cleaned[i + 1] !== '*') {
       flush();
       italic = !italic;
       i += 1;
       continue;
     }
-    // [color] open and [/color] close tags
+
     let matched = false;
+
+    // [color:#HEX]...[/color]
+    const hexMatch = cleaned.slice(i).match(/^\[color:(#[0-9a-fA-F]{3,8})\]/);
+    if (hexMatch) {
+      flush();
+      color = hexMatch[1];
+      i += hexMatch[0].length;
+      continue;
+    }
+    if (cleaned.startsWith('[/color]', i)) {
+      flush();
+      color = null;
+      i += 8;
+      continue;
+    }
+
+    // [size:N]...[/size]
+    const sizeMatch = cleaned.slice(i).match(/^\[size:(\d+)\]/);
+    if (sizeMatch) {
+      flush();
+      size = parseInt(sizeMatch[1], 10);
+      i += sizeMatch[0].length;
+      continue;
+    }
+    if (cleaned.startsWith('[/size]', i)) {
+      flush();
+      size = null;
+      i += 7;
+      continue;
+    }
+
+    // Named color tags: [red]...[/red] etc.
     for (const name of Object.keys(COLOR_MAP)) {
       const open = `[${name}]`;
       if (cleaned.startsWith(open, i)) {
@@ -81,11 +131,13 @@ export function parseRichText(raw: string): TextSegment[] {
       }
     }
     if (matched) continue;
-    // Unknown [tag] — skip it
+
+    // Unknown [tag] — skip silently
     if (cleaned[i] === '[') {
       const end = cleaned.indexOf(']', i);
       if (end !== -1) { i = end + 1; continue; }
     }
+
     current += cleaned[i];
     i++;
   }
@@ -94,10 +146,36 @@ export function parseRichText(raw: string): TextSegment[] {
   return segments.filter(s => s.text.length > 0);
 }
 
-// Returns the number of visible characters in a raw marked-up string (excluding tag syntax).
+// Количество видимых символов в размеченной строке (без тегов и маркеров).
 export function getVisibleLength(raw: string): number {
-  const segments = parseRichText(raw);
-  return segments.reduce((sum, s) => sum + s.text.length, 0);
+  return parseRichText(raw).reduce((sum, s) => sum + s.text.length, 0);
+}
+
+// Продвигает позицию в raw-строке на `speed` ВИДИМЫХ символов,
+// перепрыгивая теги и маркеры. Останавливается перед [pause].
+export function advanceTypewriter(raw: string, pos: number, speed: number): number {
+  let visible = 0;
+  let i = pos;
+  while (i < raw.length && visible < speed) {
+    // Стоп перед [pause]
+    if (raw[i] === '[' && raw.startsWith('[pause]', i)) break;
+
+    // Пропускаем любой другой [тег]
+    if (raw[i] === '[') {
+      const end = raw.indexOf(']', i);
+      if (end !== -1) { i = end + 1; continue; }
+    }
+
+    // Пропускаем ** и * маркеры
+    if (raw[i] === '*') {
+      i += raw[i + 1] === '*' ? 2 : 1;
+      continue;
+    }
+
+    i++;
+    visible++;
+  }
+  return i;
 }
 
 // Reusable canvas context for text measurement (lazy-init, client-side only).
@@ -130,8 +208,10 @@ export interface RichTextLayout {
   totalHeight: number;
 }
 
-// Lays out parsed segments into positioned words for canvas rendering.
-// Handles automatic word-wrap and explicit \n line breaks.
+// Раскладывает сегменты в позиционированные слова для рендеринга на канвасе.
+// Поддерживает автоперенос, \n, и разные размеры шрифта per-segment.
+// Примечание: высота строки основана на дефолтном fontSize — слова с [size:N]
+// могут немного выходить за пределы строки, что допустимо для выделений.
 export function layoutRichText(segments: TextSegment[], opts: LayoutOpts): RichTextLayout {
   const { maxWidth, fontSize, lineHeightMultiplier, defaultColor } = opts;
   const lineH = fontSize * lineHeightMultiplier;
@@ -143,26 +223,23 @@ export function layoutRichText(segments: TextSegment[], opts: LayoutOpts): RichT
   for (const seg of segments) {
     const color = seg.color ?? defaultColor;
     const { bold, italic } = seg;
+    const segFontSize = seg.size ?? fontSize;
 
-    // Split by explicit newlines first
     const lines = seg.text.split('\n');
     for (let li = 0; li < lines.length; li++) {
       if (li > 0) {
         curX = 0;
         curY += lineH;
       }
-      // Split into "word+trailing-space" or "pure-whitespace" tokens
       const tokens = lines[li].match(/\S+\s*|\s+/g) ?? [];
       for (const token of tokens) {
-        const tw = measureToken(token, fontSize, bold, italic);
-        // Wrap if token doesn't fit (but not at line start to avoid infinite loop on wide tokens)
+        const tw = measureToken(token, segFontSize, bold, italic);
         if (curX + tw > maxWidth && curX > 0) {
           curX = 0;
           curY += lineH;
         }
-        // Skip leading whitespace-only tokens at line start
         if (curX === 0 && !token.trim()) continue;
-        words.push({ text: token, x: curX, y: curY, bold, italic, color });
+        words.push({ text: token, x: curX, y: curY, bold, italic, color, size: segFontSize });
         curX += tw;
       }
     }

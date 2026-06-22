@@ -10,6 +10,13 @@ export type Speaker = {
   displayName: LocalizedString;
 };
 
+export type DialogueLine = {
+  id: string;
+  text: LocalizedString;
+  speaker?: string;          // speaker id — переопределяет page.speaker для этой реплики
+  portraitVariant?: string;  // вариант портрета (если отличается от дефолтного)
+};
+
 export type ItemType = 
   | 'weapon' 
   | 'armor' 
@@ -363,6 +370,8 @@ export type StudioPage = {
   // Dialogue UI Widgets (new flexible system)
   uiWidgets?: UIWidget[];
   uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'left_bar' | 'full_dialogue_demo' | 'freeform' | 'custom';
+  // Очередь реплик внутри страницы (опционально — заменяет page.text в playtest)
+  dialogueLines?: DialogueLine[];
 };
 
 export type BackgroundSettings = {
@@ -513,12 +522,12 @@ type StudioState = {
   playtestState: {
     variableValues: Record<string, number | boolean | string>;
     equippedItemIds: string[]; // legacy
-    equippedSlots: Partial<Record<EquipmentSlot, string>>; // Новый способ: slot -> itemId
+    equippedSlots: Partial<Record<EquipmentSlot, string>>;
     isInventoryOpen: boolean;
-    // For Top Resource Bar avatar evolution (auto changes over time based on state, no player input)
-    playerAvatar?: string; // 'default' | 'wounded' | 'veteran' | ...
-    // Temporary overrides for UI widgets during playtest (dynamic changes via actions, reset on page/exit)
+    playerAvatar?: string;
     widgetOverrides: Record<string, Partial<UIWidget>>;
+    // Текущий индекс реплики в dialogueLines (сбрасывается при смене страницы)
+    dialogueLineIndex: number;
   };
 
   // Actions
@@ -589,6 +598,12 @@ type StudioState = {
   addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
   updateSpeaker: (id: string, updates: Partial<Omit<Speaker, 'id'>>) => void;
   deleteSpeaker: (id: string) => void;
+
+  // === Dialogue Lines (очередь реплик внутри страницы) ===
+  addDialogueLine: (pageId: string, line?: Partial<Omit<DialogueLine, 'id'>>) => void;
+  updateDialogueLine: (pageId: string, lineId: string, updates: Partial<Omit<DialogueLine, 'id'>>) => void;
+  deleteDialogueLine: (pageId: string, lineId: string) => void;
+  advanceDialogueLine: () => void;
 
   addUIWidget: (pageId: string, widget: Omit<UIWidget, 'id'>) => void;
   updateUIWidget: (pageId: string, widgetId: string, updates: Partial<Omit<UIWidget, 'id'>>) => void;
@@ -836,6 +851,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     isInventoryOpen: false,
     playerAvatar: 'default',
     widgetOverrides: {},
+    dialogueLineIndex: 0,
   },
 
   // Canvas-only history (for button dragging on the canvas)
@@ -1649,6 +1665,64 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
+  // === Dialogue Lines ===
+  addDialogueLine: (pageId, line = {}) => {
+    const id = `dl_${Date.now().toString(36)}`;
+    const newLine: DialogueLine = {
+      id,
+      text: { ru: line.text?.ru ?? '', en: line.text?.en ?? '' },
+      speaker: line.speaker,
+      portraitVariant: line.portraitVariant,
+    };
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? { ...p, dialogueLines: [...(p.dialogueLines || []), newLine] }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  updateDialogueLine: (pageId, lineId, updates) => {
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? {
+              ...p,
+              dialogueLines: (p.dialogueLines || []).map((l) =>
+                l.id === lineId ? { ...l, ...updates } : l
+              ),
+            }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  deleteDialogueLine: (pageId, lineId) => {
+    set((state) => ({
+      pages: state.pages.map((p) =>
+        p.id === pageId
+          ? { ...p, dialogueLines: (p.dialogueLines || []).filter((l) => l.id !== lineId) }
+          : p
+      ),
+    }));
+    get().saveToLocalStorage();
+  },
+
+  advanceDialogueLine: () => {
+    const state = get();
+    const page = state.pages.find((p) => p.id === state.selectedPageId);
+    const total = page?.dialogueLines?.length ?? 0;
+    const current = state.playtestState.dialogueLineIndex;
+    if (current < total - 1) {
+      set((s) => ({
+        playtestState: { ...s.playtestState, dialogueLineIndex: current + 1 },
+      }));
+    }
+  },
+
   // === Playtest State ===
   resetPlaytestState: () => {
     const state = get();
@@ -1675,6 +1749,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         isInventoryOpen: false,
         playerAvatar: 'default',
         widgetOverrides: {},
+        dialogueLineIndex: 0,
       },
       snappingGuide: null,
     });
@@ -1959,17 +2034,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // === Canvas Undo/Redo (only button layouts from canvas) ===
   saveCanvasSnapshot: () => {
     const state = get();
-    // Save a lightweight snapshot of all button layouts
     const snapshot = state.pages.map(page => ({
       id: page.id,
       buttons: page.buttons.map(btn => ({
         id: btn.id,
         layout: { ...btn.layout }
+      })),
+      uiWidgets: (page.uiWidgets || []).map((w: any) => ({
+        id: w.id,
+        layout: { ...w.layout }
       }))
     }));
 
     set((s) => ({
-      canvasHistory: [...s.canvasHistory.slice(-49), snapshot], // keep max 50
+      canvasHistory: [...s.canvasHistory.slice(-49), snapshot],
       canvasFuture: []
     }));
   },
@@ -1984,20 +2062,26 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       buttons: page.buttons.map(btn => ({
         id: btn.id,
         layout: { ...btn.layout }
+      })),
+      uiWidgets: (page.uiWidgets || []).map((w: any) => ({
+        id: w.id,
+        layout: { ...w.layout }
       }))
     }));
 
-    // Restore previous layouts
     set((s) => ({
       pages: s.pages.map(page => {
         const snapPage = previous.find((p: any) => p.id === page.id);
         if (!snapPage) return page;
-
         return {
           ...page,
           buttons: page.buttons.map(btn => {
             const snapBtn = snapPage.buttons.find((b: any) => b.id === btn.id);
             return snapBtn ? { ...btn, layout: { ...btn.layout, ...snapBtn.layout } } : btn;
+          }),
+          uiWidgets: (page.uiWidgets || []).map((w: any) => {
+            const snapW = snapPage.uiWidgets?.find((sw: any) => sw.id === w.id);
+            return snapW ? { ...w, layout: { ...w.layout, ...snapW.layout } } : w;
           })
         };
       }),
@@ -2016,6 +2100,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       buttons: page.buttons.map(btn => ({
         id: btn.id,
         layout: { ...btn.layout }
+      })),
+      uiWidgets: (page.uiWidgets || []).map((w: any) => ({
+        id: w.id,
+        layout: { ...w.layout }
       }))
     }));
 
@@ -2023,12 +2111,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       pages: s.pages.map(page => {
         const snapPage = next.find((p: any) => p.id === page.id);
         if (!snapPage) return page;
-
         return {
           ...page,
           buttons: page.buttons.map(btn => {
             const snapBtn = snapPage.buttons.find((b: any) => b.id === btn.id);
             return snapBtn ? { ...btn, layout: { ...btn.layout, ...snapBtn.layout } } : btn;
+          }),
+          uiWidgets: (page.uiWidgets || []).map((w: any) => {
+            const snapW = snapPage.uiWidgets?.find((sw: any) => sw.id === w.id);
+            return snapW ? { ...w, layout: { ...w.layout, ...snapW.layout } } : w;
           })
         };
       }),
@@ -2075,10 +2166,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         break;
       }
       case 'goToPage': {
-        // Переход на другую страницу в режиме Playtest
         get().selectPage(action.pageId);
-        // Снимаем выделение с кнопки при переходе
         get().selectButton(null);
+        set((s) => ({
+          playtestState: { ...s.playtestState, dialogueLineIndex: 0, widgetOverrides: {} },
+        }));
         break;
       }
       case 'openInventory': {
@@ -2361,6 +2453,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         isInventoryOpen: false,
         playerAvatar: 'default',
         widgetOverrides: {},
+        dialogueLineIndex: 0,
       },
       canvasWidth: 1280,
       canvasHeight: 720,

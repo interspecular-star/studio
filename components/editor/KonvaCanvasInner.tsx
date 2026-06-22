@@ -1,13 +1,13 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Transformer } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
 
 import { useStudioStore, type UIWidget } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
-import { parseRichText, layoutRichText } from '@/lib/richText';
+import { parseRichText, layoutRichText, advanceTypewriter } from '@/lib/richText';
 
 // Trim an unclosed tag at the end of a typewriter-sliced string so markup never leaks as literal text
 function trimPartialTag(s: string): string {
@@ -43,6 +43,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     playtestState,
     executeAction,
     speakers,
+    advanceDialogueLine,
   } = useStudioStore();
 
   const [customBgImage, setCustomBgImage] = useState<HTMLImageElement | null>(null);
@@ -167,6 +168,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   }, [playtestState.widgetOverrides, currentPage?.uiWidgets, mode]);
 
   const stageRef = useRef<StageType>(null);
+  const transformerRef = useRef<any>(null);
+  const widgetNodeRefs = useRef<Map<string, any>>(new Map());
+  const buttonNodeRefs = useRef<Map<string, any>>(new Map());
 
   // Interactive states for buttons (hover / pressed)
   const [hoveredButtonId, setHoveredButtonId] = useState<string | null>(null);
@@ -255,16 +259,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               return;
             }
 
-            // Speed: base 3 chars/tick, slower on ellipsis, faster at high intensity
+            // Speed: base 3 visible chars/tick, slower on ellipsis, faster at high intensity
             let speed = 3;
-            if (remaining.startsWith('...')) speed = 0.8;
+            if (remaining.startsWith('...')) speed = 1;
             const intW = (currentPage?.uiWidgets || []).find((ww: any) => ww.type === 'intensityBar');
             if (intW?.data?.valueVar) {
               const live = playtestState.variableValues[intW.data.valueVar];
               const intensity = typeof live === 'number' ? live : 0;
               if (intensity > 70) speed += 2;
             }
-            next[w.id] = Math.min(fullText.length, current + speed);
+            // advanceTypewriter skips markup chars so speed counts only visible chars
+            next[w.id] = advanceTypewriter(fullText, current, speed);
             changed = true;
           }
         });
@@ -410,6 +415,27 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     useStudioStore.getState().setSnappingGuide(null);
   };
 
+  // Attach Konva Transformer to the selected widget or button node
+  useEffect(() => {
+    if (!transformerRef.current) return;
+    if (isPlaytest) {
+      transformerRef.current.nodes([]);
+      transformerRef.current.getLayer()?.batchDraw();
+      return;
+    }
+    const nodes: any[] = [];
+    if (selectedWidgetId) {
+      const n = widgetNodeRefs.current.get(selectedWidgetId);
+      if (n) nodes.push(n);
+    }
+    if (selectedButtonId) {
+      const n = buttonNodeRefs.current.get(selectedButtonId);
+      if (n) nodes.push(n);
+    }
+    transformerRef.current.nodes(nodes);
+    transformerRef.current.getLayer()?.batchDraw();
+  }, [selectedWidgetId, selectedButtonId, isPlaytest]);
+
   const handleButtonClick = (buttonId: string, e: any) => {
     e.cancelBubble = true;
     selectButton(buttonId);
@@ -545,19 +571,32 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               const isPlaytestMode = isPlaytest;
 
               // Common wrapper for all widget types — adds drag/select in editor
+              // Dialogue lines state (computed outside renderWidgetContent so click handler can use it)
+              const dlLines = currentPage?.dialogueLines;
+              const dlLineIndex = playtestState.dialogueLineIndex ?? 0;
+              // Editor: всегда показываем первую реплику; Playtest: текущую по индексу
+              const dlCurrentLine = dlLines?.length
+                ? dlLines[isPlaytest ? Math.min(dlLineIndex, dlLines.length - 1) : 0]
+                : null;
+              const dlIsLastLine = !dlLines?.length || dlLineIndex >= dlLines.length - 1;
+
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
                   const textSource = widget.data?.textSource || 'page';
                   const overrideText = isPlaytest ? playtestState.widgetOverrides[widget.id]?.text : null;
                   const effectiveText = overrideText || widget.text;
-                  // Priority: dynamic override > custom widget text > page text
+                  // Priority: dynamic override > current dialogue line > custom widget text > page text
                   const rawText = overrideText?.ru
+                    || dlCurrentLine?.text?.ru
                     || (textSource === 'custom' && effectiveText?.ru ? effectiveText.ru : null)
                     || currentPage?.text?.ru || '';
 
                   const boxH = Math.max(48, wH);
                   const innerPad = 14;
-                  const speakerName = widget.data?.speakerName || (currentPage?.speaker && getSpeakerName(currentPage.speaker)) || '';
+                  // Speaker: line override > widget manual override > page speaker
+                  const activeSpeakerId = dlCurrentLine?.speaker || currentPage?.speaker || '';
+                  const speakerName = widget.data?.speakerName
+                    || (activeSpeakerId ? getSpeakerName(activeSpeakerId) : '');
                   const nameY = 4;
                   const textStartY = speakerName ? 18 : 10;
                   const boxStyle = widget.style || 'default';
@@ -648,7 +687,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           />
                         </>
                       )}
-                      {/* Rich text: each token rendered with its own style and color */}
+                      {/* Rich text: each token rendered with its own style, color, and size */}
                       <Group x={innerPad + shakeX} y={textStartY + shakeY}>
                         {richWords.map((word, idx) => (
                           <Text
@@ -656,12 +695,38 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                             x={word.x}
                             y={word.y}
                             text={word.text}
-                            fontSize={richFontSize}
+                            fontSize={word.size}
                             fill={word.color}
-                            fontStyle={word.bold ? 'bold' : (word.italic ? 'italic' : '500')}
+                            fontStyle={
+                              word.bold && word.italic ? 'bold italic' :
+                              word.bold ? 'bold' :
+                              word.italic ? 'italic' :
+                              'normal'
+                            }
                           />
                         ))}
                       </Group>
+                      {/* Dialogue lines progress: "▶" when typewriter done + more lines / buttons coming */}
+                      {isPlaytest && dlLines && dlLines.length > 1 && (() => {
+                        const prog = typewriterProgress[widget.id] ?? 0;
+                        const typewriterDone = prog >= rawText.length;
+                        if (!typewriterDone) return null;
+                        const label = dlIsLastLine
+                          ? (currentPage.buttons.length > 0 ? '▼' : null)
+                          : `▶ ${dlLineIndex + 1}/${dlLines.length}`;
+                        if (!label) return null;
+                        return (
+                          <Text
+                            x={wW - innerPad - 28}
+                            y={wH - 14 + shakeY}
+                            text={label}
+                            fontSize={9}
+                            fill="#C5A46E"
+                            opacity={0.75}
+                            listening={false}
+                          />
+                        );
+                      })()}
                     </>
                   );
                 }
@@ -712,9 +777,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       />
                       <Text
                         x={0}
-                        y={Math.max(2, (wH - 12) / 2)}
+                        y={Math.max(2, (wH - 14) / 2)}
                         width={wW}
-                        height={wH}
+                        height={14}
                         text={label}
                         fontSize={Math.max(9, Math.min(12, Math.round(wH * 0.45)))}
                         align="center"
@@ -899,6 +964,12 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   key={widget.id}
                   x={wX}
                   y={wY}
+                  width={wW}
+                  height={wH}
+                  ref={(node: any) => {
+                    if (node) widgetNodeRefs.current.set(widget.id, node);
+                    else widgetNodeRefs.current.delete(widget.id);
+                  }}
                   draggable={!isPlaytestMode}
                   onMouseEnter={() => setHoveredWidgetId(widget.id)}
                   onMouseLeave={() => { setHoveredWidgetId(null); setPressedWidgetId(null); }}
@@ -935,6 +1006,25 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   onMouseUp={() => setPressedWidgetId(null)}
                   onClick={(e) => {
                     e.cancelBubble = true;
+                    // DialogueBox click in playtest: skip typewriter or advance to next line
+                    if (isPlaytestMode && widget.type === 'dialogueBox') {
+                      const overrideT = playtestState.widgetOverrides[widget.id]?.text;
+                      const tSrc = widget.data?.textSource || 'page';
+                      const fullText = overrideT?.ru
+                        || dlCurrentLine?.text?.ru
+                        || (tSrc === 'custom' && widget.text?.ru ? widget.text.ru : null)
+                        || currentPage?.text?.ru || '';
+                      const prog = typewriterProgress[widget.id] ?? 0;
+                      if (prog < fullText.length) {
+                        // Skip to end of current text
+                        setTypewriterProgress(prev => ({ ...prev, [widget.id]: fullText.length }));
+                      } else if (dlLines?.length && !dlIsLastLine) {
+                        // Advance to next line
+                        advanceDialogueLine();
+                        setTypewriterProgress(prev => ({ ...prev, [widget.id]: 0 }));
+                      }
+                      return;
+                    }
                     if (isPlaytestMode && widget.type === 'choiceButton') {
                       const linkedId = (widget.data || {}).linkedButtonId;
                       if (linkedId) {
@@ -968,6 +1058,22 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }}
                   onTap={(e) => {
                     e.cancelBubble = true;
+                    if (isPlaytestMode && widget.type === 'dialogueBox') {
+                      const overrideT = playtestState.widgetOverrides[widget.id]?.text;
+                      const tSrc = widget.data?.textSource || 'page';
+                      const fullText = overrideT?.ru
+                        || dlCurrentLine?.text?.ru
+                        || (tSrc === 'custom' && widget.text?.ru ? widget.text.ru : null)
+                        || currentPage?.text?.ru || '';
+                      const prog = typewriterProgress[widget.id] ?? 0;
+                      if (prog < fullText.length) {
+                        setTypewriterProgress(prev => ({ ...prev, [widget.id]: fullText.length }));
+                      } else if (dlLines?.length && !dlIsLastLine) {
+                        advanceDialogueLine();
+                        setTypewriterProgress(prev => ({ ...prev, [widget.id]: 0 }));
+                      }
+                      return;
+                    }
                     if (isPlaytestMode && widget.type === 'choiceButton') {
                       const linkedId = (widget.data || {}).linkedButtonId;
                       if (linkedId) {
@@ -999,15 +1105,15 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     }
                   }}
                 >
-                  {/* Optional highlight ring for hover/selected — hidden in playtest */}
-                  {(isSelected || isHovered) && !isPlaytestMode && (
+                  {/* Hover ring — hidden when selected (Transformer provides its own border) and in playtest */}
+                  {isHovered && !isSelected && !isPlaytestMode && (
                     <Rect
                       x={-3}
                       y={-3}
                       width={wW + 6}
                       height={wH + 6}
                       cornerRadius={8}
-                      stroke={isSelected ? '#C5A46E' : '#8a7655'}
+                      stroke="#8a7655"
                       strokeWidth={1}
                       dash={[3, 2]}
                       listening={false}
@@ -1201,6 +1307,12 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                 key={button.id}
                 x={btnX}
                 y={btnY}
+                width={btnW}
+                height={btnH}
+                ref={(node: any) => {
+                  if (node) buttonNodeRefs.current.set(button.id, node);
+                  else buttonNodeRefs.current.delete(button.id);
+                }}
                 opacity={buttonOpacity}
                 draggable={!isPlaytest && isEnabled}
 
@@ -1321,6 +1433,61 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               </Group>
             );
           })}
+
+          {/* Resize Transformer — attaches to selected widget or button in editor mode */}
+          {!isPlaytest && (
+            <Transformer
+              ref={transformerRef}
+              rotateEnabled={false}
+              keepRatio={false}
+              borderStroke="#C5A46E"
+              borderStrokeWidth={1}
+              borderDash={[3, 2]}
+              anchorFill="#C5A46E"
+              anchorStroke="#534B40"
+              anchorSize={7}
+              anchorCornerRadius={2}
+              padding={0}
+              enabledAnchors={[
+                'top-left', 'top-center', 'top-right',
+                'middle-left', 'middle-right',
+                'bottom-left', 'bottom-center', 'bottom-right',
+              ]}
+              boundBoxFunc={(oldBox, newBox) => {
+                if (newBox.width < 20 || newBox.height < 20) return oldBox;
+                return newBox;
+              }}
+              onTransformStart={() => {
+                useStudioStore.getState().saveCanvasSnapshot();
+              }}
+              onTransformEnd={() => {
+                const pageId = selectedPageId;
+                if (!pageId) return;
+
+                if (selectedWidgetId) {
+                  const node = widgetNodeRefs.current.get(selectedWidgetId);
+                  if (node) {
+                    const newW = (node.width() * node.scaleX() / width) * 100;
+                    const newH = (node.height() * node.scaleY() / height) * 100;
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    useStudioStore.getState().updateUIWidgetLayout(pageId, selectedWidgetId, { width: newW, height: newH });
+                  }
+                }
+
+                if (selectedButtonId) {
+                  const node = buttonNodeRefs.current.get(selectedButtonId);
+                  if (node) {
+                    const newW = (node.width() * node.scaleX() / width) * 100;
+                    const newH = (node.height() * node.scaleY() / height) * 100;
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    useStudioStore.getState().updateButtonLayout(pageId, selectedButtonId, { width: newW, height: newH });
+                  }
+                }
+              }}
+            />
+          )}
         </Layer>
       </Stage>
 

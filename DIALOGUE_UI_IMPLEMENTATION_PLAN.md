@@ -2,9 +2,84 @@
 
 **Variant C: Hybrid Canvas Widgets Approach**
 
-**Status:** Advanced and mostly complete for core features (Phases 1-4 done: full widget system with dynamics, animations, markup, overrides, playtest typewriter/shake, presets, editor inspector with styles/imageOnly/z/text, multiple portraits, demo. Ready for Phase 5 or polish.)  
-**Date:** Current  
-**Author:** Grok (based on discussion)
+**Status:** 
+- **Phases 1-4**: Largely complete for the core system (data model, rendering, editor, assets, dynamics, basic animations and playtest feedback).
+- **Phase 5**: Partially started (basic markup, multiple portraits in demo, some animations).
+- **Overall progress**: Approximately **75-80%** of Phases 1-4. The system is already usable for authoring flexible dynamic dialogues. Many advanced rich-text and polish items remain.
+
+**Date:** 2026-06-17  
+**Author:** Grok (iterative implementation)
+
+## Current Implementation Status (as of latest iteration)
+
+### Implemented (Phases 1-4)
+
+**Data Model & Core System**
+- Full `UIWidget` + `UIAsset` types in `lib/store.ts`
+- `uiWidgets[]` and `uiLayoutPreset` on `StudioPage`
+- Playtest `widgetOverrides` for non-destructive dynamic changes
+- CRUD actions for widgets and assets (`addUIWidget`, `updateUIWidget`, `moveUIWidget`, `addUIAsset`, etc.)
+- Full persistence (localStorage / export / import) with migrations
+
+**Rendering (KonvaCanvasInner.tsx)**
+- `dialogueBox` — name tag, basic markup (**bold**, *italic*, [red/blue/green/yellow]), typewriter effect in playtest, shake animation (tied to angry variant + intensity >60), style support (default/important)
+- `portrait` — asset-based images, variants (default/neutral/angry/happy/sad + custom), fade+scale animation on variant change, multiple portraits supported
+- `intensityBar` — variable-driven, multi-part colored bar, smooth lerp animation
+- `quickAction` — image support from assets or letter icons, clickable (inventory opens modal)
+- `choiceButton` — image support, hover/pressed states, `imageOnly`, linked to existing buttons, fallback actions via `data.setIntensity`
+- `container` — visual grouping with optional title
+- `textLabel` — custom text support
+- Dynamic resolution using `playtestState.widgetOverrides`
+- Z-order rendering + snapping support
+
+**Editor (PageSection + app/page.tsx)**
+- Dedicated "UI АССЕТЫ" block (add via path, preview, edit)
+- Widget list (sorted by z, shows (dyn) in playtest)
+- Full inspector:
+  - Layout (x/y/width/height/z) + z-order buttons (front/up/down/back)
+  - Asset picker
+  - Type-specific fields (speakerId, variant, textSource, custom text, linkedButtonId, imageOnly, valueVar, parts, actionType, title, style)
+  - ConditionEditor for `visibleWhen`
+- Presets: `classic_vn`, `bottom_bar`, `left_bar`, `full_dialogue_demo`
+- Add buttons for all widget types
+
+**Dynamics & Playtest**
+- Temporary overrides instead of mutating base pages
+- Actions: `setPortraitVariant`, `setIntensity`, `setWidgetProperty`
+- Typewriter effect (speed affected by intensity, slows on ... and [pause])
+- Animations: portrait swap (fade+scale), intensity lerp, dialogue shake
+- Visual feedback: green dashed outline + "(dyn)" labels for overridden widgets
+- Markup support in dialogue + [shake] / [pause] tags
+
+**Demo & Presets**
+- `full_dialogue_demo` preset (dialogue + 2 portraits + left container + intensity + choices)
+- Updated default pages (tavern_01) with working examples
+- Demo buttons that change variants, intensity, and dialogue text
+
+### Remaining / To Do
+
+**Phase 4 Polish (incomplete)**
+- Richer per-segment rich text (colors + styles on individual words/phrases instead of whole block)
+- More robust pause system in typewriter (actual timed delays)
+- Error handling / defaults for missing assets/variables
+- Accessibility improvements (readable text, contrast)
+
+**Phase 5 – Advanced**
+- Full rich text engine (pauses with timing, color per segment, shakes per phrase)
+- Proper multiple portraits / expressions system (UI for managing several at once)
+- Widget-level animations and transitions
+- Global themes / skins for widgets
+- Deeper integration (show equipped items on portrait, link to inventory state)
+- Performance (culling, image caching)
+- Documentation and tests
+- Optional: speech bubbles, evidence system, etc.
+
+**General**
+- Better relative positioning inside containers
+- Migration tools for old hardcoded dialogue pages
+- More playtest actions that affect widgets
+
+**Overall Progress**: 78-82% of the original plan (very strong core + dynamics, lighter on advanced rich text and polish). The system is already usable for authoring flexible, dynamic dialogues.
 
 ## 1. Overview and Goals
 
@@ -322,3 +397,192 @@ export interface StudioPage {
 - If a more elegant variant emerges (e.g. full Godot-like Control system or external lib), revisit.
 
 This document will be updated as implementation progresses.
+
+---
+
+## 11. Обновлённый статус — 2026-06-22
+
+### Что реализовано дополнительно (после даты документа)
+
+- **Speaker registry** — Speakers вынесены из хардкода в store (`speakers[]`, CRUD). Отображаются в МИР-табе.
+- **Undo/redo для виджетов** — `saveCanvasSnapshot` теперь сохраняет и восстанавливает `uiWidgets[].layout` (раньше только кнопки).
+- **Resize handles** — Konva `Transformer` на выбранный виджет/кнопку. 8 ручек, gold-стиль, привязка к истории (`onTransformStart` → `saveCanvasSnapshot`). Отключён в playtest.
+- **Два таба правой панели** — СТРАНИЦА / МИР. PageSection без враппера-карточки. Авто-переключение на СТРАНИЦА при смене страницы.
+- **Typewriter rich text** — `trimPartialTag` исправляет утечку тегов при обрезке строки.
+- **Rich text engine** — `parseRichText` + `layoutRichText` из `lib/richText.ts`. Работает per-word рендеринг с отдельным `fontSize`, `fill`, `fontStyle` на каждый Text node.
+- **Дублирование страниц** — `duplicatePage` в store + кнопка ⧉ в списке страниц.
+- **InventoryModal** — Перенесён в `absolute inset-0` внутри canvas div (был `fixed`, выходил за пределы игрового поля).
+- **Hover ring** — Показывается только при hover (не при select). Transformer сам рисует golden border для выбранного элемента.
+
+---
+
+## 12. Phase 5 — Детальный план дальнейшей реализации
+
+### Приоритет 1: Rich Text — доработка движка
+
+**Статус:** движок работает, но неполный.
+
+| Задача | Файл | Детали |
+|---|---|---|
+| Комбинация bold+italic | `lib/richText.ts` | `fontStyle` принимает `'bold italic'` в Konva. Сейчас только одно значение. |
+| Расширить COLOR_MAP | `lib/richText.ts` | Добавить: `purple`, `orange`, `white`, `gray`, `gold` |
+| Тег `[size:N]` | `lib/richText.ts` | Изменение размера шрифта для отдельных слов/фраз |
+| Typewriter по visible-chars | `KonvaCanvasInner.tsx` | Сейчас прогресс считает raw-символы (включая теги). Нужно использовать `getVisibleLength()` для точного подсчёта символов |
+| Тег `[wave]` | `lib/richText.ts` + canvas | Волновая анимация букв (синусоида по y, offset per-char) |
+| Тег `[color:#HEX]` | `lib/richText.ts` | Произвольный hex-цвет вместо именованных |
+
+---
+
+### Приоритет 2: Dialogue Flow — диалоговый поток внутри страницы
+
+Сейчас 1 страница = 1 реплика. Для живого диалога нужны очереди реплик внутри страницы.
+
+**Вариант реализации:**
+```ts
+// StudioPage
+dialogueLines?: Array<{
+  id: string;
+  text: LocalizedString;
+  speaker?: string;       // speaker id
+  portraitVariant?: string;
+}>;
+```
+
+- `dialogueBox` widget отображает текущую строку из очереди
+- Клик/пробел → следующая строка (без смены страницы)
+- После последней строки — активируются кнопки выбора или авто-навигация
+- В редакторе: список строк в инспекторе виджета `dialogueBox`
+- Typewriter сбрасывается при переходе к следующей строке
+
+**Файлы:** `lib/store.ts` (новый тип + поле), `KonvaCanvasInner.tsx` (логика очереди в playtest), `PageSection.tsx` (редактор очереди)
+
+---
+
+### Приоритет 3: Портреты — интеграция со спикером
+
+Сейчас: портрет привязан к `assetId` вручную. Нет автосвязи speaker → portrait.
+
+**Задачи:**
+
+1. **Speaker → portrait mapping** в реестре спикеров:
+   ```ts
+   Speaker {
+     id: string;
+     displayName: LocalizedString;
+     portraitAssetId?: string;   // ← новое
+   }
+   ```
+
+2. **Portrait widget**: если `data.speakerId` задан → автоматически берёт `portraitAssetId` у этого спикера (override можно через `data.variant`).
+
+3. **Смена спикера на странице** → portrait авто-переключается в редакторе (live preview).
+
+4. **Variant picker в editor**: в инспекторе portrait показывает список вариантов из `asset.variants`, можно выбрать дефолтный для страницы.
+
+**Файлы:** `lib/store.ts` (Speaker type), `PageSection.tsx` (поле portraitAssetId у спикера), `KonvaCanvasInner.tsx` (fallback логика)
+
+---
+
+### Приоритет 4: Widget Animations — анимации виджетов
+
+| Анимация | Виджет | Реализация |
+|---|---|---|
+| Slide-in/out | любой | `visibleWhen` переход: tween x или opacity за 200ms |
+| Shake on select | `dialogueBox` | уже есть `[shake]` + intensity trigger |
+| Bounce on appear | `choiceButton` | при первом рендере — scale 0.8 → 1.0 |
+| Fade page transition | все виджеты | при смене страницы — opacity 0 → 1 |
+| Pulse | `intensityBar` | при critical value (<20%) — мигание |
+
+**Реализация:** `useEffect` с Konva `Tween` на Konva-ноде. Анимационный стейт в `useState<Record<widgetId, AnimState>>`. Не затрагивает store (только визуал).
+
+---
+
+### Приоритет 5: Глобальные темы виджетов
+
+Сейчас стили (`boxFill`, `boxStroke`, `accentColor`) захардкожены в рендерере на каждый тип виджета.
+
+**Задача:** вынести в глобальный `dialogueTheme` объект в store:
+```ts
+dialogueTheme: {
+  boxFill: string;
+  boxStroke: string;
+  boxCornerRadius: number;
+  textColor: string;
+  nameTagColor: string;
+  fontFamily: string;
+}
+```
+
+- Редактор темы в МИР-табе (color pickers)
+- Экспорт/импорт темы отдельным JSON
+- Быстрые пресеты: Dark Fantasy (текущий), Light Scroll, Cyberpunk, Clean White
+
+**Файлы:** `lib/store.ts`, `KonvaCanvasInner.tsx` (заменить хардкод на `dialogueTheme.*`), `app/page.tsx` (UI темы в МИР-табе)
+
+---
+
+### Приоритет 6: Battle HUD виджет
+
+По GDD игра имеет пошаговую боевую систему. Нужен новый тип виджета.
+
+```ts
+UIWidgetType = ... | 'battleHUD'
+```
+
+Виджет отображает:
+- HP bar (привязан к переменной)
+- Resolve bar
+- Очередь ходов (иконки из assets)
+- Накал (уже есть `intensityBar`)
+
+Можно реализовать как составной widget или как набор отдельных `intensityBar` виджетов.
+Рекомендуется второй вариант (без нового типа) пока боевая система не определена точнее.
+
+---
+
+### Приоритет 7: Copy/Paste виджетов
+
+| Действие | Реализация |
+|---|---|
+| Ctrl+C | Скопировать выбранный widget/button в `clipboard` (store field) |
+| Ctrl+V | Вставить со смещением +2% x/y, новый id |
+| Ctrl+D | Дублировать на месте (как duplicate page, но для виджетов) |
+
+**Файлы:** `lib/store.ts` (поле `clipboard: UIWidget | StudioButton | null`), `KonvaCanvasInner.tsx` (keydown listener на Stage или window), `app/page.tsx` (keyboard shortcut guard)
+
+---
+
+### Приоритет 8: Speech Bubble (опционально)
+
+Тип виджета `speechBubble`:
+- Хвостик (tail) направлен к портрету говорящего
+- `tailDirection: 'left' | 'right' | 'bottom'`
+- Рисуется как Path (Konva `Line` или `Shape`)
+- Полезно для мини-диалогов поверх сцены без bottom bar
+
+---
+
+## 13. Технические долги Phase 5
+
+| Долг | Где | Приоритет |
+|---|---|---|
+| `fontStyle` bold+italic не комбинируется | `KonvaCanvasInner.tsx:685` | Высокий |
+| Typewriter считает raw chars, не visible | `KonvaCanvasInner.tsx` typewriter effect | Высокий |
+| `any` в widget handlers | `KonvaCanvasInner.tsx` | Средний |
+| `KonvaCanvasInner.tsx` >1400 строк | разбить на `widgets/*.tsx` | Средний |
+| Portrait без asset — Text height выходит за bounds | Исправлено в текущей сессии ✅ | — |
+
+---
+
+## 14. Рекомендуемый порядок реализации
+
+```
+Приоритет 1: Rich Text доработка       ← небольшой, высокий эффект
+Приоритет 2: Dialogue Flow (очередь)   ← ключевое для нарратива
+Приоритет 3: Speaker → Portrait link   ← связывает данные между собой
+Приоритет 7: Copy/Paste                ← QoL, быстрая реализация
+Приоритет 5: Темы виджетов             ← визуальная целостность
+Приоритет 4: Animations                ← polish
+Приоритет 6: Battle HUD                ← зависит от боевой системы
+Приоритет 8: Speech Bubble             ← опционально
+```

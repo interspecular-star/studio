@@ -477,25 +477,94 @@ export default function PageSection({
                       <input value={w.data?.title || ''} onChange={e=>updateW({data:{...(w.data||{}), title: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Левая панель" />
                     </div>
                   )}
-                  {w.type === 'dialogueBox' && (
-                    <div>
-                      <label className="text-[10px]">Имя говорящего (оверрайд)</label>
-                      <input value={w.data?.speakerName || ''} onChange={e=>updateW({data:{...(w.data||{}), speakerName: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="из страницы" />
-                      <label className="text-[10px] mt-1 block">Источник текста</label>
-                      <select value={w.data?.textSource || 'page'} onChange={e=>updateW({data:{...(w.data||{}), textSource: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
-                        <option value="page">Из страницы</option>
-                        <option value="custom">Свой текст виджета</option>
-                      </select>
-                      {w.data?.textSource === 'custom' && (
-                        <input value={w.text?.ru || ''} onChange={e=>updateW({text: { ...(w.text||{ru:'',en:''}), ru: e.target.value }})} className="w-full text-xs mt-1 px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="Текст диалога" />
-                      )}
-                      <label className="text-[10px] mt-1 block">Стиль</label>
-                      <select value={w.style || 'default'} onChange={e=>updateW({style: e.target.value})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
-                        <option value="default">Обычный</option>
-                        <option value="important">Важный</option>
-                      </select>
-                    </div>
-                  )}
+                  {w.type === 'dialogueBox' && (() => {
+                    const store = useStudioStore.getState();
+                    const dlLines = currentPage?.dialogueLines || [];
+                    return (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px]">Имя говорящего (оверрайд)</label>
+                          <input value={w.data?.speakerName || ''} onChange={e=>updateW({data:{...(w.data||{}), speakerName: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" placeholder="из страницы" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] block">Источник текста</label>
+                          <select value={w.data?.textSource || 'page'} onChange={e=>updateW({data:{...(w.data||{}), textSource: e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                            <option value="page">Из страницы</option>
+                            <option value="custom">Свой текст виджета</option>
+                          </select>
+                          {w.data?.textSource === 'custom' && (
+                            <textarea value={w.text?.ru || ''} onChange={e=>updateW({text: { ...(w.text||{ru:'',en:''}), ru: e.target.value }})} rows={2} className="w-full text-xs mt-1 px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)] resize-none" placeholder="Текст диалога" />
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-[10px] block">Стиль</label>
+                          <select value={w.style || 'default'} onChange={e=>updateW({style: e.target.value})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]">
+                            <option value="default">Обычный</option>
+                            <option value="important">Важный</option>
+                          </select>
+                        </div>
+
+                        {/* Dialogue Lines (очередь реплик) */}
+                        <div className="border-t border-[var(--studio-border)] pt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-medium text-[var(--studio-text-secondary)]">
+                              РЕПЛИКИ ({dlLines.length})
+                            </label>
+                            <button
+                              onClick={() => store.addDialogueLine(currentPage.id)}
+                              className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
+                            >+ Добавить</button>
+                          </div>
+                          {dlLines.length === 0 ? (
+                            <p className="text-[9px] text-[var(--studio-text-muted)] leading-tight">
+                              Нет реплик. Если добавить — текст диалога страницы будет игнорироваться, отображаться будут только реплики. Клик по боксу переходит к следующей.
+                            </p>
+                          ) : (
+                            <p className="text-[9px] text-[var(--studio-accent)] opacity-70 leading-tight mb-1">
+                              ⚠ Текст диалога страницы игнорируется — активны реплики.
+                            </p>
+                          )}
+                          {dlLines.map((line: any, idx: number) => (
+                            <div key={line.id} className="mb-2 rounded border border-[var(--studio-border)] bg-[#1C1814] p-1.5">
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="text-[9px] text-[var(--studio-text-muted)] w-4 shrink-0">{idx + 1}.</span>
+                                <select
+                                  value={line.speaker || ''}
+                                  onChange={e => store.updateDialogueLine(currentPage.id, line.id, { speaker: e.target.value || undefined })}
+                                  className="flex-1 text-[10px] px-1 py-0.5 bg-[#252018] border border-[var(--studio-border)] min-w-0"
+                                  title="Спикер этой реплики"
+                                >
+                                  <option value="">— спикер страницы —</option>
+                                  {speakers.map((s: any) => (
+                                    <option key={s.id} value={s.id}>{s.displayName.ru}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => store.deleteDialogueLine(currentPage.id, line.id)}
+                                  className="text-[10px] opacity-40 hover:opacity-100 hover:text-red-400 px-1 shrink-0"
+                                  title="Удалить реплику"
+                                >✕</button>
+                              </div>
+                              <textarea
+                                value={line.text?.ru || ''}
+                                onChange={e => store.updateDialogueLine(currentPage.id, line.id, { text: { ru: e.target.value, en: line.text?.en || '' } })}
+                                rows={2}
+                                className="w-full text-xs px-1.5 py-1 bg-[#252018] border border-[var(--studio-border)] resize-none"
+                                placeholder={`Реплика ${idx + 1}…`}
+                              />
+                              <input
+                                value={line.portraitVariant || ''}
+                                onChange={e => store.updateDialogueLine(currentPage.id, line.id, { portraitVariant: e.target.value || undefined })}
+                                className="w-full text-[10px] mt-1 px-1.5 py-0.5 bg-[#252018] border border-[var(--studio-border)]"
+                                placeholder="Вариант портрета (angry, happy…)"
+                                title="Вариант портрета для этой реплики"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="pt-2 border-t border-[var(--studio-border)]">
                     <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />
