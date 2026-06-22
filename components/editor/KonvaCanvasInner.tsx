@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Transformer } from 'react-konva';
 import type { Stage as StageType } from 'konva/lib/Stage';
+import Konva from 'konva';
 
 import { useStudioStore, type UIWidget } from '@/lib/store';
 import { getSnappedButtonPosition } from '@/lib/snapping';
@@ -190,6 +191,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   const prevPortraitVariantsRef = useRef<Record<string, string>>({});
   const [portraitSwapAnim, setPortraitSwapAnim] = useState<Record<string, number>>({}); // widgetId -> timestamp of swap
 
+  // Widget IDs that have already played their appear animation (bounce for choiceButton)
+  const seenWidgetIdsRef = useRef<Set<string>>(new Set());
+
   // Typewriter progress for dialogueBox in playtest (char count per widget)
   const [typewriterProgress, setTypewriterProgress] = useState<Record<string, number>>({});
   // Pause timestamps: widgetId -> Date.now() value when the pause ends (set when [pause] tag is encountered)
@@ -200,6 +204,19 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
   const isPlaytest = mode === 'playtest';
   const bgSettings = bgDef?.settings || { scale: 1, offsetX: 0, offsetY: 0, brightness: 1, opacity: 1, fitMode: 'cover', parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false } };
+
+  // Page fade-in: when page changes in playtest, fade all widget groups 0 → 1
+  useLayoutEffect(() => {
+    if (!isPlaytest) return;
+    seenWidgetIdsRef.current.clear(); // reset bounce seen-list so choiceButtons re-animate
+    const t = setTimeout(() => {
+      widgetNodeRefs.current.forEach((node) => {
+        node.opacity(0);
+        node.to({ opacity: 1, duration: 0.25, easing: Konva.Easings.EaseOut });
+      });
+    }, 16); // one frame so refs are populated after render
+    return () => clearTimeout(t);
+  }, [currentPage?.id, isPlaytest]);
 
   // Typewriter effect for dialogueBox text in playtest
   useEffect(() => {
@@ -864,13 +881,16 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   const clamped = Math.max(0, Math.min(100, val));
                   const partWidth = wW / parts;
                   const filledParts = Math.floor((clamped / 100) * parts);
+                  // Pulse when critical (<20%) in playtest — interval re-renders drive the animation
+                  const isCritical = isPlaytest && clamped < 20;
+                  const pulseOpacity = isCritical ? 0.45 + 0.55 * Math.abs(Math.sin(Date.now() / 280)) : 1;
 
                   return (
-                    <Group>
+                    <Group opacity={pulseOpacity}>
                       {Array.from({ length: parts }).map((_, i) => {
                         const isFilled = i < filledParts;
                         const colors = data.colors || ['#4b2e1e', '#8a5a3a', '#c27a4a'];
-                        const color = isFilled ? (colors[i % colors.length] || '#c27a4a') : '#2a221c';
+                        const fillColor = isFilled ? (colors[i % colors.length] || '#c27a4a') : '#2a221c';
                         return (
                           <Rect
                             key={i}
@@ -878,7 +898,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                             y={0}
                             width={partWidth - 1}
                             height={wH}
-                            fill={color}
+                            fill={fillColor}
                             stroke="#534B40"
                             strokeWidth={0.5}
                           />
@@ -980,8 +1000,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   width={wW}
                   height={wH}
                   ref={(node: any) => {
-                    if (node) widgetNodeRefs.current.set(widget.id, node);
-                    else widgetNodeRefs.current.delete(widget.id);
+                    if (node) {
+                      widgetNodeRefs.current.set(widget.id, node);
+                      // Bounce appear for choiceButton (once per page visit)
+                      if (isPlaytest && widget.type === 'choiceButton' && !seenWidgetIdsRef.current.has(widget.id)) {
+                        seenWidgetIdsRef.current.add(widget.id);
+                        node.scaleX(0.85); node.scaleY(0.85); node.opacity(0);
+                        node.to({ scaleX: 1, scaleY: 1, opacity: 1, duration: 0.22, easing: Konva.Easings.BackEaseOut });
+                      }
+                    } else {
+                      widgetNodeRefs.current.delete(widget.id);
+                    }
                   }}
                   draggable={!isPlaytestMode}
                   onMouseEnter={() => setHoveredWidgetId(widget.id)}
