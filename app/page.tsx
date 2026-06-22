@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker } from '@/lib/store';
+import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker, type StudioPage } from '@/lib/store';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
 import ActionEditor from '@/components/editor/ActionEditor';
@@ -112,6 +112,7 @@ export default function SlayStudio() {
     addSpeaker,
     updateSpeaker,
     deleteSpeaker,
+    duplicatePage,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -597,8 +598,15 @@ export default function SlayStudio() {
                       <div className="font-mono text-[10px] opacity-60 mt-0.5">{page.id}</div>
                     </button>
                     <button
+                      title="Дублировать страницу"
+                      onClick={(e) => { e.stopPropagation(); duplicatePage(page.id); }}
+                      className="ml-1 opacity-0 group-hover:opacity-50 hover:!opacity-100 p-1"
+                    >
+                      ⧉
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }}
-                      className="ml-2 opacity-0 group-hover:opacity-60 hover:opacity-100 p-1"
+                      className="ml-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 p-1"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -699,11 +707,6 @@ export default function SlayStudio() {
               <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
               </CanvasWithRulers>
-            )}
-
-            {/* Модальное окно инвентаря (поверх холста в Playtest) */}
-            {mode === 'playtest' && playtestState.isInventoryOpen && (
-              <InventoryModal onClose={() => {}} />
             )}
 
             {/* Item Creation Modal */}
@@ -2083,7 +2086,6 @@ export default function SlayStudio() {
                       );
                     })}
                   </div>
-                  <p className="mt-1 text-[9px] text-[var(--studio-text-muted)]">Ассеты для портретов, скинов кнопок. Позже: 9-slice, варианты hover.</p>
                 </>
               )}
             </div>
@@ -2172,8 +2174,9 @@ export default function SlayStudio() {
                   {/* === СТРАНИЦА tab: current page properties === */}
                   {rightTab === 'page' && (
                   <>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
             <PageSection
+              noCard
               currentPage={currentPage}
               renamePage={renamePage}
               updateCurrentPage={updateCurrentPage}
@@ -2326,12 +2329,6 @@ export default function SlayStudio() {
           </div>
           )}
                   </div>
-                  {/* hint — outside scroll area, inside page tab */}
-                  {(currentPage?.speaker && currentPage.speaker !== 'none') && (
-                    <div className="shrink-0 border-t border-[var(--studio-border)] p-3 text-center text-[10px] text-[var(--studio-text-muted)]">
-                      Перетаскивай кнопки прямо на холсте
-                    </div>
-                  )}
                   </>
                   )}
                 </>
@@ -2340,6 +2337,11 @@ export default function SlayStudio() {
           )}
         </div>
       </div>
+
+      {/* Inventory modal at root level so fixed positioning is never clipped */}
+      {mode === 'playtest' && playtestState.isInventoryOpen && (
+        <InventoryModal onClose={() => {}} />
+      )}
     </div>
   );
 }

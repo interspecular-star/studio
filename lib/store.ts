@@ -688,6 +688,7 @@ type StudioState = {
   setStartingInventoryQuantity: (itemId: string, quantity: number) => void;
 
   addPage: () => void;
+  duplicatePage: (id: string) => void;
   deletePage: (id: string) => void;
 };
 
@@ -2475,6 +2476,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       selectedButtonId: null,
       selectedWidgetId: null,
     }));
+    get().saveToLocalStorage();
+  },
+
+  duplicatePage: (id) => {
+    const state = get();
+    const src = state.pages.find((p) => p.id === id);
+    if (!src) return;
+    const ts = Date.now().toString(36);
+    const newId = `${id}_c${ts}`;
+    const cloned = JSON.parse(JSON.stringify(src)) as StudioPage;
+    cloned.id = newId;
+    cloned.title = { ru: src.title.ru + ' (копия)', en: src.title.en + ' (copy)' };
+    cloned.buttons = cloned.buttons.map((b, i) => ({ ...b, id: `btn_${ts}_${i}` }));
+    cloned.uiWidgets = (cloned.uiWidgets || []).map((w, i) => ({ ...w, id: `uiw_${ts}_${i}` }));
+    const srcIdx = state.pages.findIndex((p) => p.id === id);
+    const newPages = [...state.pages];
+    newPages.splice(srcIdx + 1, 0, cloned);
+    set({ pages: newPages, selectedPageId: newId, selectedButtonId: null, selectedWidgetId: null });
     get().saveToLocalStorage();
   },
 

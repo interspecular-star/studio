@@ -9,6 +9,14 @@ import { getSnappedButtonPosition } from '@/lib/snapping';
 import { evaluateCondition } from '@/lib/conditions';
 import { parseRichText, layoutRichText } from '@/lib/richText';
 
+// Trim an unclosed tag at the end of a typewriter-sliced string so markup never leaks as literal text
+function trimPartialTag(s: string): string {
+  const lastOpen = s.lastIndexOf('[');
+  if (lastOpen === -1) return s;
+  if (s.lastIndexOf(']') > lastOpen) return s;
+  return s.substring(0, lastOpen);
+}
+
 // No more built-in gradient themes (user removed all built-ins)
 
 
@@ -560,9 +568,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     boxStroke = isSelected ? '#E8D4A0' : '#8a7655';
                   }
 
-                  // Typewriter: slice raw text by raw-char progress (markup chars count toward progress)
+                  // Typewriter: slice raw text by raw-char progress; trim any dangling '[' so markup never renders as literal text
                   const partialRaw = (isPlaytest && typewriterProgress[widget.id] !== undefined)
-                    ? rawText.substring(0, typewriterProgress[widget.id])
+                    ? trimPartialTag(rawText.substring(0, typewriterProgress[widget.id]))
                     : rawText;
 
                   // Detect [shake] before parsing so we can apply it at box level
@@ -991,8 +999,8 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     }
                   }}
                 >
-                  {/* Optional highlight ring for hover/selected */}
-                  {(isSelected || isHovered) && (
+                  {/* Optional highlight ring for hover/selected — hidden in playtest */}
+                  {(isSelected || isHovered) && !isPlaytestMode && (
                     <Rect
                       x={-3}
                       y={-3}

@@ -27,6 +27,7 @@ interface PageSectionProps {
   coordinateClipboard: any;
   variables: any[];
   items: any[];
+  noCard?: boolean;
 }
 
 export default function PageSection({
@@ -49,6 +50,7 @@ export default function PageSection({
   coordinateClipboard,
   variables,
   items,
+  noCard = false,
 }: PageSectionProps) {
   const { backgrounds, selectedWidgetId: currentSelectedWidgetId, speakers } = useStudioStore();
   const [collapsed, setCollapsed] = useState(false);
@@ -56,16 +58,18 @@ export default function PageSection({
   if (!currentPage) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-      >
-        <span>СТРАНИЦА</span>
-        <span className="text-xs">{collapsed ? '▶' : '▼'}</span>
-      </button>
+    <div className={noCard ? undefined : 'rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3'}>
+      {!noCard && (
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
+        >
+          <span>СТРАНИЦА</span>
+          <span className="text-xs">{collapsed ? '▶' : '▼'}</span>
+        </button>
+      )}
 
-      {!collapsed && (
+      {(noCard || !collapsed) && (
         <div className="space-y-4">
           {/* Page Name + ID */}
           <div>
@@ -245,123 +249,24 @@ export default function PageSection({
             />
           </div>
 
-          {/* === ДИАЛОГ UI: ВИДЖЕТЫ ===
-              Перетаскивай на холсте. Выбери в списке — редактируй в инспекторе ниже. */}
+          {/* === ДИАЛОГ UI: ВИДЖЕТЫ === */}
           <div className="pt-1 border-t border-[var(--studio-border)] mt-2">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-[var(--studio-text-secondary)]">ДИАЛОГ UI — ВИДЖЕТЫ ({(currentPage?.uiWidgets || []).length})</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => {
-                    const { applyUILayoutPreset } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    applyUILayoutPreset(currentPage.id, 'classic_vn');
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  Классика
-                </button>
-                <button
-                  onClick={() => {
-                    const { applyUILayoutPreset } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    applyUILayoutPreset(currentPage.id, 'bottom_bar');
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  Нижняя панель
-                </button>
-                <button
-                  onClick={() => {
-                    const { applyUILayoutPreset } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    applyUILayoutPreset(currentPage.id, 'left_bar');
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  Левая панель
-                </button>
-                <button
-                  onClick={() => {
-                    const { applyUILayoutPreset } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    applyUILayoutPreset(currentPage.id, 'full_dialogue_demo');
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  Полный демо
-                </button>
-                <button
-                  onClick={() => {
-                    const { addUIWidget } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    addUIWidget(currentPage.id, {
-                      type: 'dialogueBox',
-                      layout: { x: 16, y: 78, width: 68, height: 12, z: 20 },
-                      style: 'default',
-                    });
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  + Текст
-                </button>
-                <button
-                  onClick={() => {
-                    const { addUIWidget } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    addUIWidget(currentPage.id, {
-                      type: 'textLabel',
-                      layout: { x: 42, y: 58, width: 16, height: 3, z: 15 },
-                      style: 'default',
-                      data: { speakerId: currentPage.speaker },
-                    });
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  + Имя
-                </button>
-                <button
-                  onClick={() => {
-                    const { addUIWidget } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    addUIWidget(currentPage.id, {
-                      type: 'intensityBar',
-                      layout: { x: 10, y: 5, width: 30, height: 4, z: 40 },
-                      data: { valueVar: 'souls', parts: 3 }
-                    });
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  + Накал
-                </button>
-                <button
-                  onClick={() => {
-                    const { addUIWidget } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    addUIWidget(currentPage.id, {
-                      type: 'quickAction',
-                      layout: { x: 5, y: 20 + Math.random()*10, width: 8, height: 8, z: 50 },
-                      data: { actionType: 'inventory' }
-                    });
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  + Быстр.дейст.
-                </button>
-                <button
-                  onClick={() => {
-                    const { addUIWidget } = useStudioStore.getState();
-                    if (!currentPage) return;
-                    addUIWidget(currentPage.id, {
-                      type: 'container',
-                      layout: { x: 1, y: 12, width: 12, height: 70, z: 1 },
-                    });
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]"
-                >
-                  + Контейнер
-                </button>
-              </div>
+              <label title="Перетаскивай виджеты на холсте. Выбери в списке — редактируй свойства ниже." className="text-xs font-medium text-[var(--studio-text-secondary)] cursor-help">
+                ВИДЖЕТЫ ({(currentPage?.uiWidgets || []).length})
+              </label>
+              <span className="text-[9px] text-[var(--studio-text-muted)]">пресеты ↓</span>
+            </div>
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              <button title="Классическая VN-раскладка" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'classic_vn'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Классика</button>
+              <button title="Нижняя панель диалога" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'bottom_bar'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Н.панель</button>
+              <button title="Левая панель" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'left_bar'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Лев.панель</button>
+              <button title="Полный демо всех виджетов" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'full_dialogue_demo'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Демо</button>
+              <button title="Добавить блок диалога" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Текст</button>
+              <button title="Добавить метку имени спикера" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: currentPage.speaker } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Имя</button>
+              <button title="Добавить бар накала" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'intensityBar', layout: { x: 10, y: 5, width: 30, height: 4, z: 40 }, data: { valueVar: 'souls', parts: 3 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Накал</button>
+              <button title="Добавить быстрое действие" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'quickAction', layout: { x: 5, y: 20, width: 8, height: 8, z: 50 }, data: { actionType: 'inventory' } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Действие</button>
+              <button title="Добавить контейнер" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'container', layout: { x: 1, y: 12, width: 12, height: 70, z: 1 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Контейнер</button>
             </div>
 
             {(currentPage?.uiWidgets || []).length === 0 && (
