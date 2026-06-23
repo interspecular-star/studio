@@ -162,6 +162,7 @@ export default function LeftSidebar() {
   };
 
   // ——— Drop line component ———
+  // h-4 (16px) hit area, 2px visual line — generous target, subtle look
   const DropLine = ({ actId, index }: { actId: string | null; index: number }) => {
     const isActive =
       dropTarget?.type === 'page-slot' &&
@@ -169,12 +170,14 @@ export default function LeftSidebar() {
       dropTarget.index === index;
     return (
       <div
-        className="h-1 mx-2 rounded transition-all"
-        style={{ background: isActive ? 'var(--studio-accent)' : 'transparent' }}
-        onDragOver={(e) => { e.preventDefault(); setDropTarget({ type: 'page-slot', actId, index }); }}
-        onDragLeave={() => setDropTarget(null)}
-        onDrop={(e) => onDropPageSlot(e, actId, index)}
-      />
+        className="relative h-4 flex items-center px-3 -my-0.5 z-10"
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropTarget({ type: 'page-slot', actId, index }); }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); }}
+        onDrop={(e) => { e.stopPropagation(); onDropPageSlot(e, actId, index); }}
+      >
+        <div className={`h-0.5 w-full rounded-full transition-all duration-75 ${isActive ? 'bg-[var(--studio-accent)] opacity-100' : 'opacity-0'}`} />
+        {isActive && <div className="absolute left-2 w-2 h-2 rounded-full bg-[var(--studio-accent)] top-1/2 -translate-y-1/2" />}
+      </div>
     );
   };
 
@@ -295,53 +298,55 @@ export default function LeftSidebar() {
     const hasPages = act.pageIds.length > 0;
     const visibleIds = searchLower ? matchingPageIds : act.pageIds;
 
+    // h-5 (20px) hit area for act reordering drop zone
+    const isActSlotActive = dropTarget?.type === 'act-slot' && dropTarget.index === actIdx;
+
     return (
       <>
-        {/* Act drop zone (for act reordering) */}
+        {/* Act drop zone (for act reordering) — generous hit area */}
         <div
-          className="h-1.5 mx-1 rounded transition-all"
-          style={{
-            background:
-              dropTarget?.type === 'act-slot' && dropTarget.index === actIdx
-                ? 'var(--studio-accent)' : 'transparent',
-          }}
+          className="relative h-5 flex items-center px-2"
           onDragOver={(e) => {
-            if (dragItemRef.current?.type === 'act') { e.preventDefault(); setDropTarget({ type: 'act-slot', index: actIdx }); }
+            if (dragItemRef.current?.type === 'act') { e.preventDefault(); e.stopPropagation(); setDropTarget({ type: 'act-slot', index: actIdx }); }
           }}
-          onDragLeave={() => setDropTarget(null)}
-          onDrop={(e) => onDropActSlot(e, actIdx)}
-        />
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); }}
+          onDrop={(e) => { e.stopPropagation(); onDropActSlot(e, actIdx); }}
+        >
+          <div className={`h-0.5 w-full rounded-full transition-all duration-75 ${isActSlotActive ? 'bg-[var(--studio-accent)] opacity-100' : 'opacity-0'}`} />
+          {isActSlotActive && <div className="absolute left-1 w-2 h-2 rounded-full bg-[var(--studio-accent)] top-1/2 -translate-y-1/2" />}
+        </div>
 
         <div className="mx-1 mb-1 rounded-lg overflow-hidden border border-[var(--studio-border)]">
           {/* Act header */}
           <div
-            className="flex items-center gap-1.5 px-2 py-2 bg-[var(--studio-bg-elevated)] cursor-default"
+            className="flex items-center gap-1.5 px-2 py-2 bg-[var(--studio-bg-elevated)] cursor-grab active:cursor-grabbing select-none"
             draggable={!isEditingTitle}
-            onDragStart={(e) => !isEditingTitle && onDragStartAct(e, act.id, actIdx)}
+            onDragStart={(e) => { if (!isEditingTitle) { e.stopPropagation(); onDragStartAct(e, act.id, actIdx); } }}
             onDragEnd={onDragEnd}
             onDragOver={(e) => {
-              if (dragItemRef.current?.type === 'page') { e.preventDefault(); setDropTarget({ type: 'page-slot', actId: act.id, index: act.pageIds.length }); }
+              if (dragItemRef.current?.type === 'page') { e.preventDefault(); e.stopPropagation(); setDropTarget({ type: 'page-slot', actId: act.id, index: act.pageIds.length }); }
             }}
-            onDragLeave={() => setDropTarget(null)}
-            onDrop={(e) => onDropPageSlot(e, act.id, act.pageIds.length)}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); }}
+            onDrop={(e) => { if (dragItemRef.current?.type === 'page') { e.stopPropagation(); onDropPageSlot(e, act.id, act.pageIds.length); } }}
           >
             {/* Color dot */}
             <div
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-[var(--studio-border)]"
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-[var(--studio-border)] cursor-default"
               style={{ background: act.color || 'var(--studio-text-muted)' }}
             />
 
-            {/* Collapse toggle */}
+            {/* Collapse toggle — ONLY this toggles collapse */}
             {!searchLower && (
               <button
-                onClick={() => toggleActCollapsed(act.id)}
-                className="p-0.5 text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)]"
+                onClick={(e) => { e.stopPropagation(); toggleActCollapsed(act.id); }}
+                className="p-0.5 text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] flex-shrink-0"
+                title={act.collapsed ? 'Развернуть' : 'Свернуть'}
               >
                 {act.collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
             )}
 
-            {/* Title */}
+            {/* Title — double-click opens rename, single-click only expands if collapsed */}
             {isEditingTitle ? (
               <input
                 autoFocus
@@ -349,17 +354,18 @@ export default function LeftSidebar() {
                 onChange={(e) => setActTitleDraft(e.target.value)}
                 onBlur={commitEditAct}
                 onKeyDown={(e) => { if (e.key === 'Enter') commitEditAct(); if (e.key === 'Escape') setEditingActId(null); }}
-                className="flex-1 rounded border border-[var(--studio-accent)] bg-[var(--studio-bg-base)] px-1.5 py-0.5 text-xs text-[var(--studio-text-primary)] outline-none"
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 rounded border border-[var(--studio-accent)] bg-[var(--studio-bg-base)] px-1.5 py-0.5 text-xs text-[var(--studio-text-primary)] outline-none cursor-text"
               />
             ) : (
-              <button
-                onDoubleClick={() => startEditAct(act)}
-                onClick={() => toggleActCollapsed(act.id)}
-                className="flex-1 text-left text-xs font-medium text-[var(--studio-text-primary)] truncate"
+              <span
+                onDoubleClick={(e) => { e.stopPropagation(); startEditAct(act); }}
+                onClick={(e) => { e.stopPropagation(); if (act.collapsed) toggleActCollapsed(act.id); }}
+                className="flex-1 text-left text-xs font-medium text-[var(--studio-text-primary)] truncate cursor-pointer"
                 title="Двойной клик — переименовать"
               >
                 {act.title}
-              </button>
+              </span>
             )}
 
             {/* Page count badge */}
@@ -535,28 +541,29 @@ export default function LeftSidebar() {
       </div>
 
       {/* Content */}
-      <div
-        className="flex-1 overflow-y-auto py-2"
-        onDragOver={(e) => {
-          if (dragItemRef.current?.type === 'act') { e.preventDefault(); setDropTarget({ type: 'act-slot', index: acts.length }); }
-        }}
-        onDragLeave={() => setDropTarget(null)}
-        onDrop={(e) => onDropActSlot(e, acts.length)}
-      >
+      <div className="flex-1 overflow-y-auto py-1">
         {/* Acts */}
         {acts.map((act, actIdx) => (
           <ActSection key={act.id} act={act} actIdx={actIdx} />
         ))}
 
-        {/* Final act drop zone */}
-        <div
-          className="h-1.5 mx-1 rounded transition-all"
-          style={{
-            background:
-              dropTarget?.type === 'act-slot' && dropTarget.index === acts.length
-                ? 'var(--studio-accent)' : 'transparent',
-          }}
-        />
+        {/* Final act drop zone — after last act */}
+        {acts.length > 0 && (() => {
+          const isActive = dropTarget?.type === 'act-slot' && dropTarget.index === acts.length;
+          return (
+            <div
+              className="relative h-5 flex items-center px-2"
+              onDragOver={(e) => {
+                if (dragItemRef.current?.type === 'act') { e.preventDefault(); e.stopPropagation(); setDropTarget({ type: 'act-slot', index: acts.length }); }
+              }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); }}
+              onDrop={(e) => { e.stopPropagation(); onDropActSlot(e, acts.length); }}
+            >
+              <div className={`h-0.5 w-full rounded-full transition-all duration-75 ${isActive ? 'bg-[var(--studio-accent)] opacity-100' : 'opacity-0'}`} />
+              {isActive && <div className="absolute left-1 w-2 h-2 rounded-full bg-[var(--studio-accent)] top-1/2 -translate-y-1/2" />}
+            </div>
+          );
+        })()}
 
         {/* Unassigned section */}
         {(unassignedPageIds.length > 0 || acts.length === 0) && (
