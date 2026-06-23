@@ -66,6 +66,14 @@ export type DialogueLine = {
   portraitVariant?: string;  // вариант портрета (если отличается от дефолтного)
 };
 
+export type StudioAct = {
+  id: string;
+  title: string;
+  color?: string;       // hex цветовая метка (опционально)
+  collapsed: boolean;
+  pageIds: string[];    // упорядоченный список id страниц в акте
+};
+
 export type ItemType = 
   | 'weapon' 
   | 'armor' 
@@ -768,9 +776,23 @@ type StudioState = {
   removeFromStartingInventory: (itemId: string) => void;
   setStartingInventoryQuantity: (itemId: string, quantity: number) => void;
 
-  addPage: () => void;
+  addPage: (actId?: string | null) => void;
   duplicatePage: (id: string) => void;
   deletePage: (id: string) => void;
+
+  // === Acts / Scenes system ===
+  acts: StudioAct[];
+  unassignedPageIds: string[];  // страницы не входящие ни в один акт
+  leftSidebarLocked: boolean;   // замок: не авто-сворачивать при смене режима
+
+  addAct: (title?: string) => string;
+  updateAct: (id: string, updates: Partial<Pick<StudioAct, 'title' | 'color' | 'collapsed'>>) => void;
+  deleteAct: (id: string, mode: 'unassign' | 'delete-pages') => void;
+  duplicateAct: (id: string) => void;
+  reorderActs: (fromIdx: number, toIdx: number) => void;
+  movePageToAct: (pageId: string, targetActId: string | null, targetIndex: number) => void;
+  toggleActCollapsed: (id: string) => void;
+  toggleLeftSidebarLocked: () => void;
 };
 
 const createDefaultPage = (id: string): StudioPage => ({
@@ -880,9 +902,11 @@ const createDefaultSpeakers = (): Speaker[] => [
   { id: 'burmil',   displayName: { ru: 'Бурмил',     en: 'Burmil'   } },
 ];
 
+const _initialPages = createDefaultPages();
+
 export const useStudioStore = create<StudioState>((set, get) => ({
   meta: createInitialMeta(),
-  pages: createDefaultPages(),
+  pages: _initialPages,
   selectedPageId: 'intro_01',
   selectedButtonId: null,
   selectedWidgetId: null,
@@ -933,6 +957,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Sidebar states (auto-collapsed in Playtest by default)
   leftSidebarCollapsed: false,
   rightSidebarCollapsed: false,
+  leftSidebarLocked: false,
+
+  // Acts system
+  acts: [],
+  unassignedPageIds: _initialPages.map((p) => p.id),
 
   // Player stats panel starts collapsed by default
   playerStatsCollapsed: true,
@@ -2041,20 +2070,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       get().resetPlaytestState();
     }
 
+    const locked = get().leftSidebarLocked;
     set({
       mode: 'playtest',
-      // Automatically collapse sidebars when entering Playtest (user can still expand manually)
-      leftSidebarCollapsed: true,
-      rightSidebarCollapsed: true,
+      // Collapse sidebars unless locked by user
+      ...(locked ? {} : { leftSidebarCollapsed: true, rightSidebarCollapsed: true }),
     });
   },
 
   exitPlaytest: () => {
+    const locked = get().leftSidebarLocked;
     set({
       mode: 'editor',
-      // Expand sidebars when returning to editor for better editing experience
-      leftSidebarCollapsed: false,
-      rightSidebarCollapsed: false,
+      // Expand sidebars unless locked by user
+      ...(locked ? {} : { leftSidebarCollapsed: false, rightSidebarCollapsed: false }),
     });
   },
 
@@ -2072,6 +2101,115 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   toggleItemsCollapsed: () => set((state) => ({ itemsCollapsed: !state.itemsCollapsed })),
 
   toggleBackgroundsCollapsed: () => set((state) => ({ backgroundsCollapsed: !state.backgroundsCollapsed })),
+
+  // === Acts system ===
+  addAct: (title) => {
+    const id = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+    const newAct: StudioAct = { id, title: title || 'Новый акт', collapsed: false, pageIds: [] };
+    set((state) => ({ acts: [...state.acts, newAct] }));
+    get().saveToLocalStorage();
+    return id;
+  },
+
+  updateAct: (id, updates) => {
+    set((state) => ({ acts: state.acts.map((a) => (a.id === id ? { ...a, ...updates } : a)) }));
+    get().saveToLocalStorage();
+  },
+
+  deleteAct: (id, mode) => {
+    const state = get();
+    const act = state.acts.find((a) => a.id === id);
+    if (!act) return;
+    if (mode === 'delete-pages') {
+      const toDelete = new Set(act.pageIds);
+      const newPages = state.pages.filter((p) => !toDelete.has(p.id));
+      const newUnassigned = state.unassignedPageIds.filter((pid) => !toDelete.has(pid));
+      const newSelected = toDelete.has(state.selectedPageId ?? '')
+        ? (newPages[0]?.id ?? null) : state.selectedPageId;
+      set({ pages: newPages, unassignedPageIds: newUnassigned, acts: state.acts.filter((a) => a.id !== id), selectedPageId: newSelected });
+    } else {
+      // unassign: move pages to unassigned
+      set((s) => ({
+        acts: s.acts.filter((a) => a.id !== id),
+        unassignedPageIds: [...s.unassignedPageIds, ...act.pageIds],
+      }));
+    }
+    get().saveToLocalStorage();
+  },
+
+  duplicateAct: (id) => {
+    const state = get();
+    const src = state.acts.find((a) => a.id === id);
+    if (!src) return;
+    const ts = Date.now().toString(36);
+    const newActId = `act_${ts}_dup`;
+    const pageIdMap: Record<string, string> = {};
+    const newPages: StudioPage[] = src.pageIds.map((pid, i) => {
+      const srcPage = state.pages.find((p) => p.id === pid);
+      if (!srcPage) return null as any;
+      const newPid = `${pid}_c${ts}_${i}`;
+      pageIdMap[pid] = newPid;
+      const cloned = JSON.parse(JSON.stringify(srcPage)) as StudioPage;
+      cloned.id = newPid;
+      cloned.title = { ru: srcPage.title.ru + ' (копия)', en: srcPage.title.en + ' (copy)' };
+      cloned.buttons = cloned.buttons.map((b, bi) => ({ ...b, id: `btn_${ts}_${i}_${bi}` }));
+      cloned.uiWidgets = (cloned.uiWidgets || []).map((w, wi) => ({ ...w, id: `uiw_${ts}_${i}_${wi}` }));
+      return cloned;
+    }).filter(Boolean);
+    const newAct: StudioAct = {
+      id: newActId,
+      title: src.title + ' (копия)',
+      color: src.color,
+      collapsed: false,
+      pageIds: src.pageIds.map((pid) => pageIdMap[pid]).filter(Boolean),
+    };
+    const srcActIdx = state.acts.findIndex((a) => a.id === id);
+    const newActs = [...state.acts];
+    newActs.splice(srcActIdx + 1, 0, newAct);
+    set((s) => ({ pages: [...s.pages, ...newPages], acts: newActs }));
+    get().saveToLocalStorage();
+  },
+
+  reorderActs: (fromIdx, toIdx) => {
+    set((state) => {
+      const newActs = [...state.acts];
+      const [moved] = newActs.splice(fromIdx, 1);
+      newActs.splice(toIdx, 0, moved);
+      return { acts: newActs };
+    });
+    get().saveToLocalStorage();
+  },
+
+  movePageToAct: (pageId, targetActId, targetIndex) => {
+    set((state) => {
+      // Remove from current location
+      const newActs = state.acts.map((a) => ({ ...a, pageIds: a.pageIds.filter((pid) => pid !== pageId) }));
+      const newUnassigned = state.unassignedPageIds.filter((pid) => pid !== pageId);
+      // Insert at target
+      if (targetActId) {
+        return {
+          acts: newActs.map((a) => {
+            if (a.id !== targetActId) return a;
+            const ids = [...a.pageIds];
+            ids.splice(Math.min(targetIndex, ids.length), 0, pageId);
+            return { ...a, pageIds: ids };
+          }),
+          unassignedPageIds: newUnassigned,
+        };
+      } else {
+        const ids = [...newUnassigned];
+        ids.splice(Math.min(targetIndex, ids.length), 0, pageId);
+        return { acts: newActs, unassignedPageIds: ids };
+      }
+    });
+    get().saveToLocalStorage();
+  },
+
+  toggleActCollapsed: (id) => {
+    set((state) => ({ acts: state.acts.map((a) => (a.id === id ? { ...a, collapsed: !a.collapsed } : a)) }));
+  },
+
+  toggleLeftSidebarLocked: () => set((state) => ({ leftSidebarLocked: !state.leftSidebarLocked })),
 
   toggleItemCollapsed: (itemId) => set((state) => {
     // Теперь collapsedItemIds = список РАЗВЁРНУТЫХ предметов.
@@ -2396,6 +2534,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       meta: { ...state.meta, lastSaved: new Date().toISOString() },
       pages: state.pages,
       selectedPageId: state.selectedPageId,
+      acts: state.acts,
+      unassignedPageIds: state.unassignedPageIds,
       items: state.items,
       variables: state.variables,
       backgrounds: state.backgrounds,
@@ -2445,6 +2585,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return pg;
       });
 
+      // Migration: if acts not present, put all pages in unassigned
+      const loadedActs: StudioAct[] = parsed.acts || [];
+      const loadedUnassigned: string[] = parsed.unassignedPageIds
+        || (parsed.acts ? [] : migratedPages.map((p: any) => p.id));
+
       set({
         meta: parsed.meta || createInitialMeta(),
         pages: migratedPages,
@@ -2452,6 +2597,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         selectedButtonId: null,
         selectedWidgetId: null,
         coordinateClipboard: null,
+        acts: loadedActs,
+        unassignedPageIds: loadedUnassigned,
         // Backward compatible: default to empty guides
         guides: parsed.guides || { horizontal: [], vertical: [] },
         snappingGuide: null,
@@ -2463,7 +2610,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         speakers: parsed.speakers || createDefaultSpeakers(),
         dialogueTheme: parsed.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: parsed.startingInventory || {},
-        // Canvas resolution (default to 16:9 1280x720 for new/legacy projects)
         canvasWidth: parsed.canvasWidth || 1280,
         canvasHeight: parsed.canvasHeight || 720,
       });
@@ -2483,6 +2629,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         exportedAt: new Date().toISOString(),
       },
       pages: state.pages,
+      acts: state.acts,
+      unassignedPageIds: state.unassignedPageIds,
       guides: state.guides,
       items: state.items,
       variables: state.variables,
@@ -2539,6 +2687,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         return pg;
       });
 
+      // Migration: if acts not present, put all pages in unassigned
+      const importedActs: StudioAct[] = data.acts || [];
+      const importedUnassigned: string[] = data.unassignedPageIds
+        || (data.acts ? [] : migratedPages.map((p: any) => p.id));
+
       set({
         meta: data.meta || { ...createInitialMeta(), name: 'Импортированный проект' },
         pages: migratedPages,
@@ -2546,6 +2699,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         selectedButtonId: null,
         selectedWidgetId: null,
         coordinateClipboard: null,
+        acts: importedActs,
+        unassignedPageIds: importedUnassigned,
         // Support guides in imported files
         guides: data.guides || { horizontal: [], vertical: [] },
         snappingGuide: null,
@@ -2577,13 +2732,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   createNewProject: () => {
+    const defaultPages = createDefaultPages();
     set({
       meta: { ...createInitialMeta(), name: 'Новый проект' },
-      pages: createDefaultPages(),
+      pages: defaultPages,
       selectedPageId: 'intro_01',
       selectedButtonId: null,
       selectedWidgetId: null,
       coordinateClipboard: null,
+      acts: [],
+      unassignedPageIds: defaultPages.map((p) => p.id),
       guides: { horizontal: [], vertical: [] },
       snappingGuide: null,
       snapEnabled: true,
@@ -2708,14 +2866,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
 
-  addPage: () => {
+  addPage: (actId) => {
     const newPage = createDefaultPage(`page_${Date.now().toString(36)}`);
-    set((state) => ({
-      pages: [...state.pages, newPage],
-      selectedPageId: newPage.id,
-      selectedButtonId: null,
-      selectedWidgetId: null,
-    }));
+    set((state) => {
+      const newPages = [...state.pages, newPage];
+      if (actId) {
+        // Insert into specified act
+        const newActs = state.acts.map((a) =>
+          a.id === actId ? { ...a, pageIds: [...a.pageIds, newPage.id] } : a
+        );
+        return { pages: newPages, acts: newActs, selectedPageId: newPage.id, selectedButtonId: null, selectedWidgetId: null };
+      } else {
+        return { pages: newPages, unassignedPageIds: [...state.unassignedPageIds, newPage.id], selectedPageId: newPage.id, selectedButtonId: null, selectedWidgetId: null };
+      }
+    });
     get().saveToLocalStorage();
   },
 
@@ -2733,7 +2897,23 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const srcIdx = state.pages.findIndex((p) => p.id === id);
     const newPages = [...state.pages];
     newPages.splice(srcIdx + 1, 0, cloned);
-    set({ pages: newPages, selectedPageId: newId, selectedButtonId: null, selectedWidgetId: null });
+    // Insert clone after original in the same act or unassigned
+    const ownerAct = state.acts.find((a) => a.pageIds.includes(id));
+    if (ownerAct) {
+      const posInAct = ownerAct.pageIds.indexOf(id);
+      const newActs = state.acts.map((a) => {
+        if (a.id !== ownerAct.id) return a;
+        const newIds = [...a.pageIds];
+        newIds.splice(posInAct + 1, 0, newId);
+        return { ...a, pageIds: newIds };
+      });
+      set({ pages: newPages, acts: newActs, selectedPageId: newId, selectedButtonId: null, selectedWidgetId: null });
+    } else {
+      const posInUnassigned = state.unassignedPageIds.indexOf(id);
+      const newUnassigned = [...state.unassignedPageIds];
+      newUnassigned.splice(posInUnassigned + 1, 0, newId);
+      set({ pages: newPages, unassignedPageIds: newUnassigned, selectedPageId: newId, selectedButtonId: null, selectedWidgetId: null });
+    }
     get().saveToLocalStorage();
   },
 
@@ -2741,8 +2921,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set((state) => {
       const filtered = state.pages.filter((p) => p.id !== id);
       const newSelected = state.selectedPageId === id ? (filtered[0]?.id ?? null) : state.selectedPageId;
+      // Remove from acts and unassigned
+      const newActs = state.acts.map((a) => ({ ...a, pageIds: a.pageIds.filter((pid) => pid !== id) }));
+      const newUnassigned = state.unassignedPageIds.filter((pid) => pid !== id);
       const result = {
         pages: filtered,
+        acts: newActs,
+        unassignedPageIds: newUnassigned,
         selectedPageId: newSelected,
         selectedButtonId: null,
         selectedWidgetId: null,
