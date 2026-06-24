@@ -1,11 +1,109 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2, History, RotateCcw } from 'lucide-react';
 import { useStudioStore } from '@/lib/store';
 import ActionEditor from './ActionEditor';
 import ConditionEditor from './ConditionEditor';
 import type { UIWidget } from '@/lib/store';
+
+// ── Per-slot editor for choiceButton group ─────────────────────────────────────
+function SlotEditor({
+  index, item, variables, items, widgets,
+  onTextChange, onActionsChange, onConditionChange, onRemove,
+}: {
+  index: number;
+  item: any;
+  variables: any[];
+  items: any[];
+  widgets: any[];
+  onTextChange: (ru: string) => void;
+  onActionsChange: (acts: any[]) => void;
+  onConditionChange: (cond: any) => void;
+  onRemove?: () => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const acts: any[] = item.actions || [];
+
+  return (
+    <div className="rounded border border-[var(--studio-border)] bg-[#161310]">
+      <div
+        className="flex items-center justify-between px-2 py-1 cursor-pointer hover:bg-[var(--studio-bg-panel)]"
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono text-[var(--studio-accent)]">{index + 1}</span>
+          <span className="text-[10px] text-[var(--studio-text-secondary)] truncate max-w-[120px]">
+            {item.text?.ru || `Выбор ${index + 1}`}
+          </span>
+          {acts.length > 0 && <span className="text-[9px] rounded bg-[var(--studio-accent)] px-1 text-[#1C1814]">{acts.length}</span>}
+          {item.visibleWhen && <span className="text-[9px] text-[var(--studio-text-muted)]">◈</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {onRemove && (
+            <button
+              onClick={e => { e.stopPropagation(); onRemove(); }}
+              className="text-[10px] text-[var(--studio-danger,#ef4444)] hover:underline px-1"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-[10px] text-[var(--studio-text-muted)]">{collapsed ? '▸' : '▾'}</span>
+        </div>
+      </div>
+      {!collapsed && (
+        <div className="px-2 pb-2 space-y-2 border-t border-[var(--studio-border)]">
+          <div className="pt-1.5">
+            <label className="text-[10px] text-[var(--studio-text-secondary)] block mb-0.5">Текст</label>
+            <input
+              value={item.text?.ru || ''}
+              onChange={e => onTextChange(e.target.value)}
+              className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)] rounded"
+              placeholder={`Выбор ${index + 1}`}
+            />
+          </div>
+          <ConditionEditor
+            label="Видим когда"
+            condition={item.visibleWhen}
+            onChange={onConditionChange}
+            variables={variables}
+            items={items}
+          />
+          <div>
+            <label className="text-[10px] text-[var(--studio-text-secondary)] block mb-1">ДЕЙСТВИЯ</label>
+            <div className="space-y-1.5">
+              {acts.map((act: any, ai: number) => (
+                <div key={ai} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-1.5 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-[var(--studio-text-muted)]">#{ai + 1}</span>
+                    <button
+                      onClick={() => { const next = [...acts]; next.splice(ai, 1); onActionsChange(next); }}
+                      className="text-[9px] text-[var(--studio-danger,#ef4444)] hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <ActionEditor
+                    action={act}
+                    onChange={(a: any) => { const next = [...acts]; next[ai] = a; onActionsChange(next); }}
+                    variables={variables}
+                    items={items}
+                    widgets={widgets}
+                  />
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => onActionsChange([...acts, { type: 'goToPage', pageId: '' }])}
+              className="w-full mt-1 text-[10px] px-2 py-1 bg-[var(--studio-bg-base)] border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+            >
+              + Действие
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface PageSectionProps {
   currentPage: any;
@@ -54,6 +152,10 @@ export default function PageSection({
 }: PageSectionProps) {
   const { backgrounds, selectedWidgetId: currentSelectedWidgetId, speakers } = useStudioStore();
   const [collapsed, setCollapsed] = useState(false);
+  const [onEnterCollapsed, setOnEnterCollapsed] = useState(false);
+  const [onDialogueEndCollapsed, setOnDialogueEndCollapsed] = useState(false);
+  const editorDialoguePreviewLine = useStudioStore(s => s.editorDialoguePreviewLine);
+  const setEditorDialoguePreview = useStudioStore(s => s.setEditorDialoguePreview);
 
   if (!currentPage) return null;
 
@@ -249,25 +351,150 @@ export default function PageSection({
             />
           </div>
 
+          {/* === ПРИ ВХОДЕ: автоматические действия === */}
+          {(() => {
+            const onEnterActions: any[] = currentPage?.onEnter || [];
+            const addAction = () => {
+              const firstCustomVar = variables.find((v: any) => v.category === 'custom') || variables[0];
+              updateCurrentPage({ onEnter: [...onEnterActions, { type: 'setVariable', variableId: firstCustomVar?.id || '', value: true }] });
+            };
+            const updateAction = (index: number, action: any) => {
+              const next = [...onEnterActions];
+              next[index] = action;
+              updateCurrentPage({ onEnter: next });
+            };
+            const removeAction = (index: number) => {
+              updateCurrentPage({ onEnter: onEnterActions.filter((_, i) => i !== index) });
+            };
+
+            return (
+              <div className="border-t border-[var(--studio-border)] pt-3">
+                <button
+                  onClick={() => setOnEnterCollapsed(!onEnterCollapsed)}
+                  className="flex w-full items-center justify-between text-xs font-medium text-[var(--studio-text-secondary)] mb-2"
+                >
+                  <span className="flex items-center gap-1.5">
+                    ПРИ ВХОДЕ
+                    {onEnterActions.length > 0 && (
+                      <span className="rounded-full bg-[var(--studio-accent)] text-[#1C1814] text-[9px] font-bold px-1.5 py-0.5 leading-none">
+                        {onEnterActions.length}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] opacity-50">{onEnterCollapsed ? '▶' : '▼'}</span>
+                </button>
+
+                {!onEnterCollapsed && (
+                  <div className="space-y-2">
+                    {onEnterActions.length === 0 && (
+                      <p className="text-[10px] text-[var(--studio-text-muted)] italic">
+                        Действия выполняются автоматически когда игрок попадает на эту страницу
+                      </p>
+                    )}
+
+                    {onEnterActions.map((action: any, i: number) => (
+                      <div key={i} className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-base)] p-2 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-[var(--studio-text-muted)] font-mono">#{i + 1}</span>
+                          <button
+                            onClick={() => removeAction(i)}
+                            className="text-[10px] text-[var(--studio-danger,#ef4444)] hover:underline"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                        <ActionEditor
+                          action={action}
+                          onChange={(a: any) => updateAction(i, a)}
+                          variables={variables}
+                          items={items}
+                          widgets={currentPage?.uiWidgets || []}
+                        />
+                      </div>
+                    ))}
+
+                    <button
+                      onClick={addAction}
+                      className="w-full text-xs px-2 py-1.5 border border-dashed border-[var(--studio-border)] rounded-lg hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+                    >
+                      + Добавить действие
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* === ПО ОКОНЧАНИИ ДИАЛОГА === */}
+          {(currentPage?.dialogueLines?.length > 0) && (() => {
+            const onEndActions: any[] = currentPage?.onDialogueEnd || [];
+            const addAction = () => {
+              updateCurrentPage({ onDialogueEnd: [...onEndActions, { type: 'showItemReward', items: [] }] });
+            };
+            const updateAction = (index: number, action: any) => {
+              const next = [...onEndActions]; next[index] = action;
+              updateCurrentPage({ onDialogueEnd: next });
+            };
+            const removeAction = (index: number) => {
+              updateCurrentPage({ onDialogueEnd: onEndActions.filter((_, i) => i !== index) });
+            };
+            return (
+              <div className="border-t border-[var(--studio-border)] pt-3">
+                <button
+                  onClick={() => setOnDialogueEndCollapsed(!onDialogueEndCollapsed)}
+                  className="flex w-full items-center justify-between text-xs font-medium text-[var(--studio-text-secondary)] mb-2"
+                >
+                  <span className="flex items-center gap-1.5">
+                    КОНЕЦ ДИАЛОГА
+                    {onEndActions.length > 0 && (
+                      <span className="rounded-full bg-[var(--studio-accent)] text-[#1C1814] text-[9px] font-bold px-1.5 py-0.5 leading-none">
+                        {onEndActions.length}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] opacity-50">{onDialogueEndCollapsed ? '▶' : '▼'}</span>
+                </button>
+                {!onDialogueEndCollapsed && (
+                  <div className="space-y-2">
+                    {onEndActions.length === 0 && (
+                      <p className="text-[10px] text-[var(--studio-text-muted)] italic">
+                        Срабатывает когда игрок кликает после последней реплики
+                      </p>
+                    )}
+                    {onEndActions.map((action: any, i: number) => (
+                      <div key={i} className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-base)] p-2 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-[var(--studio-text-muted)] font-mono">#{i + 1}</span>
+                          <button onClick={() => removeAction(i)} className="text-[10px] text-[var(--studio-danger,#ef4444)] hover:underline">Удалить</button>
+                        </div>
+                        <ActionEditor action={action} onChange={(a: any) => updateAction(i, a)} variables={variables} items={items} widgets={currentPage?.uiWidgets || []} />
+                      </div>
+                    ))}
+                    <button
+                      onClick={addAction}
+                      className="w-full text-xs px-2 py-1.5 border border-dashed border-[var(--studio-border)] rounded-lg hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+                    >
+                      + Добавить действие
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* === ДИАЛОГ UI: ВИДЖЕТЫ === */}
           <div className="pt-1 border-t border-[var(--studio-border)] mt-2">
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <label title="Перетаскивай виджеты на холсте. Выбери в списке — редактируй свойства ниже." className="text-xs font-medium text-[var(--studio-text-secondary)] cursor-help">
                 ВИДЖЕТЫ ({(currentPage?.uiWidgets || []).length})
               </label>
-              <span className="text-[9px] text-[var(--studio-text-muted)]">пресеты ↓</span>
-            </div>
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              <button title="Классическая VN-раскладка" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'classic_vn'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Классика</button>
-              <button title="Нижняя панель диалога" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'bottom_bar'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Н.панель</button>
-              <button title="Левая панель" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'left_bar'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Лев.панель</button>
-              <button title="Полный демо всех виджетов" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.applyUILayoutPreset(currentPage.id, 'full_dialogue_demo'); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">Демо</button>
-              <button title="Добавить блок диалога" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Текст</button>
-              <button title="Добавить метку имени спикера" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: currentPage.speaker } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Имя</button>
-              <button title="Добавить бар накала" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'intensityBar', layout: { x: 10, y: 5, width: 30, height: 4, z: 40 }, data: { valueVar: 'souls', parts: 3 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Накал</button>
-              <button title="Добавить быстрое действие" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'quickAction', layout: { x: 5, y: 20, width: 8, height: 8, z: 50 }, data: { actionType: 'inventory' } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Действие</button>
-              <button title="Добавить контейнер" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'container', layout: { x: 1, y: 12, width: 12, height: 70, z: 1 } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Контейнер</button>
-              <button title="Добавить речевой пузырь" onClick={() => { const s = useStudioStore.getState(); if (currentPage) s.addUIWidget(currentPage.id, { type: 'speechBubble', layout: { x: 25, y: 40, width: 40, height: 18, z: 25 }, data: { tailDirection: 'bottom' } }); }} className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]">+ Пузырь</button>
+              <button
+                title="Открыть библиотеку виджетов и пресетов (W)"
+                onClick={() => useStudioStore.getState().openWidgetLibrary()}
+                className="flex items-center gap-1 rounded-md bg-[var(--studio-accent)] px-2 py-0.5 text-[10px] font-semibold text-[#1C1814] hover:brightness-110 transition-all"
+              >
+                + Библиотека
+              </button>
             </div>
 
             {(currentPage?.uiWidgets || []).length === 0 && (
@@ -421,8 +648,8 @@ export default function PageSection({
                     </select>
                   </div>
 
-                  {/* General text for applicable widgets */}
-                  {(w.type === 'textLabel' || w.type === 'choiceButton') && (
+                  {/* General text for applicable widgets (legacy single choiceButton or textLabel) */}
+                  {(w.type === 'textLabel' || (w.type === 'choiceButton' && !w.data?.items)) && (
                     <div>
                       <label className="text-[10px] text-[var(--studio-text-secondary)]">Текст (РУ)</label>
                       <input value={w.text?.ru || ''} onChange={e => updateW({ text: { ...(w.text||{ru:'',en:''}), ru: e.target.value } })} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
@@ -444,15 +671,131 @@ export default function PageSection({
                       <div className="text-[9px] text-[var(--studio-text-muted)] mt-0.5">Или введи свой</div>
                     </div>
                   )}
-                  {w.type === 'choiceButton' && (
-                    <div>
-                      <label className="text-[10px]">Linked button ID</label>
-                      <input value={w.data?.linkedButtonId || ''} onChange={e=>updateW({data:{...(w.data||{}), linkedButtonId:e.target.value}})} className="w-full text-xs px-2 py-1 bg-[#1C1814] border border-[var(--studio-border)]" />
-                      <label className="text-[10px] mt-1 block flex items-center">
-                        <input type="checkbox" checked={!!w.data?.imageOnly} onChange={e=>updateW({data:{...(w.data||{}), imageOnly: e.target.checked}})} className="mr-1" /> Image only (no text)
-                      </label>
-                    </div>
-                  )}
+                  {w.type === 'choiceButton' && (() => {
+                    const items: any[] = w.data?.items || [];
+                    const isNewFormat = !!w.data?.items;
+
+                    const updateItems = (next: any[]) =>
+                      updateW({ data: { ...(w.data || {}), items: next, count: next.length } });
+
+                    const addSlot = () => {
+                      const n = items.length + 1;
+                      const newItem = { id: `ci_${Date.now()}`, text: { ru: `Выбор ${n}`, en: `Choice ${n}` }, actions: [] };
+                      updateItems([...items, newItem]);
+                    };
+
+                    const removeSlot = (i: number) => {
+                      const next = [...items]; next.splice(i, 1); updateItems(next);
+                    };
+
+                    const updateSlotText = (i: number, ru: string) => {
+                      const next = [...items];
+                      next[i] = { ...next[i], text: { ...(next[i].text || {}), ru } };
+                      updateItems(next);
+                    };
+
+                    const updateSlotActions = (i: number, acts: any[]) => {
+                      const next = [...items];
+                      next[i] = { ...next[i], actions: acts };
+                      updateItems(next);
+                    };
+
+                    const updateSlotCondition = (i: number, cond: any) => {
+                      const next = [...items];
+                      next[i] = { ...next[i], visibleWhen: cond };
+                      updateItems(next);
+                    };
+
+                    if (!isNewFormat) {
+                      // Legacy widget — show migration prompt
+                      return (
+                        <div className="space-y-2">
+                          <div className="rounded border border-amber-600/40 bg-amber-600/10 p-2 text-[10px] text-amber-400">
+                            Старый формат (1 кнопка). Для авто-центрирования группы обнови до нового.
+                          </div>
+                          <button
+                            onClick={() => {
+                              const existingActions = w.actions ?? (w.action ? [w.action] : []);
+                              updateW({
+                                data: {
+                                  ...(w.data || {}),
+                                  items: [{ id: `ci_${Date.now()}`, text: { ru: w.text?.ru || 'Выбор 1', en: w.text?.en || 'Choice 1' }, actions: existingActions, visibleWhen: w.visibleWhen }],
+                                  count: 1,
+                                },
+                                action: undefined,
+                                actions: undefined,
+                                visibleWhen: undefined,
+                              });
+                            }}
+                            className="w-full text-xs px-2 py-1.5 bg-amber-600/20 border border-amber-600/50 rounded hover:bg-amber-600/30 text-amber-300 transition-colors"
+                          >
+                            Обновить до группы
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        {/* Slot count selector */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-[var(--studio-text-secondary)] shrink-0">СЛОТЫ</label>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(n => (
+                              <button
+                                key={n}
+                                onClick={() => {
+                                  if (n > items.length) {
+                                    const toAdd = n - items.length;
+                                    const newItems = [...items];
+                                    for (let k = 0; k < toAdd; k++) {
+                                      const idx = newItems.length + 1;
+                                      newItems.push({ id: `ci_${Date.now()}_${k}`, text: { ru: `Выбор ${idx}`, en: `Choice ${idx}` }, actions: [] });
+                                    }
+                                    updateItems(newItems);
+                                  } else if (n < items.length) {
+                                    updateItems(items.slice(0, n));
+                                  }
+                                }}
+                                className={`w-6 h-6 text-[11px] rounded border transition-colors ${items.length === n ? 'border-[var(--studio-accent)] text-[var(--studio-accent)] bg-[var(--studio-accent)]/10' : 'border-[var(--studio-border)] text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)]'}`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                          <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none ml-auto">
+                            <input type="checkbox" checked={!!w.data?.imageOnly} onChange={e => updateW({ data: { ...(w.data || {}), imageOnly: e.target.checked } })} className="accent-[var(--studio-accent)]" />
+                            Img only
+                          </label>
+                        </div>
+
+                        {/* Per-slot editors */}
+                        {items.map((item: any, i: number) => (
+                          <SlotEditor
+                            key={item.id || i}
+                            index={i}
+                            item={item}
+                            variables={st.variables || []}
+                            items={st.items || []}
+                            widgets={currentPage?.uiWidgets || []}
+                            onTextChange={(ru) => updateSlotText(i, ru)}
+                            onActionsChange={(acts) => updateSlotActions(i, acts)}
+                            onConditionChange={(cond) => updateSlotCondition(i, cond)}
+                            onRemove={items.length > 1 ? () => removeSlot(i) : undefined}
+                          />
+                        ))}
+
+                        {items.length < 5 && (
+                          <button
+                            onClick={addSlot}
+                            className="w-full text-xs px-2 py-1 bg-[var(--studio-bg-base)] border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+                          >
+                            + Слот
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {w.type === 'intensityBar' && (
                     <div>
                       <label className="text-[10px]">Value variable ID</label>
@@ -498,6 +841,8 @@ export default function PageSection({
                   {w.type === 'dialogueBox' && (() => {
                     const store = useStudioStore.getState();
                     const dlLines = currentPage?.dialogueLines || [];
+                    const previewIdx = editorDialoguePreviewLine;
+                    const setPreview = setEditorDialoguePreview;
                     return (
                       <div className="space-y-2">
                         <div>
@@ -521,6 +866,15 @@ export default function PageSection({
                             <option value="important">Важный</option>
                           </select>
                         </div>
+                        <label className="flex items-center gap-2 text-[10px] cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={w.data?.clickable !== false}
+                            onChange={e => updateW({ data: { ...(w.data || {}), clickable: e.target.checked } })}
+                            className="accent-[var(--studio-accent)]"
+                          />
+                          <span>Кликабельно <span className="text-[var(--studio-text-muted)]">(клик переключает реплику)</span></span>
+                        </label>
 
                         {/* Dialogue Lines (очередь реплик) */}
                         <div className="border-t border-[var(--studio-border)] pt-2">
@@ -535,12 +889,25 @@ export default function PageSection({
                           </div>
                           {dlLines.length === 0 ? (
                             <p className="text-[9px] text-[var(--studio-text-muted)] leading-tight">
-                              Нет реплик. Если добавить — текст диалога страницы будет игнорироваться, отображаться будут только реплики. Клик по боксу переходит к следующей.
+                              Нет реплик — показывается статичный текст страницы. Реплики запускаются действием «Продвинуть диалог».
                             </p>
                           ) : (
-                            <p className="text-[9px] text-[var(--studio-accent)] opacity-70 leading-tight mb-1">
-                              ⚠ Текст диалога страницы игнорируется — активны реплики.
-                            </p>
+                            <div className="flex items-center gap-1 mb-1.5">
+                              <span className="text-[9px] text-[var(--studio-text-muted)]">Превью:</span>
+                              <button
+                                onClick={() => setPreview(null)}
+                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${previewIdx === null ? 'bg-[var(--studio-accent)] text-[#1C1814] border-[var(--studio-accent)]' : 'border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]'}`}
+                                title="Показать статичный текст страницы"
+                              >текст</button>
+                              {dlLines.map((_: any, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => setPreview(i)}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${previewIdx === i ? 'bg-[var(--studio-accent)] text-[#1C1814] border-[var(--studio-accent)]' : 'border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)]'}`}
+                                  title={`Превью реплики ${i + 1}`}
+                                >{i + 1}</button>
+                              ))}
+                            </div>
                           )}
                           {dlLines.map((line: any, idx: number) => (
                             <div key={line.id} className="mb-2 rounded border border-[var(--studio-border)] bg-[#1C1814] p-1.5">
@@ -584,9 +951,11 @@ export default function PageSection({
                     );
                   })()}
 
-                  <div className="pt-2 border-t border-[var(--studio-border)]">
-                    <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />
-                  </div>
+                  {!(w.type === 'choiceButton' && w.data?.items) && (
+                    <div className="pt-2 border-t border-[var(--studio-border)]">
+                      <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -626,247 +995,6 @@ export default function PageSection({
             </div>
           </div>
 
-          {/* Buttons Section */}
-          <div className="border-t border-[var(--studio-border)] pt-5">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-xs font-medium text-[var(--studio-text-secondary)]">
-                КНОПКИ ({currentPage?.buttons.length ?? 0})
-              </div>
-              <button
-                onClick={handleAddButton}
-                className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2.5 py-1 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
-              >
-                <Plus className="h-3 w-3" /> Добавить
-              </button>
-            </div>
-
-            {/* Buttons list */}
-            <div className="space-y-1.5 mb-4">
-              {currentPage?.buttons.length === 0 && (
-                <div className="text-xs text-[var(--studio-text-muted)] py-2">Кнопок пока нет</div>
-              )}
-              {currentPage?.buttons.map((btn: any) => (
-                <div
-                  key={btn.id}
-                  onClick={() => selectButton(btn.id)}
-                  className={`group flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm transition ${selectedButtonId === btn.id
-                    ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]'
-                    : 'border-[var(--studio-border)] hover:border-[var(--studio-border-strong)]'
-                    }`}
-                >
-                  <span className="truncate pr-2">{btn.text.ru}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteButton(btn.id); }}
-                    className="opacity-40 hover:opacity-100 p-0.5"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Selected Button Inspector */}
-            {selectedButton && (
-              <div className="space-y-4 rounded-xl border border-[var(--studio-accent)]/40 bg-[var(--studio-bg-elevated)] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-medium text-[var(--studio-accent)]">РЕДАКТИРОВАНИЕ КНОПКИ</div>
-                  <div className="flex items-center gap-1">
-                    {/* Version history - ported from old visual editor per-button history */}
-                    <button
-                      onClick={() => {
-                        const store = useStudioStore.getState();
-                        if ((selectedButton.history?.length ?? 0) > 0) {
-                          store.restoreButtonFromHistory(currentPage.id, selectedButton.id, 0);
-                        }
-                      }}
-                      disabled={(selectedButton.history?.length ?? 0) === 0}
-                      className="text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] p-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={(selectedButton.history?.length ?? 0) > 0 ? "Восстановить предыдущую позицию этой кнопки" : "История пока пуста — переместите кнопку на холсте"}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteButton(selectedButton.id)}
-                      className="text-[var(--studio-danger)] hover:text-red-400"
-                      title="Удалить кнопку"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mini history list - always visible for visibility (inspired by old VersionHistory.tsx) */}
-                <div className="mt-2 mb-3 border border-[var(--studio-border)] rounded p-2 bg-[#161310] text-[10px]">
-                  <div className="flex items-center gap-1 mb-1 text-[var(--studio-text-muted)]">
-                    <History className="h-3 w-3" /> История позиций 
-                    {(selectedButton.history?.length ?? 0) > 0 ? `(последние ${Math.min(5, selectedButton.history!.length)})` : '(пока пуста)'}
-                  </div>
-                  {(selectedButton.history?.length ?? 0) > 0 ? (
-                    <div className="space-y-1 max-h-20 overflow-auto">
-                      {selectedButton.history!.slice(-5).reverse().map((entry: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center text-[var(--studio-text-muted)]">
-                          <span className="font-mono">
-                            x:{entry.layout.x.toFixed(0)} y:{entry.layout.y.toFixed(0)}
-                          </span>
-                          <button
-                            onClick={() => {
-                              const store = useStudioStore.getState();
-                              store.restoreButtonFromHistory(currentPage.id, selectedButton.id, idx);
-                            }}
-                            className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                          >
-                            Восст.
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-[9px] text-[var(--studio-text-muted)]">Переместите кнопку на холсте (drag или редактируйте координаты), чтобы записать предыдущие позиции для отката.</div>
-                  )}
-                  <div className="text-[9px] text-[var(--studio-text-muted)] mt-1">Позиции сохраняются автоматически при перемещении/изменении layout</div>
-                </div>
-
-                {/* Button text */}
-                <div>
-                  <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Текст кнопки (РУ)</label>
-                  <input
-                    value={selectedButton.text.ru}
-                    onChange={(e) => updateSelectedButton({ text: { ...selectedButton.text, ru: e.target.value } })}
-                    className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Текст кнопки (EN)</label>
-                  <input
-                    value={selectedButton.text.en}
-                    onChange={(e) => updateSelectedButton({ text: { ...selectedButton.text, en: e.target.value } })}
-                    className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
-                </div>
-
-                {/* Coordinates */}
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <label className="text-[10px] font-medium text-[var(--studio-text-secondary)]">КООРДИНАТЫ И РАЗМЕР</label>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={handleCopyCoordinates}
-                        className="rounded border border-[var(--studio-border)] px-2 py-0.5 text-[10px] hover:border-[var(--studio-accent)]"
-                        title="Скопировать координаты и размер этой кнопки"
-                      >
-                        Копировать
-                      </button>
-                      <button
-                        onClick={handlePasteCoordinates}
-                        disabled={!coordinateClipboard}
-                        className="rounded border border-[var(--studio-border)] px-2 py-0.5 text-[10px] hover:border-[var(--studio-accent)] disabled:cursor-not-allowed disabled:opacity-40"
-                        title="Вставить скопированные координаты и размер"
-                      >
-                        Вставить
-                      </button>
-                    </div>
-                  </div>
-
-                  {coordinateClipboard && (
-                    <div className="mb-2 rounded bg-[var(--studio-accent)]/10 px-2 py-1 text-[10px] text-[var(--studio-accent)]">
-                      В буфере: X {coordinateClipboard.x}% / Y {coordinateClipboard.y}%
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    {[
-                      { label: 'X', key: 'x' as const },
-                      { label: 'Y', key: 'y' as const },
-                      { label: 'Ширина', key: 'width' as const },
-                      { label: 'Высота', key: 'height' as const },
-                    ].map(({ label, key }) => (
-                      <div key={key}>
-                        <div className="text-[9px] text-[var(--studio-text-muted)]">{label}</div>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="1"
-                          max={key === 'x' || key === 'y' ? 90 : 60}
-                          value={selectedButton.layout[key]}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            if (!isNaN(val)) {
-                              updateSelectedButtonLayout({ [key]: Math.max(4, Math.min(90, val)) });
-                            }
-                          }}
-                          className="w-full rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-center text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-1 text-center text-[9px] text-[var(--studio-text-muted)]">
-                    Можно вводить точные значения вручную
-                  </div>
-                </div>
-
-                {/* Style */}
-                <div>
-                  <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Стиль кнопки</label>
-                  <select
-                    value={selectedButton.layout.style}
-                    onChange={(e) => updateSelectedButton({ layout: { ...selectedButton.layout, style: e.target.value } })}
-                    className="w-full rounded-md border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5 text-sm"
-                  >
-                    <option value="default">Обычная</option>
-                    <option value="important">Важная (выделяется)</option>
-                    <option value="danger">Опасная / негативная</option>
-                    <option value="subtle">Тонкая / малозаметная</option>
-                  </select>
-                </div>
-
-                {/* Action */}
-                <div>
-                  <label className="mb-1 block text-[10px] text-[var(--studio-text-secondary)]">Что делает кнопка</label>
-                  <ActionEditor
-                    action={selectedButton.action}
-                    onChange={(newAction) => updateSelectedButton({ action: newAction })}
-                    variables={variables}
-                    items={items}
-                    widgets={currentPage?.uiWidgets || []}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Conditions */}
-            {selectedButton && (
-              <div className="space-y-4 pt-4 border-t border-[var(--studio-border)]">
-                <div className="text-xs font-medium text-[var(--studio-accent)]">УСЛОВИЯ</div>
-
-                <ConditionEditor
-                  label="Видимость кнопки"
-                  condition={selectedButton.visibleWhen}
-                  onChange={(newCondition) =>
-                    updateSelectedButton({ visibleWhen: newCondition })
-                  }
-                  variables={variables}
-                  items={items}
-                />
-
-                <ConditionEditor
-                  label="Доступность кнопки"
-                  condition={selectedButton.enabledWhen}
-                  onChange={(newCondition) =>
-                    updateSelectedButton({ enabledWhen: newCondition })
-                  }
-                  variables={variables}
-                  items={items}
-                />
-              </div>
-            )}
-
-            {!selectedButton && currentPage && currentPage.buttons.length > 0 && (
-              <div className="text-center text-xs text-[var(--studio-text-muted)] py-3">
-                Выбери кнопку на холсте или в списке
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>

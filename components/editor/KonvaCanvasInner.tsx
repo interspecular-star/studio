@@ -192,6 +192,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   // For widgets (Phase 2 drag support)
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
   const [pressedWidgetId, setPressedWidgetId] = useState<string | null>(null);
+  const [hoveredItemKey, setHoveredItemKey] = useState<string | null>(null);
 
   // Animated values for some widgets (e.g. intensity bar)
   const [animValues, setAnimValues] = useState<Record<string, number>>({});
@@ -280,12 +281,19 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     const dialogueWidgets = (currentPage?.uiWidgets || []).filter((w: any) => w.type === 'dialogueBox');
     if (dialogueWidgets.length === 0) return;
 
+    // Current dialogue line text (if dialogue started via advanceDialogue)
+    const twDlIdx = playtestState.dialogueLineIndex ?? 0;
+    const twDlStarted = playtestState.dialogueStarted ?? false;
+    const twDlLine = twDlStarted && currentPage?.dialogueLines?.length
+      ? currentPage.dialogueLines[Math.min(twDlIdx, currentPage.dialogueLines.length - 1)]
+      : null;
+
     // Reset progress (and pause) when text length shrinks (text was changed)
     const resetNeeded: string[] = [];
     dialogueWidgets.forEach((w: any) => {
       const overrideT = playtestState.widgetOverrides[w.id]?.text ?? null;
       const textSource = w.data?.textSource || 'page';
-      const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
+      const fullText = overrideT?.ru || twDlLine?.text?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
       const currentProg = typewriterProgress[w.id] || 0;
       if (currentProg > fullText.length) {
         resetNeeded.push(w.id);
@@ -318,7 +326,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
           const overrideT = playtestState.widgetOverrides[w.id]?.text ?? null;
           const textSource = w.data?.textSource || 'page';
-          const fullText = overrideT?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
+          const fullText = overrideT?.ru || twDlLine?.text?.ru || (textSource === 'custom' && w.text?.ru ? w.text.ru : (currentPage?.text?.ru || ''));
           const current = prev[w.id] || 0;
           if (current < fullText.length) {
             const remaining = fullText.substring(current);
@@ -350,6 +358,20 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     }, 60);
     return () => clearInterval(interval);
   }, [isPlaytest, currentPage?.uiWidgets, currentPage?.text?.ru, currentPage?.id, playtestState]);
+
+  // Reset typewriter to 0 whenever dialogue line index advances (advanceDialogue action)
+  useEffect(() => {
+    if (!isPlaytest) return;
+    const dialogueWidgets = (currentPage?.uiWidgets || []).filter((w: any) => w.type === 'dialogueBox');
+    if (!dialogueWidgets.length) return;
+    setTypewriterProgress(prev => {
+      const next = { ...prev };
+      dialogueWidgets.forEach((w: any) => { next[w.id] = 0; });
+      return next;
+    });
+    typewriterPausedRef.current = {};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playtestState.dialogueLineIndex, playtestState.dialogueStarted]);
 
   const pctToPx = (pct: number, total: number) => (pct / 100) * total;
 
@@ -646,11 +668,16 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
               // Dialogue lines state (computed outside renderWidgetContent so click handler can use it)
               const dlLines = currentPage?.dialogueLines;
               const dlLineIndex = playtestState.dialogueLineIndex ?? 0;
-              // Editor: всегда показываем первую реплику; Playtest: текущую по индексу
-              const dlCurrentLine = dlLines?.length
-                ? dlLines[isPlaytest ? Math.min(dlLineIndex, dlLines.length - 1) : 0]
+              // В плейтесте — только если диалог запущен; в редакторе — только если включён превью
+              const dlStarted = isPlaytest
+                ? (playtestState.dialogueStarted ?? false)
+                : (useStudioStore.getState().editorDialoguePreviewLine !== null);
+              const editorPreviewIdx = useStudioStore.getState().editorDialoguePreviewLine ?? 0;
+              const activeIdx = isPlaytest ? dlLineIndex : editorPreviewIdx;
+              const dlCurrentLine = dlStarted && dlLines?.length
+                ? dlLines[Math.min(activeIdx, dlLines.length - 1)]
                 : null;
-              const dlIsLastLine = !dlLines?.length || dlLineIndex >= dlLines.length - 1;
+              const dlIsLastLine = !dlLines?.length || activeIdx >= dlLines.length - 1;
 
               const renderWidgetContent = () => {
                 if (widget.type === 'dialogueBox') {
@@ -780,7 +807,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         ))}
                       </Group>
                       {/* Dialogue lines progress: "▶" when typewriter done + more lines / buttons coming */}
-                      {isPlaytest && dlLines && dlLines.length > 1 && (() => {
+                      {isPlaytest && dlStarted && dlLines && dlLines.length > 1 && (() => {
                         const prog = typewriterProgress[widget.id] ?? 0;
                         const typewriterDone = prog >= rawText.length;
                         if (!typewriterDone) return null;
@@ -876,22 +903,114 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
                 if (widget.type === 'choiceButton') {
                   const data = widget.data || {};
+
+                  // === New group system (data.items present) ===
+                  if (data.items?.length) {
+                    const allItems: any[] = data.items;
+                    const getVarValue = (variableId: string) => {
+                      const live = playtestState.variableValues[variableId];
+                      if (live !== undefined) return live;
+                      const v = useStudioStore.getState().variables.find((vv: any) => vv.id === variableId);
+                      return v?.defaultValue;
+                    };
+
+                    const itemsWithVis = allItems.map((item: any, idx: number) => ({
+                      item,
+                      idx,
+                      visible: !item.visibleWhen || evaluateCondition(
+                        item.visibleWhen,
+                        useStudioStore.getState().variables,
+                        useStudioStore.getState().items,
+                        getVarValue
+                      ),
+                    }));
+
+                    const shownItems = isPlaytest
+                      ? itemsWithVis.filter((v: any) => v.visible)
+                      : itemsWithVis;
+
+                    if (shownItems.length === 0) return null;
+
+                    const gap = Math.max(2, Math.min(8, Math.round(wW * 0.015)));
+                    const btnW = (wW - gap * (shownItems.length - 1)) / shownItems.length;
+
+                    const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                    let cImgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
+                    if (cImgSrc && !cImgSrc.startsWith('http') && !cImgSrc.startsWith('/')) cImgSrc = '/' + cImgSrc;
+                    const cImg = cImgSrc ? widgetImages[cImgSrc] : null;
+
+                    return (
+                      <Group>
+                        {shownItems.map(({ item, idx, visible }: any, i: number) => {
+                          const bx = i * (btnW + gap);
+                          const itemKey = `${widget.id}_${idx}`;
+                          const iHovered = hoveredItemKey === itemKey;
+                          const iPressed = pressedWidgetId === widget.id && iHovered;
+                          const itemOpacity = !isPlaytest && !visible ? 0.3 : 1;
+                          const fill = iPressed ? 'rgba(48,38,28,0.98)' : iHovered ? 'rgba(72,62,48,0.95)' : 'rgba(80,65,45,0.85)';
+
+                          return (
+                            <Group
+                              key={item.id || idx}
+                              x={bx}
+                              y={0}
+                              opacity={itemOpacity}
+                              onMouseEnter={() => { if (isPlaytest) setHoveredItemKey(itemKey); }}
+                              onMouseLeave={() => { if (isPlaytest) setHoveredItemKey(null); }}
+                              onClick={(e: any) => {
+                                if (isPlaytest) {
+                                  e.cancelBubble = true;
+                                  if (item.actions?.length) {
+                                    for (const a of item.actions) useStudioStore.getState().executeAction(a);
+                                  }
+                                }
+                              }}
+                              onTap={(e: any) => {
+                                if (isPlaytest) {
+                                  e.cancelBubble = true;
+                                  if (item.actions?.length) {
+                                    for (const a of item.actions) useStudioStore.getState().executeAction(a);
+                                  }
+                                }
+                              }}
+                            >
+                              {cImg ? (
+                                <>
+                                  <KonvaImage image={cImg} width={btnW} height={wH} />
+                                  {!data.imageOnly && (
+                                    <Text x={2} y={wH / 2 - 6} width={btnW - 4} text={item.text?.ru || `Выбор ${idx + 1}`} fontSize={11} fill={theme.textColor} align="center" fontFamily={theme.fontFamily} />
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <Rect width={btnW} height={wH} cornerRadius={5} fill={fill} stroke={isSelected ? theme.textColor : theme.boxStroke} strokeWidth={isSelected ? 2.5 : 1} />
+                                  <Text x={2} y={wH / 2 - 6} width={btnW - 4} text={item.text?.ru || `Выбор ${idx + 1}`} fontSize={11} fill={theme.textColor} align="center" fontFamily={theme.fontFamily} />
+                                </>
+                              )}
+                              {!isPlaytest && (
+                                <Text x={3} y={2} text={`${idx + 1}`} fontSize={7} fill={theme.textColor} opacity={0.4} listening={false} />
+                              )}
+                            </Group>
+                          );
+                        })}
+                      </Group>
+                    );
+                  }
+
+                  // === Legacy single-button (backward compat) ===
                   const linkedBtn = data.linkedButtonId ? currentPage.buttons.find((b: any) => b.id === data.linkedButtonId) : null;
                   const btnText = linkedBtn ? linkedBtn.text.ru : (widget.text?.ru || 'Choice');
                   const isLinked = !!linkedBtn;
                   const isPressed = pressedWidgetId === widget.id;
                   const hoverFill = isPressed ? 'rgba(48,38,28,0.98)' : (isHovered ? 'rgba(72,62,48,0.95)' : (isLinked ? 'rgba(60,50,37,0.92)' : 'rgba(80,65,45,0.85)'));
 
-                  // If asset image for this choice widget, draw it (like button images)
                   const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
-                  let cImgSrc = asset?.url ? asset.url.trim().replace(/\\/g,'/') : null;
+                  let cImgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
                   if (cImgSrc && !cImgSrc.startsWith('http') && !cImgSrc.startsWith('/')) cImgSrc = '/' + cImgSrc;
                   const cImg = cImgSrc ? widgetImages[cImgSrc] : null;
 
                   if (cImg) {
-                    if (data.imageOnly) {
-                      return <KonvaImage image={cImg} width={wW} height={wH} />;
-                    }
+                    if (data.imageOnly) return <KonvaImage image={cImg} width={wW} height={wH} />;
                     return (
                       <>
                         <KonvaImage image={cImg} width={wW} height={wH} />
@@ -902,16 +1021,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
 
                   return (
                     <>
-                      <Rect
-                        x={0}
-                        y={0}
-                        width={wW}
-                        height={wH}
-                        cornerRadius={5}
-                        fill={hoverFill}
-                        stroke={isSelected ? theme.textColor : (isLinked ? theme.nameTagColor : theme.boxStroke)}
-                        strokeWidth={isSelected ? 2.5 : (isLinked ? 1.8 : 1)}
-                      />
+                      <Rect x={0} y={0} width={wW} height={wH} cornerRadius={5} fill={hoverFill} stroke={isSelected ? theme.textColor : (isLinked ? theme.nameTagColor : theme.boxStroke)} strokeWidth={isSelected ? 2.5 : (isLinked ? 1.8 : 1)} />
                       <Text x={2} y={wH / 2 - 6} width={wW} text={btnText} fontSize={11} fill={theme.textColor} align="center" fontFamily={theme.fontFamily} />
                     </>
                   );
@@ -1134,6 +1244,46 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   );
                 }
 
+                if (widget.type === 'inventory') {
+                  const isPressed = pressedWidgetId === widget.id;
+                  const asset = widget.assetId ? (useStudioStore.getState().uiAssets || []).find((a: any) => a.id === widget.assetId) : null;
+                  let invImgSrc = asset?.url ? asset.url.trim().replace(/\\/g, '/') : null;
+                  if (invImgSrc && !invImgSrc.startsWith('http') && !invImgSrc.startsWith('/')) invImgSrc = '/' + invImgSrc;
+                  const invImg = invImgSrc ? widgetImages[invImgSrc] : null;
+                  if (invImg) {
+                    return <KonvaImage image={invImg} width={wW} height={wH} opacity={isPressed ? 0.7 : 1} />;
+                  }
+                  // Default placeholder: bag icon + label
+                  const invFontSize = Math.max(8, Math.min(14, wH * 0.28));
+                  return (
+                    <Group>
+                      <Rect
+                        x={0} y={0} width={wW} height={wH}
+                        cornerRadius={4}
+                        fill={isPressed ? 'rgba(40,35,25,0.98)' : (isHovered ? 'rgba(80,65,45,0.95)' : 'rgba(55,45,32,0.85)')}
+                        stroke={isSelected ? '#C5A46E' : '#534B40'}
+                        strokeWidth={isSelected ? 1.5 : 1}
+                      />
+                      <Text
+                        x={0} y={wH * 0.18}
+                        width={wW}
+                        text="🎒"
+                        fontSize={invFontSize * 1.4}
+                        align="center"
+                      />
+                      <Text
+                        x={0} y={wH * 0.62}
+                        width={wW}
+                        text="Инвентарь"
+                        fontSize={invFontSize}
+                        fill="#C5A46E"
+                        align="center"
+                        fontStyle="500"
+                      />
+                    </Group>
+                  );
+                }
+
                 // Fallback
                 return (
                   <Rect x={0} y={0} width={wW} height={wH} fill="#222" stroke="#555" />
@@ -1197,7 +1347,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   onClick={(e) => {
                     e.cancelBubble = true;
                     // DialogueBox click in playtest: skip typewriter or advance to next line
-                    if (isPlaytestMode && widget.type === 'dialogueBox') {
+                    if (isPlaytestMode && widget.type === 'dialogueBox' && widget.data?.clickable !== false) {
                       const overrideT = playtestState.widgetOverrides[widget.id]?.text;
                       const tSrc = widget.data?.textSource || 'page';
                       const fullText = overrideT?.ru
@@ -1212,10 +1362,25 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                         // Advance to next line
                         advanceDialogueLine();
                         setTypewriterProgress(prev => ({ ...prev, [widget.id]: 0 }));
+                      } else if (dlLines?.length && dlIsLastLine) {
+                        // Last line done — fire onDialogueEnd
+                        const onEnd = currentPage?.onDialogueEnd;
+                        if (onEnd?.length) {
+                          for (const a of onEnd) useStudioStore.getState().executeAction(a);
+                        }
                       }
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'choiceButton') {
+                      if (widget.data?.items?.length) return; // new group: sub-buttons handle via cancelBubble
+                      if (widget.actions?.length) {
+                        for (const a of widget.actions) useStudioStore.getState().executeAction(a);
+                        return;
+                      }
+                      if (widget.action) {
+                        useStudioStore.getState().executeAction(widget.action);
+                        return;
+                      }
                       const linkedId = (widget.data || {}).linkedButtonId;
                       if (linkedId) {
                         const linked = currentPage.buttons.find((b: any) => b.id === linkedId);
@@ -1224,7 +1389,6 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           return;
                         }
                       }
-                      // Fallback for demo: use data or lower intensity
                       const chData = widget.data || {};
                       if (chData.setIntensity !== undefined) {
                         useStudioStore.getState().executeAction({ type: 'setIntensity', value: chData.setIntensity });
@@ -1238,7 +1402,10 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       if (at === 'inventory') {
                         useStudioStore.getState().openInventory();
                       }
-                      // map/skills can be extended later with custom actions
+                      return;
+                    }
+                    if (isPlaytestMode && widget.type === 'inventory') {
+                      useStudioStore.getState().openInventory();
                       return;
                     }
                     if (!isPlaytestMode) {
@@ -1248,7 +1415,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                   }}
                   onTap={(e) => {
                     e.cancelBubble = true;
-                    if (isPlaytestMode && widget.type === 'dialogueBox') {
+                    if (isPlaytestMode && widget.type === 'dialogueBox' && widget.data?.clickable !== false) {
                       const overrideT = playtestState.widgetOverrides[widget.id]?.text;
                       const tSrc = widget.data?.textSource || 'page';
                       const fullText = overrideT?.ru
@@ -1265,6 +1432,15 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                       return;
                     }
                     if (isPlaytestMode && widget.type === 'choiceButton') {
+                      if (widget.data?.items?.length) return; // new group: sub-buttons handle via cancelBubble
+                      if (widget.actions?.length) {
+                        for (const a of widget.actions) useStudioStore.getState().executeAction(a);
+                        return;
+                      }
+                      if (widget.action) {
+                        useStudioStore.getState().executeAction(widget.action);
+                        return;
+                      }
                       const linkedId = (widget.data || {}).linkedButtonId;
                       if (linkedId) {
                         const linked = currentPage.buttons.find((b: any) => b.id === linkedId);
@@ -1273,7 +1449,6 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                           return;
                         }
                       }
-                      // Fallback for demo: use data or lower intensity
                       const chData = widget.data || {};
                       if (chData.setIntensity !== undefined) {
                         useStudioStore.getState().executeAction({ type: 'setIntensity', value: chData.setIntensity });
@@ -1681,11 +1856,6 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
         </Layer>
       </Stage>
 
-      {currentPage.buttons.length === 0 && (
-        <div className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 text-xs text-[var(--studio-text-muted)]/60">
-          Нажми «Добавить кнопку» в правой панели
-        </div>
-      )}
     </div>
   );
 }

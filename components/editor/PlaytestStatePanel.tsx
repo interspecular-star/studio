@@ -22,6 +22,8 @@ export default function PlaytestStatePanel() {
     items,
     playtestState,
     resetPlaytestState,
+    loadPlaytestProgress,
+    clearPlaytestSave,
     equipItem,
     unequipItem,
     isItemEquipped,
@@ -84,9 +86,15 @@ export default function PlaytestStatePanel() {
   const equippableItems = items.filter(i => i.isEquippable);
 
   const handleReset = () => {
-    if (confirm('Сбросить все значения Playtest к начальным?')) {
+    if (confirm('Сбросить всё к начальным значениям? Сохранённый прогресс будет удалён.')) {
+      clearPlaytestSave();
       resetPlaytestState();
     }
+  };
+
+  const handleLoadSave = () => {
+    const loaded = loadPlaytestProgress();
+    if (!loaded) alert('Нет сохранённого прогресса.');
   };
 
   const handleToggleEquip = (itemId: string) => {
@@ -112,17 +120,24 @@ export default function PlaytestStatePanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b border-[var(--studio-border)] px-4 py-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-[var(--studio-text-secondary)]">
+      <div className="border-b border-[var(--studio-border)] px-4 py-3 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-[var(--studio-text-secondary)] flex-1">
           ТЕКУЩЕЕ СОСТОЯНИЕ
         </span>
         <button
+          onClick={handleLoadSave}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)] text-[var(--studio-accent)]"
+          title="Загрузить прогресс последней сессии"
+        >
+          ↑ Прогресс
+        </button>
+        <button
           onClick={handleReset}
           className="flex items-center gap-1.5 text-xs px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-elevated)] text-[var(--studio-text-secondary)]"
-          title="Сбросить все значения Playtest"
+          title="Сбросить к начальным значениям"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Сбросить всё
+          Сброс
         </button>
       </div>
 
@@ -388,6 +403,47 @@ export default function PlaytestStatePanel() {
             </div>
           )}
         </div>
+
+        {/* === ФЛАГИ / ПЕРЕМЕННЫЕ СЦЕНЫ (custom category) === */}
+        {variables.filter(v => v.category === 'custom').length > 0 && (
+          <div>
+            <div className="text-xs font-medium text-[var(--studio-text-muted)] mb-2 uppercase tracking-wider">
+              ФЛАГИ И ПЕРЕМЕННЫЕ СЦЕНЫ
+            </div>
+            <div className="space-y-1">
+              {variables
+                .filter(v => v.category === 'custom')
+                .map((variable) => {
+                  const raw = getCurrentValue(variable);
+                  let display: string;
+                  if (variable.type === 'boolean') {
+                    display = (raw === true || raw === 1) ? 'Да ✓' : 'Нет ✗';
+                  } else {
+                    display = String(raw ?? variable.defaultValue);
+                  }
+                  const isActive = variable.type === 'boolean'
+                    ? (raw === true || raw === 1)
+                    : raw !== variable.defaultValue;
+
+                  return (
+                    <div
+                      key={variable.id}
+                      className={`flex items-center justify-between rounded border px-2.5 py-1.5 text-xs transition-colors ${
+                        isActive
+                          ? 'border-[var(--studio-accent)]/60 bg-[var(--studio-accent)]/10'
+                          : 'border-[var(--studio-border)] bg-[var(--studio-bg-elevated)]'
+                      }`}
+                    >
+                      <span className="text-[var(--studio-text-secondary)] truncate">{variable.displayName.ru}</span>
+                      <span className={`font-mono font-semibold ${isActive ? 'text-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)]'}`}>
+                        {display}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {/* (Инвентарь перенесён выше — сразу после блока "В БОЮ") */}
       </div>

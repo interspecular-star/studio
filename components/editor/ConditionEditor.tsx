@@ -23,21 +23,19 @@ export default function ConditionEditor({
     if (hasCondition) {
       onChange(undefined);
     } else {
-      const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
+      const firstVar =
+        variables.find((v: any) => v.category === 'custom') ||
+        variables.find((v: any) => v.type === 'number') ||
+        variables[0];
       if (firstVar) {
         onChange({
           type: 'variable',
           variableId: firstVar.id,
-          operator: '>=',
-          value: firstVar.type === 'number' ? 1 : true,
+          operator: firstVar.type === 'boolean' ? '==' : '>=',
+          value: firstVar.type === 'boolean' ? true : firstVar.type === 'number' ? 1 : true,
         });
       } else {
-        onChange({
-          type: 'variable',
-          variableId: '',
-          operator: '>=',
-          value: 0,
-        });
+        onChange({ type: 'variable', variableId: '', operator: '==', value: true });
       }
     }
   };
@@ -101,18 +99,36 @@ export default function ConditionEditor({
           </select>
 
           {/* Variable */}
-          {condition.type === 'variable' && (
-            <div className="grid grid-cols-3 gap-1">
-              <select value={condition.variableId} onChange={(e) => onChange({ ...condition, variableId: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                {variables.length === 0 && <option value="">Нет переменных</option>}
-                {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
-              </select>
-              <select value={condition.operator} onChange={(e) => onChange({ ...condition, operator: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">≠</option>
-              </select>
-              <input type={variables.find((v:any)=>v.id===condition.variableId)?.type==='number'?'number':'text'} value={condition.value} onChange={(e) => { const vt = variables.find((v:any)=>v.id===condition.variableId)?.type; onChange({...condition, value: vt==='number' ? parseFloat(e.target.value)||0 : e.target.value}); }} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-            </div>
-          )}
+          {condition.type === 'variable' && (() => {
+            const selVar = variables.find((v: any) => v.id === condition.variableId);
+            const isBool = selVar?.type === 'boolean';
+            return (
+              <div className="grid grid-cols-3 gap-1">
+                <select value={condition.variableId} onChange={(e) => {
+                  const v = variables.find((vv: any) => vv.id === e.target.value);
+                  onChange({ ...condition, variableId: e.target.value, operator: v?.type === 'boolean' ? '==' : condition.operator, value: v?.type === 'boolean' ? true : condition.value });
+                }} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                  <option value="">— переменная —</option>
+                  {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
+                </select>
+                <select value={condition.operator} onChange={(e) => onChange({ ...condition, operator: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                  {isBool ? (
+                    <><option value="==">равно</option><option value="!=">≠</option></>
+                  ) : (
+                    <><option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">≠</option></>
+                  )}
+                </select>
+                {isBool ? (
+                  <select value={condition.value === true || condition.value === 1 ? 'true' : 'false'} onChange={(e) => onChange({ ...condition, value: e.target.value === 'true' })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                    <option value="true">Да</option>
+                    <option value="false">Нет</option>
+                  </select>
+                ) : (
+                  <input type={selVar?.type === 'number' ? 'number' : 'text'} value={condition.value} onChange={(e) => { onChange({ ...condition, value: selVar?.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }); }} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Item Quantity */}
           {condition.type === 'itemQuantity' && (

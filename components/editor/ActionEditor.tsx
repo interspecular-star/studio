@@ -29,6 +29,8 @@ export default function ActionEditor({ action, onChange, variables, items, widge
     else if (newType === 'giveResource') newAction = { type: 'giveResource', resource: 'coins', amount: 10 };
     else if (newType === 'removeResource') newAction = { type: 'removeResource', resource: 'coins', amount: 10 };
     else if (newType === 'openInventory') newAction = { type: 'openInventory' };
+    else if (newType === 'showItemReward') newAction = { type: 'showItemReward', items: [{ itemId: items[0]?.id || '', amount: 1 }] };
+    else if (newType === 'advanceDialogue') newAction = { type: 'advanceDialogue' };
     else if (newType === 'setPortraitVariant') newAction = { type: 'setPortraitVariant', variant: 'angry', widgetId: undefined };
     else if (newType === 'setIntensity') newAction = { type: 'setIntensity', value: 80 };
     else if (newType === 'setWidgetProperty') newAction = { type: 'setWidgetProperty', pageId: '', widgetId: widgets[0]?.id || '', key: 'text', value: '' };
@@ -75,8 +77,14 @@ export default function ActionEditor({ action, onChange, variables, items, widge
         <optgroup label="Игрок">
           <option value="changePlayerStat">Изменить стат игрока</option>
         </optgroup>
+        <optgroup label="Ресурсы">
+          <option value="giveResource">Выдать ресурс</option>
+          <option value="removeResource">Забрать ресурс</option>
+        </optgroup>
         <optgroup label="Интерфейс">
           <option value="openInventory">Открыть инвентарь</option>
+          <option value="showItemReward">Показать награду</option>
+          <option value="advanceDialogue">Продвинуть диалог</option>
         </optgroup>
         <optgroup label="UI Виджеты (диалог)">
           <option value="setPortraitVariant">Сменить вариант портрета</option>
@@ -94,14 +102,26 @@ export default function ActionEditor({ action, onChange, variables, items, widge
         />
       )}
 
-      {(type === 'setVariable' || type === 'addToVariable' || type === 'subtractFromVariable') && (
-        <div className="grid grid-cols-2 gap-2">
-          <select value={action.variableId || ''} onChange={(e) => onChange({ ...action, variableId: e.target.value })} className={selectCls}>
-            {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
-          </select>
-          <input type="number" value={action.amount ?? action.value ?? 0} onChange={(e) => onChange({ ...action, ...(type === 'setVariable' ? { value: parseFloat(e.target.value) || 0 } : { amount: parseFloat(e.target.value) || 0 }) })} className={selectCls} />
-        </div>
-      )}
+      {(type === 'setVariable' || type === 'addToVariable' || type === 'subtractFromVariable') && (() => {
+        const selectedVar = variables.find((v: any) => v.id === action.variableId);
+        const isBool = selectedVar?.type === 'boolean';
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <select value={action.variableId || ''} onChange={(e) => onChange({ ...action, variableId: e.target.value })} className={selectCls}>
+              <option value="">— переменная —</option>
+              {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
+            </select>
+            {type === 'setVariable' && isBool ? (
+              <select value={action.value === true || action.value === 1 ? 'true' : 'false'} onChange={(e) => onChange({ ...action, value: e.target.value === 'true' })} className={selectCls}>
+                <option value="true">Да (true)</option>
+                <option value="false">Нет (false)</option>
+              </select>
+            ) : (
+              <input type="number" value={action.amount ?? action.value ?? 0} onChange={(e) => onChange({ ...action, ...(type === 'setVariable' ? { value: parseFloat(e.target.value) || 0 } : { amount: parseFloat(e.target.value) || 0 }) })} className={selectCls} />
+            )}
+          </div>
+        );
+      })()}
 
       {(type === 'giveItem' || type === 'removeItem') && (
         <div className="grid grid-cols-2 gap-2">
@@ -120,10 +140,111 @@ export default function ActionEditor({ action, onChange, variables, items, widge
         </div>
       )}
 
+      {(type === 'giveResource' || type === 'removeResource') && (
+        <div className="grid grid-cols-2 gap-2">
+          <select value={action.resource || 'coins'} onChange={(e) => onChange({ ...action, resource: e.target.value })} className={selectCls}>
+            <option value="coins">Монеты</option>
+            <option value="gasoline">Бензин</option>
+            <option value="gems">Кристаллы</option>
+          </select>
+          <input type="number" value={action.amount || 1} onChange={(e) => onChange({ ...action, amount: parseInt(e.target.value) || 1 })} className={selectCls} />
+        </div>
+      )}
+
       {type === 'openInventory' && (
         <p className="text-xs text-[var(--studio-text-muted)] italic">
           Откроет модальное окно инвентаря с манекеном и ячейками.
         </p>
+      )}
+
+      {type === 'advanceDialogue' && (
+        <p className="text-xs text-[var(--studio-text-muted)] italic leading-snug">
+          1-й клик запускает реплики диалога, последующие — переключают строки. После последней реплики срабатывают действия «Конец диалога» страницы.
+        </p>
+      )}
+
+      {type === 'showItemReward' && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] text-[var(--studio-text-muted)] italic">Предметы для отображения в модалке награды:</p>
+          {(action.items || []).map((entry: any, i: number) => (
+            <div key={i} className="grid grid-cols-[1fr_60px_auto] gap-1 items-center">
+              <select
+                value={entry.itemId || ''}
+                onChange={(e) => {
+                  const next = [...action.items];
+                  next[i] = { ...entry, itemId: e.target.value };
+                  onChange({ ...action, items: next });
+                }}
+                className={selectCls}
+              >
+                <option value="">— предмет —</option>
+                {items.map((it: any) => <option key={it.id} value={it.id}>{it.name?.ru || it.id}</option>)}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={entry.amount ?? 1}
+                onChange={(e) => {
+                  const next = [...action.items];
+                  next[i] = { ...entry, amount: parseInt(e.target.value) || 1 };
+                  onChange({ ...action, items: next });
+                }}
+                className={selectCls}
+              />
+              <button
+                onClick={() => {
+                  const next = [...action.items];
+                  next.splice(i, 1);
+                  onChange({ ...action, items: next });
+                }}
+                className="text-[var(--studio-danger,#ef4444)] text-xs px-1 hover:underline"
+              >✕</button>
+            </div>
+          ))}
+          <button
+            onClick={() => onChange({ ...action, items: [...(action.items || []), { itemId: items[0]?.id || '', amount: 1 }] })}
+            className="w-full text-[10px] px-2 py-1 border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+          >
+            + Предмет
+          </button>
+
+          {/* afterCollect — действия при нажатии "Получить" */}
+          <div className="border-t border-[var(--studio-border)] pt-1.5 mt-1">
+            <p className="text-[10px] text-[var(--studio-text-muted)] italic mb-1">При нажатии «Получить»:</p>
+            {(action.afterCollect || []).map((ac: any, i: number) => (
+              <div key={i} className="mb-1.5 rounded border border-[var(--studio-border)] bg-[#161310] p-1.5 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[9px] text-[var(--studio-text-muted)] font-mono">#{i + 1}</span>
+                  <button
+                    onClick={() => {
+                      const next = [...(action.afterCollect || [])];
+                      next.splice(i, 1);
+                      onChange({ ...action, afterCollect: next });
+                    }}
+                    className="text-[9px] text-[var(--studio-danger,#ef4444)] hover:underline"
+                  >✕</button>
+                </div>
+                <ActionEditor
+                  action={ac}
+                  onChange={(updated: any) => {
+                    const next = [...(action.afterCollect || [])];
+                    next[i] = updated;
+                    onChange({ ...action, afterCollect: next });
+                  }}
+                  variables={variables}
+                  items={items}
+                  widgets={widgets}
+                />
+              </div>
+            ))}
+            <button
+              onClick={() => onChange({ ...action, afterCollect: [...(action.afterCollect || []), { type: 'setVariable', variableId: variables[0]?.id || '', value: true }] })}
+              className="w-full text-[10px] px-2 py-1 border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+            >
+              + Действие после получения
+            </button>
+          </div>
+        </div>
       )}
 
       {/* === setPortraitVariant: widgetId picker + variant === */}

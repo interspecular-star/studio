@@ -12,8 +12,10 @@ import PageSection from '@/components/editor/PageSection';
 import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
 import InventoryModal from '@/components/editor/InventoryModal';
+import ItemRewardModal from '@/components/editor/ItemRewardModal';
 import TopResourceBar from '@/components/editor/TopResourceBar';
 import LeftSidebar from '@/components/editor/LeftSidebar';
+import WidgetLibrary from '@/components/editor/WidgetLibrary';
 
 export default function SlayStudio() {
   const {
@@ -78,6 +80,8 @@ export default function SlayStudio() {
     exitPlaytest,
     leftSidebarCollapsed,
     rightSidebarCollapsed,
+    openWidgetLibrary,
+    closeWidgetLibrary,
     toggleLeftSidebar,
     toggleRightSidebar,
     saveCanvasSnapshot,
@@ -116,6 +120,9 @@ export default function SlayStudio() {
     duplicatePage,
     dialogueTheme,
     updateDialogueTheme,
+    loadPlaytestProgress,
+    clearPlaytestSave,
+    collectItemReward,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -184,6 +191,20 @@ export default function SlayStudio() {
   // 'force-show' = always show HUD (even on dialog pages)
   // 'force-hide' = always hide HUD (for testing clean game view in game mode)
   const [hudOverride, setHudOverride] = useState<'auto' | 'force-show' | 'force-hide'>('auto');
+
+  // Hotkey W → open Widget Library (skip when focus is in an input/textarea)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        openWidgetLibrary();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [openWidgetLibrary]);
 
   // Load project from localStorage on first mount
   useEffect(() => {
@@ -557,14 +578,36 @@ export default function SlayStudio() {
             <div className="flex items-center justify-between bg-[#C25D3A] px-4 py-2 text-sm text-white shadow-inner">
               <div className="flex items-center gap-2">
                 <span className="font-semibold">▶ PLAYTEST РЕЖИМ</span>
-                <span className="opacity-90">— Кнопки выполняют действия. Состояние не сохраняется.</span>
               </div>
-              <button
-                onClick={exitPlaytest}
-                className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
-              >
-                Выйти в редактор
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const ok = loadPlaytestProgress();
+                    if (!ok) alert('Нет сохранённого прогресса');
+                  }}
+                  className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
+                  title="Загрузить сохранённый прогресс вручную"
+                >
+                  Загрузить
+                </button>
+                <button
+                  onClick={() => {
+                    clearPlaytestSave();
+                    resetPlaytestState();
+                  }}
+                  className="rounded-md bg-white/10 px-3 py-1 text-sm font-medium hover:bg-white/20 active:bg-white/30 transition-colors"
+                  title="Сбросить прогресс и начать заново"
+                >
+                  Сброс
+                </button>
+                <div className="w-px h-4 bg-white/30" />
+                <button
+                  onClick={exitPlaytest}
+                  className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
+                >
+                  Выйти в редактор
+                </button>
+              </div>
             </div>
           )}
 
@@ -574,6 +617,15 @@ export default function SlayStudio() {
               <span className="rounded bg-[var(--studio-bg-panel)] px-2 py-0.5 font-mono text-[var(--studio-text-muted)]">
                 {selectedPageId}
               </span>
+              {mode !== 'playtest' && (
+                <button
+                  onClick={openWidgetLibrary}
+                  title="Библиотека виджетов (W)"
+                  className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 font-semibold text-[#1C1814] hover:brightness-110 transition-all"
+                >
+                  + Виджет
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 text-[var(--studio-text-muted)]">
               <span className="font-mono">{canvasWidth} × {canvasHeight}</span>
@@ -635,6 +687,10 @@ export default function SlayStudio() {
                 {playtestState.isInventoryOpen && (
                   <InventoryModal onClose={() => {}} />
                 )}
+                {/* Item reward modal */}
+                {playtestState.itemRewardModal && (
+                  <ItemRewardModal />
+                )}
               </div>
             ) : (
               /* Editor: full CanvasWithRulers + guides at the chosen logical size. */
@@ -642,6 +698,9 @@ export default function SlayStudio() {
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
               </CanvasWithRulers>
             )}
+
+            {/* Widget Library Modal */}
+            <WidgetLibrary />
 
             {/* Item Creation Modal */}
             <ItemCreationModal

@@ -383,6 +383,12 @@ export type ButtonAction =
   // Инвентарь (модальное окно)
   | { type: 'openInventory' }
 
+  // Награда — показывает модалку с предметами, кнопка "Получить" выдаёт их и выполняет afterCollect
+  | { type: 'showItemReward'; items: Array<{ itemId: string; amount: number }>; afterCollect?: ButtonAction[] }
+
+  // Продвижение диалога: 1й вызов запускает, следующие листают, после последней — onDialogueEnd
+  | { type: 'advanceDialogue' }
+
   // Dialogue UI widget dynamics (Phase 3+)
   | { type: 'setWidgetProperty'; pageId: string; widgetId: string; key: string; value: any }
   | { type: 'setPortraitVariant'; pageId?: string; widgetId?: string; variant: string }
@@ -429,6 +435,10 @@ export type StudioPage = {
   uiLayoutPreset?: 'classic_vn' | 'bottom_bar' | 'left_bar' | 'full_dialogue_demo' | 'freeform' | 'custom';
   // Очередь реплик внутри страницы (опционально — заменяет page.text в playtest)
   dialogueLines?: DialogueLine[];
+  // Действия, выполняемые автоматически при входе на страницу в playtest
+  onEnter?: ButtonAction[];
+  // Действия, выполняемые когда игрок дочитал все реплики dialogueLines и кликает ещё раз
+  onDialogueEnd?: ButtonAction[];
 };
 
 export type BackgroundSettings = {
@@ -455,6 +465,14 @@ export type Background = {
   isBuiltIn?: boolean;     // prevent delete for legacy gradients
 };
 
+// === Choice Group item (new multi-button system) ===
+export interface ChoiceItem {
+  id: string;
+  text: { ru: string; en: string };
+  actions?: ButtonAction[];
+  visibleWhen?: Condition;
+}
+
 // === Dialogue UI Widgets (Variant C hybrid: positionable widgets on canvas) ===
 export type UIWidgetType =
   | 'dialogueBox'
@@ -464,7 +482,8 @@ export type UIWidgetType =
   | 'intensityBar'
   | 'textLabel'
   | 'container'
-  | 'speechBubble';
+  | 'speechBubble'
+  | 'inventory';
 
 export interface UIWidget {
   id: string;
@@ -482,6 +501,10 @@ export interface UIWidget {
   style?: string;   // 'default' | 'important' | custom skin id
   // For labels / text
   text?: LocalizedString;
+  // Action executed when clicked in playtest (for choiceButton and future interactive widgets)
+  action?: ButtonAction;
+  // Multi-action list — if present, runs all in sequence (overrides single action)
+  actions?: ButtonAction[];
   // Dynamic visibility (reuse Condition system)
   visibleWhen?: Condition;
   // Widget-specific data
@@ -492,9 +515,13 @@ export interface UIWidget {
     // dialogueBox
     speakerName?: string;
     textSource?: 'page' | 'custom';
-    // choiceButton
+    clickable?: boolean; // false = click does not advance dialogue (default true)
+    // choiceButton (legacy single)
     linkedButtonId?: string;
     imageOnly?: boolean;
+    // choiceButton (new group system)
+    items?: ChoiceItem[];
+    count?: number;
     // intensityBar
     valueVar?: string;
     parts?: number;
@@ -507,6 +534,10 @@ export interface UIWidget {
     title?: string;
     // speechBubble
     tailDirection?: 'bottom' | 'left' | 'right' | 'none';
+    // inventory
+    cols?: number;
+    rows?: number;
+    showTitle?: boolean;
     // etc.
   };
 }
@@ -594,6 +625,10 @@ type StudioState = {
     widgetOverrides: Record<string, Partial<UIWidget>>;
     // Текущий индекс реплики в dialogueLines (сбрасывается при смене страницы)
     dialogueLineIndex: number;
+    // true когда игрок нажал кнопку и запустил диалог (до этого — показывается статичный текст страницы)
+    dialogueStarted: boolean;
+    // Модалка награды — null если закрыта
+    itemRewardModal: { items: Array<{ itemId: string; amount: number }>; afterCollect?: ButtonAction[] } | null;
   };
 
   // Actions
@@ -715,6 +750,10 @@ type StudioState = {
   setMode: (mode: 'editor' | 'playtest') => void;
   enterPlaytest: () => void;
   exitPlaytest: () => void;
+  savePlaytestProgress: () => void;
+  loadPlaytestProgress: () => boolean;
+  clearPlaytestSave: () => void;
+  collectItemReward: () => void;
 
   renamePage: (oldId: string, newId: string, newTitle?: LocalizedString) => void;
   renameItem: (oldId: string, newId: string, newName?: LocalizedString) => void;
@@ -741,6 +780,15 @@ type StudioState = {
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   setSidebarsForPlaytest: (collapsed: boolean) => void;
+
+  // === Widget Library Modal ===
+  isWidgetLibraryOpen: boolean;
+  openWidgetLibrary: () => void;
+  closeWidgetLibrary: () => void;
+
+  // Editor dialogue preview: показывает конкретную реплику в canvas без плейтеста
+  editorDialoguePreviewLine: number | null;
+  setEditorDialoguePreview: (idx: number | null) => void;
 
   // Player stats panel (permanent collapsed block in editor)
   playerStatsCollapsed: boolean;
@@ -944,7 +992,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     isInventoryOpen: false,
     playerAvatar: 'default',
     widgetOverrides: {},
+    itemRewardModal: null,
     dialogueLineIndex: 0,
+    dialogueStarted: false,
   },
 
   // Canvas-only history (for button dragging on the canvas)
@@ -958,6 +1008,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   leftSidebarCollapsed: false,
   rightSidebarCollapsed: false,
   leftSidebarLocked: false,
+  isWidgetLibraryOpen: false,
+  editorDialoguePreviewLine: null,
 
   // Acts system
   acts: [],
@@ -985,7 +1037,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   setPages: (pages) => set({ pages }),
 
-  selectPage: (id) => set({ selectedPageId: id, selectedButtonId: null, selectedWidgetId: null }),
+  selectPage: (id) => set({ selectedPageId: id, selectedButtonId: null, selectedWidgetId: null, editorDialoguePreviewLine: null }),
 
   selectButton: (id) => {
     set((s) => ({ selectedButtonId: id, selectedWidgetId: id ? null : s.selectedWidgetId }));
@@ -1033,13 +1085,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         if (newSpeaker && newSpeaker !== 'none' && (!next.uiWidgets || next.uiWidgets.length === 0)) {
           next.uiWidgets = [
             {
-              id: `w_dlg_${Date.now().toString(36)}`,
+              id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
               type: 'dialogueBox',
               layout: { x: 16, y: 78, width: 68, height: 12, z: 20 },
               style: 'default',
             },
             {
-              id: `w_spk_${Date.now().toString(36)}`,
+              id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
               type: 'textLabel',
               layout: { x: 42, y: 58, width: 16, height: 3, z: 15 },
               style: 'default',
@@ -1245,6 +1297,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           return btn;
         })
       }))
+    }));
+
+    // Update acts and unassigned that reference the old page ID
+    set((s) => ({
+      acts: s.acts.map(a => ({
+        ...a,
+        pageIds: a.pageIds.map(pid => (pid === oldId ? trimmedNewId : pid)),
+      })),
+      unassignedPageIds: s.unassignedPageIds.map(pid => (pid === oldId ? trimmedNewId : pid)),
     }));
 
     // If the renamed page was selected, update selection
@@ -1718,7 +1779,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   addUIWidget: (pageId, widgetData) => {
     const newWidget: UIWidget = {
       ...widgetData,
-      id: `uiw_${Date.now().toString(36)}`,
+      id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     };
     set((state) => ({
       pages: state.pages.map((p) =>
@@ -1760,8 +1821,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     let defaultWidgets: UIWidget[] = [];
     if (preset === 'classic_vn') {
       defaultWidgets = [
-        { id: `w_dlg_${Date.now()}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
-        { id: `w_spk_${Date.now()}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default' },
+        { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+        { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default' },
       ];
     } else if (preset === 'bottom_bar') {
       defaultWidgets = [
@@ -1780,7 +1841,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       ];
     } else if (preset === 'full_dialogue_demo') {
       defaultWidgets = [
-        { id: `w_dlg_${Date.now()}`, type: 'dialogueBox', layout: { x: 15, y: 70, width: 70, height: 20, z: 20 }, style: 'default' },
+        { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'dialogueBox', layout: { x: 15, y: 70, width: 70, height: 20, z: 20 }, style: 'default' },
         { id: `w_port1_${Date.now()}`, type: 'portrait', layout: { x: 78, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'mila', variant: 'neutral' } },
         { id: `w_port2_${Date.now()}`, type: 'portrait', layout: { x: 2, y: 25, width: 18, height: 38, z: 5 }, data: { speakerId: 'slay', variant: 'default' } },
         { id: `w_cont_${Date.now()}`, type: 'container', layout: { x: 1, y: 12, width: 10, height: 75, z: 1 }, data: { title: 'Меню' } },
@@ -1922,6 +1983,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         playerAvatar: 'default',
         widgetOverrides: {},
         dialogueLineIndex: 0,
+        dialogueStarted: false,
+        itemRewardModal: null,
       },
       snappingGuide: null,
     });
@@ -2063,19 +2126,60 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setMode: (newMode) => set({ mode: newMode }),
 
   enterPlaytest: () => {
-    const currentPlaytest = get().playtestState;
-
-    // If this is a fresh Playtest session (no values yet), seed from starting inventory
-    if (Object.keys(currentPlaytest.variableValues).length === 0) {
-      get().resetPlaytestState();
-    }
+    // Auto-load save if it exists, otherwise reset to defaults
+    const loaded = get().loadPlaytestProgress();
+    if (!loaded) get().resetPlaytestState();
 
     const locked = get().leftSidebarLocked;
     set({
       mode: 'playtest',
-      // Collapse sidebars unless locked by user
       ...(locked ? {} : { leftSidebarCollapsed: true, rightSidebarCollapsed: true }),
     });
+  },
+
+  savePlaytestProgress: () => {
+    try {
+      const { playtestState } = get();
+      const save = {
+        variableValues: playtestState.variableValues,
+        equippedSlots: playtestState.equippedSlots,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('slay-playtest-save', JSON.stringify(save));
+    } catch {}
+  },
+
+  loadPlaytestProgress: () => {
+    try {
+      const raw = localStorage.getItem('slay-playtest-save');
+      if (!raw) return false;
+      const save = JSON.parse(raw);
+      set((s) => ({
+        playtestState: {
+          ...s.playtestState,
+          variableValues: save.variableValues || {},
+          equippedSlots: save.equippedSlots || {},
+        },
+      }));
+      return true;
+    } catch { return false; }
+  },
+
+  clearPlaytestSave: () => {
+    try { localStorage.removeItem('slay-playtest-save'); } catch {}
+  },
+
+  collectItemReward: () => {
+    const { playtestState } = get();
+    const reward = playtestState.itemRewardModal;
+    if (!reward) return;
+    set((s) => ({ playtestState: { ...s.playtestState, itemRewardModal: null } }));
+    for (const { itemId, amount } of reward.items) {
+      get().executeAction({ type: 'giveItem', itemId, amount });
+    }
+    if (reward.afterCollect?.length) {
+      for (const a of reward.afterCollect) get().executeAction(a);
+    }
   },
 
   exitPlaytest: () => {
@@ -2090,6 +2194,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Sidebar collapse helpers
   toggleLeftSidebar: () => set((state) => ({ leftSidebarCollapsed: !state.leftSidebarCollapsed })),
   toggleRightSidebar: () => set((state) => ({ rightSidebarCollapsed: !state.rightSidebarCollapsed })),
+
+  // Widget Library Modal
+  openWidgetLibrary: () => set({ isWidgetLibraryOpen: true }),
+  closeWidgetLibrary: () => set({ isWidgetLibraryOpen: false }),
+
+  setEditorDialoguePreview: (idx) => set({ editorDialoguePreviewLine: idx }),
 
   togglePlayerStatsCollapsed: () => set((state) => ({ playerStatsCollapsed: !state.playerStatsCollapsed })),
 
@@ -2450,18 +2560,55 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         get().selectPage(action.pageId);
         get().selectButton(null);
         set((s) => ({
-          playtestState: { ...s.playtestState, dialogueLineIndex: 0, widgetOverrides: {} },
+          playtestState: { ...s.playtestState, dialogueLineIndex: 0, dialogueStarted: false, widgetOverrides: {} },
         }));
-        break;
+        const targetPage = get().pages.find(p => p.id === action.pageId);
+        if (targetPage?.onEnter?.length) {
+          for (const enterAction of targetPage.onEnter) {
+            get().executeAction(enterAction);
+          }
+        }
+        return;
       }
       case 'openInventory': {
         set((s) => ({
-          playtestState: {
-            ...s.playtestState,
-            isInventoryOpen: true,
-          },
+          playtestState: { ...s.playtestState, isInventoryOpen: true },
         }));
         break;
+      }
+      case 'showItemReward': {
+        set((s) => ({
+          playtestState: {
+            ...s.playtestState,
+            itemRewardModal: { items: action.items, afterCollect: action.afterCollect },
+          },
+        }));
+        return;
+      }
+      case 'advanceDialogue': {
+        const { playtestState: ps, pages, selectedPageId } = get();
+        const page = pages.find(p => p.id === selectedPageId);
+        if (!page?.dialogueLines?.length) return;
+        if (!ps.dialogueStarted) {
+          // Первый вызов — запускаем с первой реплики
+          set((s) => ({
+            playtestState: { ...s.playtestState, dialogueStarted: true, dialogueLineIndex: 0 },
+          }));
+        } else {
+          const current = ps.dialogueLineIndex;
+          const total = page.dialogueLines.length;
+          if (current < total - 1) {
+            set((s) => ({
+              playtestState: { ...s.playtestState, dialogueLineIndex: current + 1 },
+            }));
+          } else {
+            // Последняя реплика — запускаем onDialogueEnd
+            if (page.onDialogueEnd?.length) {
+              for (const a of page.onDialogueEnd) get().executeAction(a);
+            }
+          }
+        }
+        return;
       }
       case 'setWidgetProperty': {
         set((s) => ({
@@ -2525,6 +2672,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         variableValues: currentValues,
       },
     }));
+    get().savePlaytestProgress();
   },
 
   // === Project Persistence ===
@@ -2577,22 +2725,58 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         // One-time seed defaults for legacy dialog pages that have speaker but no widgets yet
         if (pg.speaker && pg.speaker !== 'none' && (!pg.uiWidgets || pg.uiWidgets.length === 0)) {
           pg.uiWidgets = [
-            { id: `w_dlg_${Date.now().toString(36)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
-            { id: `w_spk_${Date.now().toString(36)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
+            { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+            { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
           ];
           pg.uiLayoutPreset = 'classic_vn';
         }
         return pg;
       });
 
+      // Sanitize: ensure all uiWidget IDs are globally unique (fix duplicate IDs from old presets)
+      const seenWidgetIds = new Set<string>();
+      const sanitizedPages = migratedPages.map((p: any) => ({
+        ...p,
+        uiWidgets: (p.uiWidgets || []).map((w: any) => {
+          if (seenWidgetIds.has(w.id)) {
+            return { ...w, id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}` };
+          }
+          seenWidgetIds.add(w.id);
+          return w;
+        }),
+      }));
+
       // Migration: if acts not present, put all pages in unassigned
-      const loadedActs: StudioAct[] = parsed.acts || [];
-      const loadedUnassigned: string[] = parsed.unassignedPageIds
-        || (parsed.acts ? [] : migratedPages.map((p: any) => p.id));
+      const rawActs: StudioAct[] = parsed.acts || [];
+      const rawUnassigned: string[] = parsed.unassignedPageIds
+        || (parsed.acts ? [] : sanitizedPages.map((p: any) => p.id));
+
+      // Sanitize: remove act.pageIds that no longer exist in pages (e.g. after a rename without the fix)
+      const validPageIds = new Set<string>(sanitizedPages.map((p: any) => p.id));
+      const loadedActs = rawActs.map((a: StudioAct) => ({
+        ...a,
+        pageIds: a.pageIds.filter((pid: string) => validPageIds.has(pid)),
+      }));
+
+      // Collect all page IDs that are tracked somewhere
+      const trackedIds = new Set<string>([
+        ...loadedActs.flatMap((a: StudioAct) => a.pageIds),
+        ...rawUnassigned.filter((pid: string) => validPageIds.has(pid)),
+      ]);
+
+      // Any page that slipped through (renamed before fix, orphaned) goes to unassigned
+      const orphaned = sanitizedPages
+        .map((p: any) => p.id)
+        .filter((pid: string) => !trackedIds.has(pid));
+
+      const loadedUnassigned = [
+        ...rawUnassigned.filter((pid: string) => validPageIds.has(pid)),
+        ...orphaned,
+      ];
 
       set({
         meta: parsed.meta || createInitialMeta(),
-        pages: migratedPages,
+        pages: sanitizedPages,
         selectedPageId: parsed.selectedPageId || migratedPages[0]?.id || null,
         selectedButtonId: null,
         selectedWidgetId: null,
@@ -2679,8 +2863,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         };
         if (pg.speaker && pg.speaker !== 'none' && (!pg.uiWidgets || pg.uiWidgets.length === 0)) {
           pg.uiWidgets = [
-            { id: `w_dlg_${Date.now().toString(36)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
-            { id: `w_spk_${Date.now().toString(36)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
+            { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default' },
+            { id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, type: 'textLabel', layout: { x: 42, y: 58, width: 16, height: 3, z: 15 }, style: 'default', data: { speakerId: pg.speaker } },
           ];
           pg.uiLayoutPreset = 'classic_vn';
         }
@@ -2759,6 +2943,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         playerAvatar: 'default',
         widgetOverrides: {},
         dialogueLineIndex: 0,
+        dialogueStarted: false,
+        itemRewardModal: null,
       },
       canvasWidth: 1280,
       canvasHeight: 720,
@@ -2893,7 +3079,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     cloned.id = newId;
     cloned.title = { ru: src.title.ru + ' (копия)', en: src.title.en + ' (copy)' };
     cloned.buttons = cloned.buttons.map((b, i) => ({ ...b, id: `btn_${ts}_${i}` }));
-    cloned.uiWidgets = (cloned.uiWidgets || []).map((w, i) => ({ ...w, id: `uiw_${ts}_${i}` }));
+    cloned.uiWidgets = (cloned.uiWidgets || []).map((w) => ({ ...w, id: `uiw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}` }));
     const srcIdx = state.pages.findIndex((p) => p.id === id);
     const newPages = [...state.pages];
     newPages.splice(srcIdx + 1, 0, cloned);
@@ -2917,14 +3103,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
-  deletePage: (id) =>
+  deletePage: (id) => {
     set((state) => {
       const filtered = state.pages.filter((p) => p.id !== id);
       const newSelected = state.selectedPageId === id ? (filtered[0]?.id ?? null) : state.selectedPageId;
-      // Remove from acts and unassigned
       const newActs = state.acts.map((a) => ({ ...a, pageIds: a.pageIds.filter((pid) => pid !== id) }));
       const newUnassigned = state.unassignedPageIds.filter((pid) => pid !== id);
-      const result = {
+      return {
         pages: filtered,
         acts: newActs,
         unassignedPageIds: newUnassigned,
@@ -2932,8 +3117,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         selectedButtonId: null,
         selectedWidgetId: null,
       };
-      return result;
-    }),
+    });
+    get().saveToLocalStorage();
+  },
 }));
 
 // Helper to get current page
