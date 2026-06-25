@@ -5,13 +5,16 @@ interface ActionEditorProps {
   onChange: (action: any) => void;
   variables: any[];
   items: any[];
-  widgets?: any[]; // uiWidgets of current page, for widget-targeting actions
+  widgets?: any[];
+  speakers?: any[];
 }
 
-export default function ActionEditor({ action, onChange, variables, items, widgets = [] }: ActionEditorProps) {
+export default function ActionEditor({ action, onChange, variables, items, widgets = [], speakers = [] }: ActionEditorProps) {
   const type = action.type;
 
   const portraitWidgets = widgets.filter((w: any) => w.type === 'portrait');
+  const playerVars = variables.filter((v: any) => v.category === 'player');
+  const resourceVars = variables.filter((v: any) => v.category === 'resources');
 
   const changeType = (newType: string) => {
     let newAction: any = { type: newType };
@@ -132,22 +135,67 @@ export default function ActionEditor({ action, onChange, variables, items, widge
         </div>
       )}
 
-      {(type === 'changeRelationship' || type === 'changeReputation' || type === 'changePlayerStat') && (
-        <div className="grid grid-cols-2 gap-2">
-          {type === 'changeRelationship' && <input value={action.characterId || ''} onChange={(e) => onChange({ ...action, characterId: e.target.value })} placeholder="mila" className={selectCls} />}
-          {type === 'changePlayerStat' && <select value={action.stat || 'strength'} onChange={(e) => onChange({ ...action, stat: e.target.value })} className={selectCls}><option value="strength">Сила</option><option value="level">Уровень</option></select>}
-          <input type="number" value={action.delta ?? 0} onChange={(e) => onChange({ ...action, delta: parseInt(e.target.value) || 0 })} className={selectCls} />
+      {type === 'changeRelationship' && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            {speakers.length > 0 ? (
+              <select value={action.characterId || ''} onChange={(e) => onChange({ ...action, characterId: e.target.value })} className={selectCls}>
+                <option value="">— персонаж —</option>
+                {speakers.map((s: any) => <option key={s.id} value={s.id}>{s.displayName?.ru || s.id}</option>)}
+              </select>
+            ) : (
+              <input value={action.characterId || ''} onChange={(e) => onChange({ ...action, characterId: e.target.value })} placeholder="characterId (mila)" className={selectCls} />
+            )}
+            <input type="number" value={action.delta ?? 0} onChange={(e) => onChange({ ...action, delta: parseInt(e.target.value) || 0 })} className={selectCls} />
+          </div>
+          <p className="text-[10px] text-[var(--studio-text-muted)] italic">
+            Ищет переменную <span className="font-mono">relationship_{'{characterId}'}</span> и добавляет дельту.
+          </p>
+        </div>
+      )}
+
+      {type === 'changeReputation' && (
+        <div className="space-y-1.5">
+          <input type="number" value={action.delta ?? 0} onChange={(e) => onChange({ ...action, delta: parseInt(e.target.value) || 0 })} className={inputCls} />
+          <p className="text-[10px] text-[var(--studio-text-muted)] italic">Ищет переменную <span className="font-mono">reputation</span> и добавляет дельту.</p>
+        </div>
+      )}
+
+      {type === 'changePlayerStat' && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            {playerVars.length > 0 ? (
+              <select value={action.stat || ''} onChange={(e) => onChange({ ...action, stat: e.target.value })} className={selectCls}>
+                <option value="">— стат —</option>
+                {playerVars.map((v: any) => <option key={v.id} value={v.name}>{v.displayName?.ru || v.name}</option>)}
+              </select>
+            ) : (
+              <input value={action.stat || ''} onChange={(e) => onChange({ ...action, stat: e.target.value })} placeholder="strength" className={selectCls} />
+            )}
+            <input type="number" value={action.delta ?? 0} onChange={(e) => onChange({ ...action, delta: parseInt(e.target.value) || 0 })} className={selectCls} />
+          </div>
+          <p className="text-[10px] text-[var(--studio-text-muted)] italic">Ищет переменную по имени стата и добавляет дельту.</p>
         </div>
       )}
 
       {(type === 'giveResource' || type === 'removeResource') && (
-        <div className="grid grid-cols-2 gap-2">
-          <select value={action.resource || 'coins'} onChange={(e) => onChange({ ...action, resource: e.target.value })} className={selectCls}>
-            <option value="coins">Монеты</option>
-            <option value="gasoline">Бензин</option>
-            <option value="gems">Кристаллы</option>
-          </select>
-          <input type="number" value={action.amount || 1} onChange={(e) => onChange({ ...action, amount: parseInt(e.target.value) || 1 })} className={selectCls} />
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            {resourceVars.length > 0 ? (
+              <select value={action.resource || ''} onChange={(e) => onChange({ ...action, resource: e.target.value })} className={selectCls}>
+                <option value="">— ресурс —</option>
+                {resourceVars.map((v: any) => <option key={v.id} value={v.name}>{v.displayName?.ru || v.name}</option>)}
+              </select>
+            ) : (
+              <select value={action.resource || 'coins'} onChange={(e) => onChange({ ...action, resource: e.target.value })} className={selectCls}>
+                <option value="coins">Монеты</option>
+                <option value="gasoline">Бензин</option>
+                <option value="gems">Кристаллы</option>
+              </select>
+            )}
+            <input type="number" value={action.amount || 1} onChange={(e) => onChange({ ...action, amount: parseInt(e.target.value) || 1 })} className={selectCls} />
+          </div>
+          <p className="text-[10px] text-[var(--studio-text-muted)] italic">Ищет переменную по имени ресурса и {type === 'giveResource' ? 'добавляет' : 'вычитает'} количество.</p>
         </div>
       )}
 

@@ -170,12 +170,40 @@ export const createPlaytestSlice = (set: any, get: any) => ({
         }
         break;
       }
-      case 'changeRelationship':
-      case 'changeReputation':
-      case 'changePlayerStat':
-      case 'giveResource':
+      case 'changeRelationship': {
+        const varName = `relationship_${(action as any).characterId}`;
+        const v = state.variables.find((v: any) => v.name === varName);
+        if (v) {
+          currentValues[v.id] = Number(currentValues[v.id] ?? v.defaultValue ?? 0) + (action as any).delta;
+        }
+        break;
+      }
+      case 'changeReputation': {
+        const v = state.variables.find((v: any) => v.name === 'reputation');
+        if (v) {
+          currentValues[v.id] = Number(currentValues[v.id] ?? v.defaultValue ?? 0) + (action as any).delta;
+        }
+        break;
+      }
+      case 'changePlayerStat': {
+        const v = state.variables.find((v: any) => v.name === (action as any).stat);
+        if (v) {
+          currentValues[v.id] = Number(currentValues[v.id] ?? v.defaultValue ?? 0) + (action as any).delta;
+        }
+        break;
+      }
+      case 'giveResource': {
+        const v = state.variables.find((v: any) => v.name === (action as any).resource);
+        if (v) {
+          currentValues[v.id] = Math.max(0, Number(currentValues[v.id] ?? v.defaultValue ?? 0) + (action as any).amount);
+        }
+        break;
+      }
       case 'removeResource': {
-        console.log('Action executed (preview):', action);
+        const v = state.variables.find((v: any) => v.name === (action as any).resource);
+        if (v) {
+          currentValues[v.id] = Math.max(0, Number(currentValues[v.id] ?? v.defaultValue ?? 0) - (action as any).amount);
+        }
         break;
       }
       case 'goToPage': {

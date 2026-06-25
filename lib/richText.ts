@@ -15,7 +15,8 @@ export type TextSegment = {
   bold: boolean;
   italic: boolean;
   color: string | null;
-  size: number | null; // null = использовать дефолтный fontSize
+  size: number | null;
+  wave: boolean;
 };
 
 export type RenderedWord = {
@@ -25,7 +26,8 @@ export type RenderedWord = {
   bold: boolean;
   italic: boolean;
   color: string;
-  size: number; // итоговый размер шрифта для этого слова
+  size: number;
+  wave: boolean;
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -44,9 +46,7 @@ export function parseRichText(raw: string): TextSegment[] {
   const cleaned = raw
     .replace(/\[pause\]/g, '')
     .replace(/\[shake\]/g, '')
-    .replace(/\[\/shake\]/g, '')
-    .replace(/\[wave\]/g, '')
-    .replace(/\[\/wave\]/g, '');
+    .replace(/\[\/shake\]/g, '');
 
   const segments: TextSegment[] = [];
   let current = '';
@@ -54,10 +54,11 @@ export function parseRichText(raw: string): TextSegment[] {
   let italic = false;
   let color: string | null = null;
   let size: number | null = null;
+  let wave = false;
 
   const flush = () => {
     if (current) {
-      segments.push({ text: current, bold, italic, color, size });
+      segments.push({ text: current, bold, italic, color, size, wave });
       current = '';
     }
   };
@@ -131,6 +132,20 @@ export function parseRichText(raw: string): TextSegment[] {
       }
     }
     if (matched) continue;
+
+    // [wave] / [/wave]
+    if (cleaned.startsWith('[wave]', i)) {
+      flush();
+      wave = true;
+      i += 6;
+      continue;
+    }
+    if (cleaned.startsWith('[/wave]', i)) {
+      flush();
+      wave = false;
+      i += 7;
+      continue;
+    }
 
     // Unknown [tag] — skip silently
     if (cleaned[i] === '[') {
@@ -239,7 +254,7 @@ export function layoutRichText(segments: TextSegment[], opts: LayoutOpts): RichT
           curY += lineH;
         }
         if (curX === 0 && !token.trim()) continue;
-        words.push({ text: token, x: curX, y: curY, bold, italic, color, size: segFontSize });
+        words.push({ text: token, x: curX, y: curY, bold, italic, color, size: segFontSize, wave: seg.wave });
         curX += tw;
       }
     }

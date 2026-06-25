@@ -8,7 +8,7 @@ import type { UIWidget } from '@/lib/store';
 
 // ── Per-slot editor for choiceButton group ─────────────────────────────────────
 function SlotEditor({
-  index, item, variables, items, widgets,
+  index, item, variables, items, widgets, speakers = [],
   onTextChange, onActionsChange, onConditionChange, onRemove,
 }: {
   index: number;
@@ -16,6 +16,7 @@ function SlotEditor({
   variables: any[];
   items: any[];
   widgets: any[];
+  speakers?: any[];
   onTextChange: (ru: string) => void;
   onActionsChange: (acts: any[]) => void;
   onConditionChange: (cond: any) => void;
@@ -88,6 +89,7 @@ function SlotEditor({
                     variables={variables}
                     items={items}
                     widgets={widgets}
+                    speakers={speakers}
                   />
                 </div>
               ))}
@@ -409,6 +411,7 @@ export default function PageSection({
                           variables={variables}
                           items={items}
                           widgets={currentPage?.uiWidgets || []}
+                          speakers={speakers}
                         />
                       </div>
                     ))}
@@ -467,7 +470,7 @@ export default function PageSection({
                           <span className="text-[10px] text-[var(--studio-text-muted)] font-mono">#{i + 1}</span>
                           <button onClick={() => removeAction(i)} className="text-[10px] text-[var(--studio-danger,#ef4444)] hover:underline">Удалить</button>
                         </div>
-                        <ActionEditor action={action} onChange={(a: any) => updateAction(i, a)} variables={variables} items={items} widgets={currentPage?.uiWidgets || []} />
+                        <ActionEditor action={action} onChange={(a: any) => updateAction(i, a)} variables={variables} items={items} widgets={currentPage?.uiWidgets || []} speakers={speakers} />
                       </div>
                     ))}
                     <button
@@ -778,6 +781,7 @@ export default function PageSection({
                             variables={st.variables || []}
                             items={st.items || []}
                             widgets={currentPage?.uiWidgets || []}
+                            speakers={speakers}
                             onTextChange={(ru) => updateSlotText(i, ru)}
                             onActionsChange={(acts) => updateSlotActions(i, acts)}
                             onConditionChange={(cond) => updateSlotCondition(i, cond)}

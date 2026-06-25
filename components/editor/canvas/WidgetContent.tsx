@@ -140,17 +140,20 @@ export default function WidgetContent({
           />
         )}
         <Group x={shakeX + innerPad} y={shakeY + textStartY}>
-          {richWords.map((word, idx) => (
-            <Text
-              key={idx}
-              x={word.x} y={word.y}
-              text={word.text}
-              fontSize={word.size}
-              fill={word.color}
-              fontFamily={theme.fontFamily}
-              fontStyle={word.bold && word.italic ? 'bold italic' : word.bold ? 'bold' : word.italic ? 'italic' : 'normal'}
-            />
-          ))}
+          {richWords.map((word, idx) => {
+            const waveY = word.wave ? Math.sin(Date.now() / 300 + idx * 0.5) * 2.5 : 0;
+            return (
+              <Text
+                key={idx}
+                x={word.x} y={word.y + waveY}
+                text={word.text}
+                fontSize={word.size}
+                fill={word.color}
+                fontFamily={theme.fontFamily}
+                fontStyle={word.bold && word.italic ? 'bold italic' : word.bold ? 'bold' : word.italic ? 'italic' : 'normal'}
+              />
+            );
+          })}
         </Group>
         {isPlaytest && (() => {
           const prog = typewriterProgress[widget.id] ?? 0;
@@ -561,17 +564,20 @@ export default function WidgetContent({
           height={wH}
         />
         <Group x={textOffsetX + innerPad} y={textOffsetY + innerPad}>
-          {sbWords.map((word, idx) => (
-            <Text
-              key={idx}
-              x={word.x} y={word.y}
-              text={word.text}
-              fontSize={word.size}
-              fill={word.color}
-              fontFamily={theme.fontFamily}
-              fontStyle={word.bold && word.italic ? 'bold italic' : word.bold ? 'bold' : word.italic ? 'italic' : 'normal'}
-            />
-          ))}
+          {sbWords.map((word, idx) => {
+            const waveY = word.wave ? Math.sin(Date.now() / 300 + idx * 0.5) * 2.5 : 0;
+            return (
+              <Text
+                key={idx}
+                x={word.x} y={word.y + waveY}
+                text={word.text}
+                fontSize={word.size}
+                fill={word.color}
+                fontFamily={theme.fontFamily}
+                fontStyle={word.bold && word.italic ? 'bold italic' : word.bold ? 'bold' : word.italic ? 'italic' : 'normal'}
+              />
+            );
+          })}
         </Group>
       </>
     );
