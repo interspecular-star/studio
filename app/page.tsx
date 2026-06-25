@@ -44,7 +44,6 @@ export default function SlayStudio() {
     openWidgetLibrary,
     rightSidebarCollapsed,
     toggleRightSidebar,
-    showEditorHUD,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -73,9 +72,9 @@ export default function SlayStudio() {
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
   const shouldShowTopResourceBar = (): boolean => {
-    if (mode === 'editor') return showEditorHUD && currentPage?.showTopResourceBar !== false;
-    if (mode !== 'playtest') return false;
     if (currentPage?.showTopResourceBar === false) return false;
+    if (mode === 'editor') return true;
+    if (mode !== 'playtest') return false;
     if (playtestState.isInventoryOpen) return false;
     const scene = currentPage?.sceneType;
     const dialogText = currentPage?.text?.ru?.trim() || '';

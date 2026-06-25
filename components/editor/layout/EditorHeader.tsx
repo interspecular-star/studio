@@ -39,8 +39,6 @@ export default function EditorHeader() {
     clearPlaytestSave,
     playtestState,
     variables,
-    showEditorHUD,
-    setShowEditorHUD,
   } = useStudioStore();
 
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'restored'>('saved');
@@ -283,18 +281,6 @@ export default function EditorHeader() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Editor HUD toggle */}
-        <div className="flex items-center gap-2 pl-3 border-l border-[var(--studio-border)]">
-          <span className="text-xs text-[var(--studio-text-muted)]">HUD</span>
-          <button
-            onClick={() => setShowEditorHUD(!showEditorHUD)}
-            className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors ${showEditorHUD ? 'bg-[var(--studio-accent)]' : 'bg-[var(--studio-border)]'}`}
-            title={showEditorHUD ? 'Скрыть игровой HUD в редакторе' : 'Показать игровой HUD в редакторе'}
-          >
-            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showEditorHUD ? 'translate-x-[17px]' : 'translate-x-0.5'}`} />
-          </button>
         </div>
 
         {/* Snapping Toggle */}

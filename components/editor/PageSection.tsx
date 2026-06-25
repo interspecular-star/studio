@@ -975,8 +975,7 @@ export default function PageSection({
               Показывать HUD ресурсов по умолчанию на этой сцене
             </label>
             <div className="text-[9px] text-[var(--studio-text-muted)] pl-5">
-              Это — дизайнерское намерение для финальной игры. 
-              Во время Playtest есть отдельная кнопка «HUD: force show» над холстом — она позволяет видеть бар на любой странице независимо от этих настроек (удобно для тестирования).
+              HUD всегда виден в редакторе и в плейтесте. Выключи, чтобы скрыть на этой сцене.
             </div>
 
             {/* sceneType (bonus for smart defaults + future logic) */}
