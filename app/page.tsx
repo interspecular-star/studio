@@ -44,6 +44,7 @@ export default function SlayStudio() {
     openWidgetLibrary,
     rightSidebarCollapsed,
     toggleRightSidebar,
+    showEditorHUD,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
@@ -73,6 +74,7 @@ export default function SlayStudio() {
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
   const shouldShowTopResourceBar = (): boolean => {
+    if (mode === 'editor') return showEditorHUD && currentPage?.showTopResourceBar !== false;
     if (mode !== 'playtest') return false;
     if (currentPage?.showTopResourceBar === false) return false;
     if (hudOverride === 'force-show') return true;
@@ -169,7 +171,14 @@ export default function SlayStudio() {
               </div>
             ) : (
               <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
-                <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+                <>
+                  <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+                  {shouldShowTopResourceBar() && (
+                    <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none border-b border-[var(--studio-border)]/60 opacity-80">
+                      <TopResourceBar currentPage={currentPage} variables={variables} playtestState={playtestState} />
+                    </div>
+                  )}
+                </>
               </CanvasWithRulers>
             )}
 

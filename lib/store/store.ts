@@ -111,6 +111,9 @@ type StudioState = {
   // Canvas size (design resolution, 16:9 recommended). Changing it re-interprets all % button layouts on the new aspect.
   setCanvasSize: (width: number, height: number) => void;
 
+  showEditorHUD: boolean;
+  setShowEditorHUD: (v: boolean) => void;
+
   // === Project Persistence ===
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => boolean; // returns true if something was loaded
@@ -314,6 +317,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // Canvas design resolution (16:9). Buttons layouts are % so they adapt when changed.
   canvasWidth: 1280,
   canvasHeight: 720,
+
+  showEditorHUD: false,
 
   // Items registry (Вариант Б — сразу делаем реестр предметов)
   items: [],
@@ -871,6 +876,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set({ canvasWidth: w, canvasHeight: h });
     get().saveToLocalStorage();
   },
+
+  setShowEditorHUD: (v) => set({ showEditorHUD: v }),
 
   // === Items Management (Вариант Б) ===
   addItem: (itemData) => {
