@@ -21,7 +21,7 @@ type StudioState = {
   coordinateClipboard: { x: number; y: number; width: number; height: number } | null;
 
   // Widget/button clipboard for Ctrl+C / Ctrl+V / Ctrl+D
-  widgetClipboard: { kind: 'widget'; item: UIWidget } | { kind: 'button'; item: StudioButton } | null;
+  widgetClipboard: { kind: 'widget'; item: UIWidget; sourcePageId: string } | { kind: 'button'; item: StudioButton; sourcePageId: string } | null;
 
   // Guides for visual alignment (project-level, percentages 0-100)
   guides: {
@@ -1062,10 +1062,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (!page) return;
     if (state.selectedWidgetId) {
       const widget = (page.uiWidgets || []).find((w) => w.id === state.selectedWidgetId);
-      if (widget) set({ widgetClipboard: { kind: 'widget', item: JSON.parse(JSON.stringify(widget)) } });
+      if (widget) set({ widgetClipboard: { kind: 'widget', item: JSON.parse(JSON.stringify(widget)), sourcePageId: state.selectedPageId! } });
     } else if (state.selectedButtonId) {
       const button = page.buttons.find((b) => b.id === state.selectedButtonId);
-      if (button) set({ widgetClipboard: { kind: 'button', item: JSON.parse(JSON.stringify(button)) } });
+      if (button) set({ widgetClipboard: { kind: 'button', item: JSON.parse(JSON.stringify(button)), sourcePageId: state.selectedPageId! } });
     }
   },
 
@@ -1073,8 +1073,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const state = get();
     const { widgetClipboard, selectedPageId } = state;
     if (!widgetClipboard || !selectedPageId) return;
-    const dx = offset ? 2 : 0;
-    const dy = offset ? 2 : 0;
+    const crossPage = widgetClipboard.sourcePageId !== selectedPageId;
+    const dx = (offset && !crossPage) ? 2 : 0;
+    const dy = (offset && !crossPage) ? 2 : 0;
     const newId = Date.now().toString(36);
     if (widgetClipboard.kind === 'widget') {
       const src = widgetClipboard.item;

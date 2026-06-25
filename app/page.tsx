@@ -52,7 +52,6 @@ export default function SlayStudio() {
   const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
   const [editingPageId, setEditingPageId] = useState('');
   const [rightTab, setRightTab] = useState<'page' | 'world'>('page');
-  const [hudOverride, setHudOverride] = useState<'auto' | 'force-show' | 'force-hide'>('auto');
 
   useEffect(() => {
     if (currentPage) {
@@ -77,8 +76,6 @@ export default function SlayStudio() {
     if (mode === 'editor') return showEditorHUD && currentPage?.showTopResourceBar !== false;
     if (mode !== 'playtest') return false;
     if (currentPage?.showTopResourceBar === false) return false;
-    if (hudOverride === 'force-show') return true;
-    if (hudOverride === 'force-hide') return false;
     if (playtestState.isInventoryOpen) return false;
     const scene = currentPage?.sceneType;
     const dialogText = currentPage?.text?.ru?.trim() || '';
@@ -138,20 +135,7 @@ export default function SlayStudio() {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 text-[var(--studio-text-muted)]">
-              <button
-                onClick={() => {
-                  const order: Array<'auto' | 'force-show' | 'force-hide'> = ['auto', 'force-show', 'force-hide'];
-                  setHudOverride(order[(order.indexOf(hudOverride) + 1) % order.length]);
-                }}
-                className={`rounded border px-1.5 py-0.5 text-[9px] transition-colors ${hudOverride !== 'auto' ? 'border-[var(--studio-accent)] text-[var(--studio-accent)]' : 'border-[var(--studio-border)] hover:border-[var(--studio-accent)]'}`}
-                title="Видимость игрового HUD (TopResourceBar)"
-              >
-                {hudOverride === 'auto' && 'HUD: авто'}
-                {hudOverride === 'force-show' && 'HUD: показать'}
-                {hudOverride === 'force-hide' && 'HUD: скрыть'}
-              </button>
-            </div>
+            <div />
           </div>
 
           <div className="flex flex-1 items-center justify-center bg-[#161310] p-6 overflow-auto relative">

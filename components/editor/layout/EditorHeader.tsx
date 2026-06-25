@@ -16,7 +16,6 @@ export default function EditorHeader() {
   const {
     meta,
     pages,
-    selectedPageId,
     mode,
     enterPlaytest,
     exitPlaytest,
@@ -102,8 +101,6 @@ export default function EditorHeader() {
     setIsEditingName(false);
   };
   const cancelEditingName = () => setIsEditingName(false);
-
-  const currentPage = pages.find(p => p.id === selectedPageId);
 
   // Count variables that differ from their defaults in current playtest state
   const changedVarsCount = variables.filter(v => {
@@ -234,19 +231,7 @@ export default function EditorHeader() {
           </button>
         </div>
 
-        {/* Page info */}
-        {currentPage && (
-          <div className="flex items-center gap-1.5 pl-3 border-l border-[var(--studio-border)]">
-            <div className="flex flex-col items-end leading-none">
-              <span className="text-xs font-medium text-[var(--studio-text-primary)] max-w-[140px] truncate" title={currentPage.title?.ru || currentPage.id}>
-                {currentPage.title?.ru || '—'}
-              </span>
-              <span className="text-[10px] font-mono text-[var(--studio-text-muted)]" title={currentPage.id}>
-                {currentPage.id}
-              </span>
-            </div>
-          </div>
-        )}
+
 
         {/* Canvas size selector */}
         <div className="relative pl-3 border-l border-[var(--studio-border)]" ref={sizeMenuRef}>
