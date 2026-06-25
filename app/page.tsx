@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Plus, Play, Save, FolderOpen, Trash2, Upload, Download, RefreshCw } from 'lucide-react';
-import { Toaster, toast } from 'sonner';
+import { Toaster } from 'sonner';
 
-import { useStudioStore, useCurrentPage, type Item, type Variable, type StatModifier, type Speaker, type StudioPage, DIALOGUE_THEME_PRESETS } from '@/lib/store';
+import { useStudioStore, useCurrentPage } from '@/lib/store';
+import EditorHeader from '@/components/editor/layout/EditorHeader';
+import WorldPanel from '@/components/editor/world/WorldPanel';
 import KonvaCanvas from '@/components/editor/KonvaCanvas';
 import CanvasWithRulers from '@/components/editor/CanvasWithRulers';
-import ActionEditor from '@/components/editor/ActionEditor';
 import PageSection from '@/components/editor/PageSection';
-import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import PlaytestStatePanel from '@/components/editor/PlaytestStatePanel';
 import InventoryModal from '@/components/editor/InventoryModal';
 import ItemRewardModal from '@/components/editor/ItemRewardModal';
@@ -22,112 +21,43 @@ export default function SlayStudio() {
     pages,
     selectedPageId,
     selectedButtonId,
-    selectedWidgetId,
-    selectPage,
     selectButton,
-    selectWidget,
-    addPage,
-    deletePage,
-    updatePage,
     addButton,
     deleteButton,
+    updatePage,
     updateButton,
     updateButtonLayout,
     copyButtonCoordinates,
     pasteButtonCoordinates,
     coordinateClipboard,
-    meta,
-    loadFromLocalStorage,
-    exportProject,
-    importProject,
-    createNewProject,
-    setProjectName,
     guides,
     addGuide,
     removeGuide,
     clearGuides,
-    snapEnabled,
-    setSnapEnabled,
-    setSnappingGuide,
     canvasWidth,
     canvasHeight,
     setCanvasSize,
-    items,
-    addItem,
-    updateItem,
-    deleteItem,
     variables,
-    backgrounds,
-    addBackground,
-    updateBackground,
-    deleteBackground,
-    uiAssets,
-    addUIAsset,
-    updateUIAsset,
-    deleteUIAsset,
-    addUIWidget,
-    updateUIWidget,
-    deleteUIWidget,
-    applyUILayoutPreset,
-    addVariable,
-    updateVariable,
-    deleteVariable,
+    items,
     playtestState,
-    resetPlaytestState,
     mode,
-    setMode,
     enterPlaytest,
     exitPlaytest,
-    leftSidebarCollapsed,
-    rightSidebarCollapsed,
-    openWidgetLibrary,
-    closeWidgetLibrary,
-    toggleLeftSidebar,
-    toggleRightSidebar,
-    saveCanvasSnapshot,
-    undoCanvas,
-    redoCanvas,
-    canvasHistory,
-    canvasFuture,
-    renamePage,
-    addDefaultPlayerStats,
-    playerStatsCollapsed,
-    togglePlayerStatsCollapsed,
-    addDefaultResources,
-    resourcesCollapsed,
-    toggleResourcesCollapsed,
-    renameItem,
-    collapsedItemIds,
-    toggleItemCollapsed,
-    addCriticalStats,
-    startingInventory,
-    addToStartingInventory,
-    removeFromStartingInventory,
-    setStartingInventoryQuantity,
-    inventoryCollapsed,
-    toggleInventoryCollapsed,
-    variablesCollapsed,
-    toggleVariablesCollapsed,
-    itemsCollapsed,
-    toggleItemsCollapsed,
-    backgroundsCollapsed,
-    toggleBackgroundsCollapsed,
-    setPlaytestVariableValue,
-    speakers,
-    addSpeaker,
-    updateSpeaker,
-    deleteSpeaker,
-    duplicatePage,
-    dialogueTheme,
-    updateDialogueTheme,
     loadPlaytestProgress,
     clearPlaytestSave,
-    collectItemReward,
+    resetPlaytestState,
+    openWidgetLibrary,
+    rightSidebarCollapsed,
+    toggleRightSidebar,
   } = useStudioStore();
 
   const currentPage = useCurrentPage();
 
-  // Keep editingPageId in sync when switching pages; auto-switch to page tab
+  const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
+  const [editingPageId, setEditingPageId] = useState('');
+  const [rightTab, setRightTab] = useState<'page' | 'world'>('page');
+  const [hudOverride, setHudOverride] = useState<'auto' | 'force-show' | 'force-hide'>('auto');
+
   useEffect(() => {
     if (currentPage) {
       setEditingPageId(currentPage.id);
@@ -135,437 +65,47 @@ export default function SlayStudio() {
     }
   }, [currentPage?.id]);
 
-  // Helper: only number variables (for item quantity linking)
-  const numberVariables = variables.filter(v => v.type === 'number');
-  const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'restored'>('saved');
-
-  // Project name editing
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editingName, setEditingName] = useState('');
-
-  // Page ID editing (local state for controlled input + confirmation flow)
-  const [editingPageId, setEditingPageId] = useState('');
-
-  // Protected core player stats that cannot be deleted
-  const protectedPlayerStats = [
-    'health', 'health_max',
-    'mana', 'mana_max',
-    'strength', 'agility', 'endurance', 'defense',
-    'souls', 'level', 'exp',
-    'crit_chance', 'crit_damage'
-  ];
-
-  /**
-   * Update a player stat value.
-   * - In Playtest: updates live variableValues immediately (so backpack size, damage etc react)
-   * - Always updates the schema defaultValue (for persistence across resets / new sessions)
-   */
-  const updatePlayerStatValue = (varId: string, val: number) => {
-    updateVariable(varId, { defaultValue: val });
-    if (mode === 'playtest') {
-      setPlaytestVariableValue(varId, val);
-    }
-  };
-
-  // Item ID editing - per item (for controlled inputs + confirmation)
-  const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-
-  // For the new dedicated Backgrounds block (deep editor for custom images + advanced settings like parallax, brightness, conditions)
-  const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
-
-  // For UI Assets (Dialogue UI skins, portraits etc)
-  const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
-
-  const [uiAssetsCollapsed, setUiAssetsCollapsed] = useState(false);
-
-  const [speakersCollapsed, setSpeakersCollapsed] = useState(false);
-  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
-
-  const [rightTab, setRightTab] = useState<'page' | 'world'>('page');
-
-  // For Top Resource Bar testing in playtest (force show/hide regardless of page flag)
-  // HUD visibility override for testing in Playtest.
-  // 'auto' = respect page flags + context (dialog, inventory, etc.)
-  // 'force-show' = always show HUD (even on dialog pages)
-  // 'force-hide' = always hide HUD (for testing clean game view in game mode)
-  const [hudOverride, setHudOverride] = useState<'auto' | 'force-show' | 'force-hide'>('auto');
-
-  // Hotkey W → open Widget Library (skip when focus is in an input/textarea)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
-      if (e.key === 'w' || e.key === 'W') {
-        e.preventDefault();
-        openWidgetLibrary();
-      }
+      if (e.key === 'w' || e.key === 'W') { e.preventDefault(); openWidgetLibrary(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [openWidgetLibrary]);
 
-  // Load project from localStorage on first mount
-  useEffect(() => {
-    const wasRestored = loadFromLocalStorage();
-    if (wasRestored) {
-      setSaveStatus('restored');
-      toast.success('Проект восстановлен из сохранения');
-      // Reset status after a few seconds
-      setTimeout(() => setSaveStatus('saved'), 2500);
-    }
-  }, [loadFromLocalStorage]);
-
-  // Project name editing handlers
-  const startEditingName = () => {
-    setEditingName(meta.name);
-    setIsEditingName(true);
-  };
-
-  const commitProjectName = () => {
-    const trimmed = editingName.trim();
-    if (trimmed && trimmed !== meta.name) {
-      setProjectName(trimmed);
-      toast.success('Название проекта изменено');
-    }
-    setIsEditingName(false);
-  };
-
-  const cancelEditingName = () => {
-    setIsEditingName(false);
-  };
-
-  // Relative time formatter (Russian) + live update
-  const [nowTick, setNowTick] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNowTick(t => t + 1), 30000); // refresh every 30s
-    return () => clearInterval(interval);
-  }, []);
-
-  const getRelativeTime = (isoString: string | null): string => {
-    if (!isoString) return 'ещё не сохранялся';
-
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-
-    if (diffSec < 30) return 'только что';
-    if (diffSec < 60) return `${diffSec} сек. назад`;
-    if (diffMin < 60) return `${diffMin} мин. назад`;
-    if (diffHour < 24) return `${diffHour} ч. назад`;
-    return date.toLocaleDateString('ru-RU');
-  };
-
-  const lastSavedText = meta.lastSaved ? getRelativeTime(meta.lastSaved) : 'ещё не сохранялся';
-
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
-  // Visibility logic for Top Resource Bar in Playtest.
-  //
-  // Priorities (higher = stronger):
-  // 1. Not in playtest → never show.
-  // 2. Per-page explicit OFF (showTopResourceBar === false) → hard hide (author's design decision for this scene).
-  // 3. Author testing override (the "HUD: force" button) → force SHOW the HUD no matter what (dialog, inventory, empty pages etc.).
-  //    This is the main tool during testing so you can see the bar on ANY page.
-  // 4. Automatic context hides (inventory, dialog scenes, pages with real dialog text).
-  //
-  // For your example:
-  // - Page 1 and 2 have dialog → auto hide (unless force or explicit per-page ON).
-  // - Page 3 "empty" → should be treated as gameplay and show the HUD by default.
   const shouldShowTopResourceBar = (): boolean => {
     if (mode !== 'playtest') return false;
-
-    // 2. Hard per-page author decision to never show on this scene
     if (currentPage?.showTopResourceBar === false) return false;
-
-    // 3. Author testing override (button above the canvas)
     if (hudOverride === 'force-show') return true;
     if (hudOverride === 'force-hide') return false;
-
-    // From here: normal auto logic (auto mode)
-
-    // Inventory is a full-screen UI → hide HUD
     if (playtestState.isInventoryOpen) return false;
-
     const scene = currentPage?.sceneType;
     const dialogText = currentPage?.text?.ru?.trim() || '';
-
     const isPlaceholderText = dialogText.includes('Текст на русском') || dialogText.length < 10;
     const hasRealDialog = dialogText.length > 10 && !isPlaceholderText;
-
-    const isDialogContext =
-      scene === 'dialog' ||
-      scene === 'menu' ||
-      (hasRealDialog && scene !== 'exploration');
-
+    const isDialogContext = scene === 'dialog' || scene === 'menu' || (hasRealDialog && scene !== 'exploration');
     if (isDialogContext) return false;
-
-    // Default: show on gameplay / exploration / empty pages (like your page 3)
     return true;
   };
 
-  // === Handlers ===
-  const handleAddPage = () => {
-    addPage();
-    toast.success('Новая страница создана');
-  };
-
-  const handleDeletePage = (id: string) => {
-    if (pages.length === 1) {
-      toast.error('Нельзя удалить последнюю страницу');
-      return;
-    }
-    deletePage(id);
-    toast.info('Страница удалена');
-  };
-
-  const handleAddButton = () => {
-    if (!selectedPageId) return;
-    addButton(selectedPageId);
-    toast.success('Кнопка добавлена');
-  };
-
-  const handleDeleteButton = (buttonId: string) => {
-    if (!selectedPageId) return;
-    deleteButton(selectedPageId, buttonId);
-    toast.info('Кнопка удалена');
-  };
-
-  const updateCurrentPage = (updates: any) => {
-    if (!selectedPageId) return;
-    updatePage(selectedPageId, updates);
-  };
-
-  const updateSelectedButton = (updates: any) => {
-    if (!selectedPageId || !selectedButtonId) return;
-    updateButton(selectedPageId, selectedButtonId, updates);
-  };
-
-  const updateSelectedButtonLayout = (layoutUpdates: Partial<any>) => {
-    if (!selectedPageId || !selectedButtonId) return;
-    updateButtonLayout(selectedPageId, selectedButtonId, layoutUpdates);
-  };
-
-  const handleCopyCoordinates = () => {
-    if (!selectedPageId || !selectedButtonId) return;
-    copyButtonCoordinates(selectedPageId, selectedButtonId);
-    toast.success('Координаты кнопки скопированы');
-  };
-
-  const handlePasteCoordinates = () => {
-    if (!selectedPageId || !selectedButtonId) return;
-    pasteButtonCoordinates(selectedPageId, selectedButtonId);
-    toast.success('Координаты применены');
-  };
+  const handleAddButton = () => { if (selectedPageId) addButton(selectedPageId); };
+  const handleDeleteButton = (buttonId: string) => { if (selectedPageId) deleteButton(selectedPageId, buttonId); };
+  const updateCurrentPage = (updates: any) => { if (selectedPageId) updatePage(selectedPageId, updates); };
+  const updateSelectedButton = (updates: any) => { if (selectedPageId && selectedButtonId) updateButton(selectedPageId, selectedButtonId, updates); };
+  const updateSelectedButtonLayout = (layoutUpdates: Partial<any>) => { if (selectedPageId && selectedButtonId) updateButtonLayout(selectedPageId, selectedButtonId, layoutUpdates); };
+  const handleCopyCoordinates = () => { if (selectedPageId && selectedButtonId) copyButtonCoordinates(selectedPageId, selectedButtonId); };
+  const handlePasteCoordinates = () => { if (selectedPageId && selectedButtonId) pasteButtonCoordinates(selectedPageId, selectedButtonId); };
+  const renamePage = useStudioStore(s => s.renamePage);
 
   return (
     <div className="studio-container flex h-screen flex-col overflow-hidden">
       <Toaster position="top-center" richColors closeButton />
 
-      {/* Top Bar */}
-      <div className="flex h-14 items-center justify-between border-b border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-5">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-[var(--studio-accent)]" />
-            <div>
-              <span className="font-semibold tracking-tight">Slay Studio</span>
-              <span className="ml-1.5 text-xs text-[var(--studio-text-muted)]">Alpha</span>
-            </div>
-          </div>
-          {/* Editable Project Name */}
-          <div className="ml-6 flex items-center gap-2 text-sm text-[var(--studio-text-secondary)]">
-            <FolderOpen className="h-4 w-4 flex-shrink-0" />
-            {isEditingName ? (
-              <input
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={commitProjectName}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitProjectName();
-                  if (e.key === 'Escape') cancelEditingName();
-                }}
-                className="w-64 rounded border border-[var(--studio-accent)] bg-[var(--studio-bg-base)] px-2 py-0.5 text-[var(--studio-text-primary)] focus:outline-none"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={startEditingName}
-                className="max-w-[280px] truncate rounded px-1.5 py-0.5 text-left hover:bg-[var(--studio-bg-elevated)] hover:text-[var(--studio-text-primary)]"
-                title="Нажмите, чтобы переименовать проект"
-              >
-                {meta.name}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Save Status Indicator - much more informative */}
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-1 text-xs">
-            {saveStatus === 'unsaved' ? (
-              <span className="text-amber-400">Есть несохранённые изменения</span>
-            ) : saveStatus === 'restored' ? (
-              <span className="flex items-center gap-1.5 text-[var(--studio-accent)]">
-                <RefreshCw className="h-3.5 w-3.5" />
-                Проект восстановлен
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-[var(--studio-text-secondary)]">
-                <Save className="h-3.5 w-3.5" />
-                Сохранено: <span className="font-mono text-[var(--studio-text-muted)]">{lastSavedText}</span>
-              </span>
-            )}
-          </div>
-
-          {/* Mode Switch */}
-          <div className="flex rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] p-0.5">
-            <button
-              onClick={exitPlaytest}
-              className={`rounded-md px-4 py-1.5 text-sm transition-all ${mode === 'editor'
-                ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
-                : 'hover:bg-[var(--studio-bg-elevated)]'
-                }`}
-            >
-              Редактор
-            </button>
-            <button
-              onClick={enterPlaytest}
-              className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm transition-all ${mode === 'playtest'
-                ? 'bg-[var(--studio-accent)] text-[#1C1814] font-medium'
-                : 'hover:bg-[var(--studio-bg-elevated)]'
-                }`}
-            >
-              <Play className="h-3.5 w-3.5" />
-              Playtest
-            </button>
-          </div>
-
-          {/* Snapping Toggle - moved out of sidebar into top bar (compact) */}
-          <div className="flex items-center gap-2 ml-2 pl-3 border-l border-[var(--studio-border)]">
-            <span className="text-xs text-[var(--studio-text-muted)]">Прилипание</span>
-            <button
-              onClick={() => {
-                const newValue = !snapEnabled;
-                setSnapEnabled(newValue);
-                if (!newValue) setSnappingGuide(null);
-              }}
-              className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors ${
-                snapEnabled ? 'bg-[var(--studio-accent)]' : 'bg-[var(--studio-border)]'
-              }`}
-              title="Вкл/выкл прилипание кнопок к направляющим"
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                  snapEnabled ? 'translate-x-[17px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Canvas Undo / Redo - only for canvas button positions */}
-          <div className="flex items-center gap-1 ml-2">
-            <button
-              onClick={undoCanvas}
-              disabled={canvasHistory.length === 0}
-              className="studio-btn flex items-center gap-1.5 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-2 text-sm hover:border-[var(--studio-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Отменить последнее изменение на холсте (Ctrl+Z)"
-            >
-              ↩ Отменить
-            </button>
-            <button
-              onClick={redoCanvas}
-              disabled={canvasFuture.length === 0}
-              className="studio-btn flex items-center gap-1.5 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-2 text-sm hover:border-[var(--studio-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Повторить (Ctrl+Shift+Z)"
-            >
-              Redo ↪
-            </button>
-          </div>
-
-          {/* Project Actions */}
-          <button
-            onClick={() => {
-              exportProject();
-              setSaveStatus('saved');
-              toast.success('Проект экспортирован');
-            }}
-            className="studio-btn flex items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-4 py-2 text-sm hover:border-[var(--studio-accent)]"
-            title="Экспортировать проект в JSON файл"
-          >
-            <Download className="h-4 w-4" />
-            Экспорт
-          </button>
-
-          <label className="studio-btn flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-4 py-2 text-sm hover:border-[var(--studio-accent)]">
-            <Upload className="h-4 w-4" />
-            Импорт
-            <input
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  try {
-                    const data = JSON.parse(event.target?.result as string);
-
-                    // Safety check before replacing current work
-                    const hasContent = pages.length > 1 || (pages[0]?.buttons.length ?? 0) > 0;
-
-                    if (hasContent) {
-                      const shouldProceed = confirm(
-                        'Импорт заменит текущий проект.\n\nРекомендуется сначала экспортировать текущую работу.\n\nПродолжить импорт?'
-                      );
-                      if (!shouldProceed) {
-                        e.target.value = '';
-                        return;
-                      }
-                    }
-
-                    const success = importProject(data);
-                    if (success) {
-                      toast.success('Проект успешно импортирован');
-                      setSaveStatus('restored');
-                    }
-                  } catch {
-                    toast.error('Не удалось прочитать файл проекта');
-                  }
-                  e.target.value = ''; // reset input
-                };
-                reader.readAsText(file);
-              }}
-            />
-          </label>
-
-          <button
-            onClick={() => {
-              const hasContent = pages.length > 1 || (pages[0]?.buttons.length ?? 0) > 0;
-              const message = hasContent
-                ? 'Создать новый проект?\n\nТекущий проект будет заменён (рекомендуется сначала экспортировать его).'
-                : 'Создать новый чистый проект?';
-
-              if (confirm(message)) {
-                createNewProject();
-                setSaveStatus('saved');
-                toast.success('Создан новый проект');
-              }
-            }}
-            className="studio-btn flex items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-4 py-2 text-sm hover:border-[var(--studio-accent)]"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Новый проект
-          </button>
-        </div>
-      </div>
+      <EditorHeader />
 
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT: Pages & Acts */}
@@ -581,36 +121,25 @@ export default function SlayStudio() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    const ok = loadPlaytestProgress();
-                    if (!ok) alert('Нет сохранённого прогресса');
-                  }}
+                  onClick={() => { const ok = loadPlaytestProgress(); if (!ok) alert('Нет сохранённого прогресса'); }}
                   className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
                   title="Загрузить сохранённый прогресс вручную"
-                >
-                  Загрузить
-                </button>
+                >Загрузить</button>
                 <button
-                  onClick={() => {
-                    clearPlaytestSave();
-                    resetPlaytestState();
-                  }}
+                  onClick={() => { clearPlaytestSave(); resetPlaytestState(); }}
                   className="rounded-md bg-white/10 px-3 py-1 text-sm font-medium hover:bg-white/20 active:bg-white/30 transition-colors"
                   title="Сбросить прогресс и начать заново"
-                >
-                  Сброс
-                </button>
+                >Сброс</button>
                 <div className="w-px h-4 bg-white/30" />
                 <button
                   onClick={exitPlaytest}
                   className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
-                >
-                  Выйти в редактор
-                </button>
+                >Выйти в редактор</button>
               </div>
             </div>
           )}
 
+          {/* Canvas sub-header */}
           <div className="flex items-center justify-between border-b border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-4 py-2 text-xs">
             <div className="flex items-center gap-3">
               <span className="font-medium">{currentPage?.title.ru}</span>
@@ -631,12 +160,9 @@ export default function SlayStudio() {
               <span className="font-mono">{canvasWidth} × {canvasHeight}</span>
               <select
                 value={`${canvasWidth}x${canvasHeight}`}
-                onChange={(e) => {
-                  const [w, h] = e.target.value.split('x').map(Number);
-                  setCanvasSize(w, h);
-                }}
+                onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setCanvasSize(w, h); }}
                 className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-1 py-0.5 text-[9px] text-[var(--studio-text-muted)]"
-                title="Разрешение игрового холста (16:9 рекомендуется). % координаты кнопок адаптируются автоматически."
+                title="Разрешение игрового холста"
               >
                 <option value="960x600">960×600 (старый 16:10)</option>
                 <option value="1280x720">1280×720 (16:9 HD)</option>
@@ -647,12 +173,10 @@ export default function SlayStudio() {
                 <button
                   onClick={() => {
                     const order: Array<'auto' | 'force-show' | 'force-hide'> = ['auto', 'force-show', 'force-hide'];
-                    const currentIndex = order.indexOf(hudOverride);
-                    const next = order[(currentIndex + 1) % order.length];
-                    setHudOverride(next);
+                    setHudOverride(order[(order.indexOf(hudOverride) + 1) % order.length]);
                   }}
                   className="ml-1 rounded border border-[var(--studio-border)] px-1.5 py-0.5 text-[9px] hover:border-[var(--studio-accent)]"
-                  title="HUD override для тестирования: auto → force show → force hide. В game режиме (без диалога) позволяет принудительно скрывать/показывать бар."
+                  title="HUD override для тестирования"
                 >
                   {hudOverride === 'auto' && 'HUD: auto'}
                   {hudOverride === 'force-show' && 'HUD: force show'}
@@ -664,62 +188,32 @@ export default function SlayStudio() {
 
           <div className="flex flex-1 items-center justify-center bg-[#161310] p-6 overflow-auto relative">
             {mode === 'playtest' ? (
-              /* Playtest: clean exact-resolution "workflow window".
-                 The Top Resource Bar is the top strip *inside* this frame — it hugs the bounds
-                 and automatically adapts when you pick a different size in the selector above. */
               <div
                 className="relative rounded-2xl border border-[var(--studio-border-strong)] bg-black overflow-hidden shadow-2xl"
                 style={{ width: canvasWidth, height: canvasHeight }}
               >
                 {shouldShowTopResourceBar() && (
                   <div className="absolute top-0 left-0 right-0 z-30 pointer-events-auto border-b border-[var(--studio-border)]/60">
-                    <TopResourceBar
-                      currentPage={currentPage}
-                      variables={variables}
-                      playtestState={playtestState}
-                    />
+                    <TopResourceBar currentPage={currentPage} variables={variables} playtestState={playtestState} />
                   </div>
                 )}
-
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
-
-                {/* Inventory modal: absolute so it fills the game canvas, not the viewport */}
-                {playtestState.isInventoryOpen && (
-                  <InventoryModal onClose={() => {}} />
-                )}
-                {/* Item reward modal */}
-                {playtestState.itemRewardModal && (
-                  <ItemRewardModal />
-                )}
+                {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
+                {playtestState.itemRewardModal && <ItemRewardModal />}
               </div>
             ) : (
-              /* Editor: full CanvasWithRulers + guides at the chosen logical size. */
               <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
               </CanvasWithRulers>
             )}
 
-            {/* Widget Library Modal */}
             <WidgetLibrary />
-
-            {/* Item Creation Modal */}
-            <ItemCreationModal
-              isOpen={isItemModalOpen}
-              onClose={() => setIsItemModalOpen(false)}
-              onCreate={(newItem) => {
-                addItem(newItem);
-                toast.success('Предмет создан');
-              }}
-              variables={variables}
-              items={items}
-            />
           </div>
         </div>
 
-        {/* RIGHT: Inspector — Balanced & Useful */}
+        {/* RIGHT: Inspector */}
         <div className={`panel flex flex-shrink-0 flex-col border-l transition-all duration-200 overflow-hidden ${rightSidebarCollapsed ? 'w-8' : 'w-80'}`}>
           {rightSidebarCollapsed ? (
-            // Collapsed thin bar on the right
             <div className="flex flex-col h-full items-center pt-3 border-b border-[var(--studio-border)]">
               <button
                 onClick={toggleRightSidebar}
@@ -731,7 +225,6 @@ export default function SlayStudio() {
             </div>
           ) : (
             <>
-              {/* Right sidebar header with integrated collapse button */}
               <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-4 py-3">
                 <span className="text-sm font-medium text-[var(--studio-text-secondary)]">
                   {mode === 'playtest' ? 'СОСТОЯНИЕ' : 'СВОЙСТВА'}
@@ -740,16 +233,13 @@ export default function SlayStudio() {
                   onClick={toggleRightSidebar}
                   className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] p-1 -mr-1"
                   title="Свернуть панель"
-                >
-                  ▶
-                </button>
+                >▶</button>
               </div>
 
               {mode === 'playtest' ? (
                 <PlaytestStatePanel />
               ) : (
                 <>
-                  {/* Tab bar */}
                   <div className="flex shrink-0 border-b border-[var(--studio-border)]">
                     <button
                       onClick={() => setRightTab('page')}
@@ -761,1654 +251,92 @@ export default function SlayStudio() {
                     >МИР</button>
                   </div>
 
-                  {/* === МИР tab: project-level registries === */}
-                  {rightTab === 'world' && (
-                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {/* === ХАРАКТЕРИСТИКИ (постоянный блок) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <div
-                onClick={togglePlayerStatsCollapsed}
-                className="flex w-full cursor-pointer items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
-              >
-                <span>ХАРАКТЕРИСТИКИ</span>
-                <span className="text-xs">{playerStatsCollapsed ? '▶' : '▼'}</span>
-              </div>
+                  {rightTab === 'world' && <WorldPanel />}
 
-              {!playerStatsCollapsed && (
-                <div className="mt-3 space-y-1.5 text-sm">
-                  {variables.filter(v => v.category === 'player').length === 0 ? (
-                    <div>
-                      <p className="text-[11px] text-[var(--studio-text-muted)] italic mb-2">
-                        Нет характеристик ГГ.
-                      </p>
-                      <button
-                        onClick={() => {
-                          if (confirm('Добавить стандартные характеристики Главного Героя?')) {
-                            addDefaultPlayerStats();
-                          }
-                        }}
-                        className="text-xs px-3 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                      >
-                        + Характеристики ГГ
-                      </button>
-                    </div>
-                  ) : (
-                    variables
-                      .filter(v => v.category === 'player')
-                      .sort((a, b) => {
-                        const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
-                        const ia = order.indexOf(a.name);
-                        const ib = order.indexOf(b.name);
-                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-                      })
-                      .map((variable) => {
-                        const currentValue = playtestState.variableValues[variable.id] ?? variable.defaultValue;
+                  {rightTab === 'page' && (
+                    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                      <PageSection
+                        noCard
+                        currentPage={currentPage}
+                        renamePage={renamePage}
+                        updateCurrentPage={updateCurrentPage}
+                        editingPageId={editingPageId}
+                        setEditingPageId={setEditingPageId}
+                        langTab={langTab}
+                        setLangTab={setLangTab}
+                        handleAddButton={handleAddButton}
+                        selectedButtonId={selectedButtonId}
+                        selectButton={selectButton}
+                        handleDeleteButton={handleDeleteButton}
+                        selectedButton={selectedButton}
+                        updateSelectedButton={updateSelectedButton}
+                        updateSelectedButtonLayout={updateSelectedButtonLayout}
+                        handleCopyCoordinates={handleCopyCoordinates}
+                        handlePasteCoordinates={handlePasteCoordinates}
+                        coordinateClipboard={coordinateClipboard}
+                        variables={variables}
+                        items={items}
+                      />
 
-                        // Special row for health and mana (current / max)
-                        if (variable.name === 'health' || variable.name === 'mana') {
-                          const maxVar = variables.find(v => v.name === `${variable.name}_max`);
-                          const maxValue = maxVar ? (playtestState.variableValues[maxVar.id] ?? maxVar.defaultValue) : currentValue;
+                      {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (
+                        <div className="border-t border-[var(--studio-border)] mt-6 pt-5">
+                          <div className="mb-3 flex items-center justify-between">
+                            <span className="text-sm font-medium text-[var(--studio-text-secondary)]">НАПРАВЛЯЮЩИЕ</span>
+                            <div className="flex gap-1">
+                              {[25, 50, 75].map(v => (
+                                <button key={v} onClick={() => addGuide('horizontal', v)} className="px-2 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]">{v}%</button>
+                              ))}
+                            </div>
+                          </div>
 
-                          const isProtected = protectedPlayerStats.includes(variable.name) || protectedPlayerStats.includes(variable.name.replace('_max', ''));
-
-                          return (
-                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
+                          <div className="mb-4">
+                            <div className="text-[10px] text-[var(--studio-text-muted)] mb-1.5">Горизонтальные (влияют на Y)</div>
+                            {guides.horizontal.length === 0 && <div className="text-[10px] text-[var(--studio-text-muted)] italic py-1">Нет направляющих</div>}
+                            {guides.horizontal.map((pos, idx) => (
+                              <div key={idx} className="flex items-center gap-2 mb-1.5">
                                 <input
-                                  type="number"
-                                  value={currentValue as number}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    updatePlayerStatValue(variable.id, val);
-                                  }}
-                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
+                                  type="number" step="0.5" min="0" max="100" value={pos}
+                                  onChange={(e) => { const nv = parseFloat(e.target.value); if (!isNaN(nv)) { removeGuide('horizontal', pos); addGuide('horizontal', Math.max(0, Math.min(100, nv))); } }}
+                                  className="w-16 rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
                                 />
-                                <span>/</span>
-                                {maxVar ? (
-                                  <input
-                                    type="number"
-                                    value={maxValue as number}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value) || 0;
-                                      updatePlayerStatValue(maxVar.id, val);
-                                    }}
-                                    className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
-                                  />
-                                ) : (
-                                  <span>{maxValue}</span>
-                                )}
-                                {!isProtected && (
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
-                                        deleteVariable(variable.id);
-                                      }
-                                    }}
-                                    className="ml-2 text-[var(--studio-danger)] hover:text-red-400 text-xs"
-                                    title="Удалить характеристику"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
+                                <span className="text-xs text-[var(--studio-text-muted)]">%</span>
+                                <button onClick={() => removeGuide('horizontal', pos)} className="ml-auto text-[var(--studio-danger)] hover:text-red-400 p-1" title="Удалить">✕</button>
                               </div>
-                            </div>
-                          );
-                        }
-
-                        // Skip _max versions (they are shown paired with health/mana)
-                        if (variable.name.endsWith('_max')) return null;
-
-                        const isProtected = protectedPlayerStats.includes(variable.name);
-
-                        // Специальное отображение для критов
-                        if (variable.name === 'crit_chance') {
-                          return (
-                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
-                                <input
-                                  type="number"
-                                  value={currentValue as number}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    updatePlayerStatValue(variable.id, val);
-                                  }}
-                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
-                                />
-                                <span>%</span>
-                                {!isProtected && (
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
-                                        deleteVariable(variable.id);
-                                      }
-                                    }}
-                                    className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
-                                    title="Удалить характеристику"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        if (variable.name === 'crit_damage') {
-                          return (
-                            <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                              <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                              <div className="flex items-center gap-1 font-mono text-[var(--studio-accent)]">
-                                <span>x</span>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={currentValue as number}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value) || 1;
-                                    updatePlayerStatValue(variable.id, val);
-                                  }}
-                                  className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right"
-                                />
-                                {!isProtected && (
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
-                                        deleteVariable(variable.id);
-                                      }
-                                    }}
-                                    className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
-                                    title="Удалить характеристику"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={variable.id} className="flex items-center justify-between gap-2 rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                            <span className="text-[var(--studio-text-secondary)]">{variable.displayName.ru}</span>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={currentValue as number}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  updatePlayerStatValue(variable.id, val);
-                                }}
-                                className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                              />
-                              {!isProtected && (
-                                <button
-                                  onClick={() => {
-                                    if (confirm(`Удалить характеристику "${variable.displayName.ru}"?`)) {
-                                      deleteVariable(variable.id);
-                                    }
-                                  }}
-                                  className="ml-1 text-[var(--studio-danger)] hover:text-red-400 text-xs"
-                                  title="Удалить характеристику"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* === РЕСУРСЫ (постоянный блок, как характеристики) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={toggleResourcesCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
-              >
-                <span>РЕСУРСЫ</span>
-                <span className="text-xs">{resourcesCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!resourcesCollapsed && (
-                <div className="mt-3 space-y-1.5 text-sm">
-                  {variables.filter(v => v.category === 'resources').length === 0 ? (
-                    <div>
-                      <p className="text-[11px] text-[var(--studio-text-muted)] italic mb-2">
-                        Ресурсы (монеты, бензин, драгоценности) отсутствуют.
-                      </p>
-                      <button
-                        onClick={() => {
-                          if (confirm('Добавить стандартные расходники (монеты, бензин, драгоценности)?')) {
-                            addDefaultResources();
-                          }
-                        }}
-                        className="flex items-center gap-1 rounded border border-[var(--studio-border)] px-2 py-0.5 text-xs hover:bg-[var(--studio-bg-panel)]"
-                      >
-                        + Добавить
-                      </button>
-                    </div>
-                  ) : (
-                    variables
-                      .filter(v => v.category === 'resources')
-                      .map((resource) => {
-                        const value = playtestState.variableValues[resource.id] ?? resource.defaultValue;
-                        return (
-                          <div key={resource.id} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                            <span className="text-[var(--studio-text-secondary)]">{resource.displayName.ru}</span>
-                            <input
-                              type="number"
-                              value={value as number}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                updateVariable(resource.id, { defaultValue: val });
-                              }}
-                              className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                            />
-                          </div>
-                        );
-                      })
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* === ИНВЕНТАРЬ (новый блок между ресурсами и переменными) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={toggleInventoryCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
-              >
-                <span>ИНВЕНТАРЬ</span>
-                <span className="text-xs">{inventoryCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!inventoryCollapsed && (
-                <div className="mt-3 space-y-1.5 text-sm">
-                  {Object.keys(startingInventory).length === 0 ? (
-                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                      Здесь будут предметы, с которыми игрок начинает игру.
-                      Добавляйте их кнопкой «В инвентарь» в списке предметов ниже.
-                    </p>
-                  ) : (
-                    Object.entries(startingInventory).map(([itemId, qty]) => {
-                      const item = items.find(i => i.id === itemId);
-                      if (!item) return null;
-
-                      return (
-                        <div key={itemId} className="flex items-center justify-between rounded border border-[var(--studio-border)] bg-[#1C1814] px-3 py-1.5">
-                          <span className="truncate text-[var(--studio-text-secondary)]">{item.name.ru}</span>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              value={qty}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                setStartingInventoryQuantity(itemId, val);
-
-                                // Синхронизируем с привязанной переменной количества (чтобы стартовое значение сразу работало в Playtest)
-                                const linkedItem = items.find(i => i.id === itemId);
-                                if (linkedItem?.quantityVariableId) {
-                                  updateVariable(linkedItem.quantityVariableId, { defaultValue: val });
-                                }
-                              }}
-                              className="w-14 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs text-right font-mono text-[var(--studio-accent)]"
-                            />
-                            <button
-                              onClick={() => removeFromStartingInventory(itemId)}
-                              className="text-[var(--studio-danger)] hover:text-red-400 text-xs"
-                              title="Убрать из стартового инвентаря"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* === VARIABLES / ПЕРЕМЕННЫЕ === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={toggleVariablesCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-              >
-                <span>ПЕРЕМЕННЫЕ</span>
-                <span className="text-xs">{variablesCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!variablesCollapsed && (
-                <>
-                  <div className="flex gap-1 mb-2">
-                    <button
-                      onClick={() => resetPlaytestState()}
-                      className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                      title="Сбросить все значения превью к дефолтным"
-                    >
-                      Сбросить
-                    </button>
-                    <button
-                      onClick={() => {
-                        const newVar: Omit<Variable, 'id'> = {
-                          name: `custom_var_${Date.now().toString(36)}`,
-                          displayName: { ru: 'Новая переменная', en: 'New Variable' },
-                          type: 'number',
-                          defaultValue: 0,
-                          category: 'custom',
-                        };
-                        addVariable(newVar);
-                      }}
-                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-2 py-0.5 text-xs font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)]"
-                    >
-                      + Добавить
-                    </button>
-                  </div>
-
-                  {variables.length === 0 && (
-                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                      Нет переменных. Создайте первую, чтобы использовать в условиях.
-                    </p>
-                  )}
-
-                  <div className="space-y-2 max-h-72 overflow-auto pr-1">
-                    {variables
-                      .filter(v => v.category !== 'player' && v.category !== 'resources')
-                      .map((variable) => (
-                        <div key={variable.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              {/* Display Name RU */}
-                              <input
-                                value={variable.displayName.ru}
-                                onChange={(e) =>
-                                  updateVariable(variable.id, {
-                                    displayName: { ...variable.displayName, ru: e.target.value },
-                                  })
-                                }
-                                className="w-full bg-transparent font-medium focus:outline-none"
-                                placeholder="Название (RU)"
-                              />
-                              {/* Internal Name + Live Value */}
-                              <div className="flex justify-between text-[10px] text-[var(--studio-text-muted)] font-mono mt-0.5">
-                                <span>{variable.name}</span>
-                                <span className="text-[var(--studio-accent)]">
-                                  {playtestState.variableValues[variable.id] ?? variable.defaultValue}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => {
-                                if (confirm('Удалить эту переменную?')) {
-                                  deleteVariable(variable.id);
-                                }
-                              }}
-                              className="text-[var(--studio-danger)] hover:text-red-400 text-sm leading-none"
-                            >
-                              ✕
-                            </button>
+                            ))}
                           </div>
 
-                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                            {/* Type */}
-                            <select
-                              value={variable.type}
-                              onChange={(e) =>
-                                updateVariable(variable.id, {
-                                  type: e.target.value as Variable['type'],
-                                  defaultValue: e.target.value === 'boolean' ? false : e.target.value === 'string' ? '' : 0,
-                                })
-                              }
-                              className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1"
-                            >
-                              <option value="number">Число</option>
-                              <option value="boolean">Да/Нет</option>
-                              <option value="string">Текст</option>
-                            </select>
-
-                            {/* Category */}
-                            <select
-                              value={variable.category}
-                              onChange={(e) =>
-                                updateVariable(variable.id, {
-                                  category: e.target.value as Variable['category'],
-                                })
-                              }
-                              className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1"
-                            >
-                              <option value="custom">Кастомная</option>
-                              <option value="player">Игрок</option>
-                              <option value="resources">Ресурсы</option>
-                              <option value="reputation">Репутация</option>
-                              <option value="relationships">Отношения</option>
-                              <option value="inventory">Инвентарь</option>
-                            </select>
-                          </div>
-
-                          {/* Default Value */}
-                          <div className="mt-2">
-                            <label className="text-[10px] text-[var(--studio-text-muted)]">Значение по умолчанию</label>
-                            {variable.type === 'boolean' ? (
-                              <select
-                                value={String(variable.defaultValue)}
-                                onChange={(e) =>
-                                  updateVariable(variable.id, {
-                                    defaultValue: e.target.value === 'true',
-                                  })
-                                }
-                                className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-sm"
-                              >
-                                <option value="true">Да</option>
-                                <option value="false">Нет</option>
-                              </select>
-                            ) : (
-                              <input
-                                type={variable.type === 'number' ? 'number' : 'text'}
-                                value={variable.defaultValue as any}
-                                onChange={(e) => {
-                                  let val: any = e.target.value;
-                                  if (variable.type === 'number') {
-                                    val = parseFloat(e.target.value) || 0;
-                                  }
-                                  updateVariable(variable.id, { defaultValue: val });
-                                }}
-                                className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-sm"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Page Properties */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={toggleItemsCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-              >
-                <span>ПРЕДМЕТЫ</span>
-                <span className="text-xs">{itemsCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!itemsCollapsed && (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <button
-                      onClick={() => setIsItemModalOpen(true)}
-                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-3 py-1.5 text-sm font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full justify-center"
-                    >
-                      + Создать предмет
-                    </button>
-                  </div>
-
-                  {items.length === 0 && (
-                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                      Нет предметов. Добавьте первый, чтобы использовать в действиях и условиях.
-                    </p>
-                  )}
-
-                  <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                    {items.map((item) => {
-                      const isCollapsed = !collapsedItemIds.includes(item.id);
-
-                      return (
-                        <div key={item.id} className="rounded border border-[var(--studio-border)] bg-[#1C1814] p-2 text-sm">
-                          {/* Header: Name + ID + Collapse + Delete */}
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => toggleItemCollapsed(item.id)}
-                                  className="text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] text-xs"
-                                >
-                                  {isCollapsed ? '▶' : '▼'}
-                                </button>
-                                <input
-                                  value={item.name.ru}
-                                  onChange={(e) =>
-                                    updateItem(item.id, {
-                                      name: { ...item.name, ru: e.target.value },
-                                    })
-                                  }
-                                  className="flex-1 bg-transparent font-medium focus:outline-none text-sm"
-                                  placeholder="Название (RU)"
-                                />
-                              </div>
-
-                          {/* ID - editable with local state */}
-                          <div className="mt-0.5 flex items-center gap-1">
-                            <span className="text-[10px] text-[var(--studio-text-muted)]">ID:</span>
-                            <input
-                              value={editingItemIds[item.id] ?? item.id}
-                              onChange={(e) => {
-                                setEditingItemIds(prev => ({
-                                  ...prev,
-                                  [item.id]: e.target.value
-                                }));
-                              }}
-                              onBlur={() => {
-                                const current = editingItemIds[item.id] ?? item.id;
-                                const newId = current.trim();
-                                if (newId && newId !== item.id) {
-                                  if (confirm(`Изменить ID предмета с "${item.id}" на "${newId}"?\nВсе условия и действия, использующие этот предмет, будут обновлены.`)) {
-                                    renameItem(item.id, newId);
-                                  }
-                                }
-                                // Always clean up local editing state
-                                setEditingItemIds(prev => {
-                                  const copy = { ...prev };
-                                  delete copy[item.id];
-                                  return copy;
-                                });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                                if (e.key === 'Escape') {
-                                  setEditingItemIds(prev => {
-                                    const copy = { ...prev };
-                                    delete copy[item.id];
-                                    return copy;
-                                  });
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                              className="font-mono text-[10px] bg-transparent border-b border-[var(--studio-border)] focus:outline-none w-auto"
-                            />
-                          </div>
-
-                          {/* Новые свойства предмета */}
-                          {!isCollapsed && (
-                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                              {/* Тип предмета */}
-                              <div>
-                                <div className="text-[var(--studio-text-muted)] mb-0.5">Тип</div>
-                                <select
-                                  value={item.type ?? 'misc'}
-                                  onChange={(e) => updateItem(item.id, { type: e.target.value as any })}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                >
-                                  {Object.entries({
-                                    weapon: 'Оружие',
-                                    armor: 'Броня',
-                                    accessory: 'Аксессуар',
-                                    consumable: 'Расходник',
-                                    material: 'Материал',
-                                    quest: 'Квестовый',
-                                    misc: 'Прочее',
-                                  }).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Редкость */}
-                              <div>
-                                <div className="text-[var(--studio-text-muted)] mb-0.5">Редкость</div>
-                                <select
-                                  value={item.rarity ?? 'common'}
-                                  onChange={(e) => updateItem(item.id, { rarity: e.target.value as any })}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                >
-                                  {Object.entries({
-                                    trash: 'Мусор',
-                                    junk: 'Хлам',
-                                    common: 'Простой',
-                                    uncommon: 'Средний',
-                                    rare: 'Высокий',
-                                    epic: 'Легендарный',
-                                    legendary: 'Мифический',
-                                    mythic: 'Имбовый',
-                                    overpowered: 'Имбовый+',
-                                  }).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Прочность */}
-                              <div className="col-span-2">
-                                <div className="text-[var(--studio-text-muted)] mb-0.5">Прочность</div>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    value={item.durability ?? 100}
-                                    onChange={(e) => updateItem(item.id, { durability: parseInt(e.target.value) || 0 })}
-                                    className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                  />
-                                  <span>/</span>
-                                  <input
-                                    type="number"
-                                    value={item.maxDurability ?? 100}
-                                    onChange={(e) => updateItem(item.id, { maxDurability: parseInt(e.target.value) || 1 })}
-                                    className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Урон оружия (только для оружия) */}
-                              {item.isEquippable && item.type === 'weapon' && (
-                                <div className="col-span-2">
-                                  <div className="text-[var(--studio-text-muted)] mb-0.5">Урон оружия (базовый)</div>
-                                  <input
-                                    type="number"
-                                    value={item.weaponDamage ?? 0}
-                                    onChange={(e) => updateItem(item.id, { weaponDamage: parseInt(e.target.value) || 0 })}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                    placeholder="Например: 8"
-                                  />
-                                  <p className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
-                                    Этот урон будет суммироваться с Силой ГГ
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Защита (показывается для всех одеваемых предметов) */}
-                              {item.isEquippable && (
-                                <div className="col-span-2">
-                                  <div className="text-[var(--studio-text-muted)] mb-0.5">Защита</div>
-                                  <input
-                                    type="number"
-                                    value={item.defenseValue ?? 0}
-                                    onChange={(e) => updateItem(item.id, { defenseValue: parseInt(e.target.value) || 0 })}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                    placeholder="Например: 3"
-                                  />
-                                  <p className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
-                                    Это значение будет добавлено к базовой Защите персонажа
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Цена */}
-                              <div>
-                                <div className="text-[var(--studio-text-muted)] mb-0.5">Цена</div>
-                                <input
-                                  type="number"
-                                  value={item.price ?? 0}
-                                  onChange={(e) => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                />
-                              </div>
-
-                              {/* Можно одевать + Слот */}
-                              <div>
-                                <div className="flex items-center gap-2 mt-4">
-                                  <label className="flex items-center gap-1 text-[10px]">
-                                    <input
-                                      type="checkbox"
-                                      checked={item.isEquippable ?? false}
-                                      onChange={(e) => updateItem(item.id, { isEquippable: e.target.checked })}
-                                    />
-                                    Одеваемый
-                                  </label>
-                                </div>
-                                {item.isEquippable && (
-                                  <select
-                                    value={item.slot || ''}
-                                    onChange={(e) => updateItem(item.id, { 
-                                      slot: (e.target.value || null) as any 
-                                    })}
-                                    className="mt-1 w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                  >
-                                    <option value="">— Слот —</option>
-                                    <option value="one_handed_weapon">Одноручное оружие</option>
-                                    <option value="two_handed_weapon">Двуручное оружие</option>
-                                    <option value="shield">Щит</option>
-                                    <option value="helmet">Шлем</option>
-                                    <option value="gloves">Перчатки</option>
-                                    <option value="chest">Тело</option>
-                                    <option value="legs">Ноги</option>
-                                    <option value="boots">Ботинки</option>
-                                    <option value="belt">Пояс</option>
-                                    <option value="cloak">Плащ</option>
-                                    <option value="amulet">Амулет</option>
-                                    <option value="ring">Кольцо</option>
-                                    <option value="minion">Миньон</option>
-                                  </select>
-                                )}
-                              </div>
-
-                              {/* === Модификаторы характеристик === */}
-                              <div className="col-span-2 mt-2 pt-2 border-t border-[var(--studio-border)]">
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <div className="text-[10px] text-[var(--studio-text-muted)]">Бонусы к характеристикам</div>
-                                  <button
-                                    onClick={() => {
-                                      const playerVars = variables.filter(v => v.category === 'player');
-                                      if (playerVars.length === 0) {
-                                        alert('Сначала создайте характеристики ГГ');
-                                        return;
-                                      }
-                                      const newMod: StatModifier = {
-                                        statId: playerVars[0].id,
-                                        value: 1,
-                                      };
-                                      const currentMods = item.modifiers || [];
-                                      updateItem(item.id, { modifiers: [...currentMods, newMod] });
-                                    }}
-                                    className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                                  >
-                                    + Бонус
-                                  </button>
-                                </div>
-
-                                {(item.modifiers || []).length > 0 && (
-                                  <div className="space-y-1.5">
-                                    {(item.modifiers || []).map((mod, index) => {
-                                      const stat = variables.find(v => v.id === mod.statId);
-                                      return (
-                                        <div key={index} className="flex items-center gap-2 text-xs">
-                                          <select
-                                            value={mod.statId}
-                                            onChange={(e) => {
-                                              const newMods = [...(item.modifiers || [])];
-                                              newMods[index] = { ...mod, statId: e.target.value };
-                                              updateItem(item.id, { modifiers: newMods });
-                                            }}
-                                            className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                                          >
-                                            {variables
-                                              .filter(v => v.category === 'player')
-                                              .map(v => (
-                                                <option key={v.id} value={v.id}>{v.displayName.ru}</option>
-                                              ))}
-                                          </select>
-
-                                          <input
-                                            type="number"
-                                            step="0.1"
-                                            value={mod.value}
-                                            onChange={(e) => {
-                                              const newMods = [...(item.modifiers || [])];
-                                              // Поддержка дробных значений (0.5, 0,5) + русские запятые
-                                              const raw = e.target.value.replace(',', '.');
-                                              const parsed = parseFloat(raw);
-                                              newMods[index] = { ...mod, value: isNaN(parsed) ? 0 : parsed };
-                                              updateItem(item.id, { modifiers: newMods });
-                                            }}
-                                            className="w-16 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs text-right"
-                                          />
-
-                                          <button
-                                            onClick={() => {
-                                              const newMods = (item.modifiers || []).filter((_, i) => i !== index);
-                                              updateItem(item.id, { modifiers: newMods.length > 0 ? newMods : undefined });
-                                            }}
-                                            className="text-[var(--studio-danger)] hover:text-red-400"
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {(item.modifiers || []).length === 0 && (
-                                  <div className="text-[10px] text-[var(--studio-text-muted)] italic">
-                                    Нет бонусов. Нажмите "+ Бонус", чтобы добавить (например +3 к Урону).
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => addToStartingInventory(item.id, 1)}
-                          className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] text-[var(--studio-text-muted)] mr-1"
-                          title="Добавить в стартовый инвентарь"
-                        >
-                          В инвентарь
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Удалить этот предмет?')) deleteItem(item.id);
-                          }}
-                          className="text-[var(--studio-danger)] hover:text-red-400 ml-1 text-sm leading-none"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      {!isCollapsed && (
-                        <>
-                          {/* Название EN */}
-                          <input
-                            value={item.name.en}
-                            onChange={(e) =>
-                              updateItem(item.id, {
-                                name: { ...item.name, en: e.target.value },
-                              })
-                            }
-                            className="mt-1 w-full bg-transparent text-[10px] text-[var(--studio-text-muted)] focus:outline-none"
-                            placeholder="Name (EN)"
-                          />
-
-                          {/* Путь к иконке (подготовка под будущие иконки) */}
-                          <input
-                            value={item.icon || ''}
-                            onChange={(e) =>
-                              updateItem(item.id, {
-                                icon: e.target.value.trim() || undefined,
-                              })
-                            }
-                            className="mt-1 w-full bg-transparent text-[10px] text-[var(--studio-text-muted)] focus:outline-none font-mono"
-                            placeholder="Путь к иконке (например: /icons/sword.png)"
-                          />
-
-                          {/* Описание RU */}
-                          <textarea
-                            value={item.description.ru}
-                            onChange={(e) =>
-                              updateItem(item.id, {
-                                description: { ...item.description, ru: e.target.value },
-                              })
-                            }
-                            placeholder="Описание (RU)"
-                            className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
-                            rows={2}
-                          />
-
-                          {/* Описание EN */}
-                          <textarea
-                            value={item.description.en || ''}
-                            onChange={(e) =>
-                              updateItem(item.id, {
-                                description: { ...item.description, en: e.target.value },
-                              })
-                            }
-                            placeholder="Description (EN)"
-                            className="mt-1 w-full resize-y bg-transparent text-xs focus:outline-none"
-                            rows={2}
-                          />
-
-                          {/* Quantity Variable Linking */}
-                          <div className="mt-3 pt-2 border-t border-[var(--studio-border)]">
-                            <label className="text-[10px] text-[var(--studio-text-muted)] block mb-1">
-                              Количество хранится в переменной
-                            </label>
-                            <div className="flex gap-2">
-                              <select
-                                value={item.quantityVariableId || ''}
-                                onChange={(e) => {
-                                  updateItem(item.id, {
-                                    quantityVariableId: e.target.value || undefined,
-                                  });
-                                }}
-                                className="flex-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-                              >
-                                <option value="">— Не отслеживать количество —</option>
-                                {numberVariables.map((v) => (
-                                  <option key={v.id} value={v.id}>
-                                    {v.displayName.ru} ({v.name})
-                                  </option>
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="text-[10px] text-[var(--studio-text-muted)]">Вертикальные (влияют на X)</div>
+                              <div className="flex gap-1">
+                                {[25, 50, 75].map(v => (
+                                  <button key={v} onClick={() => addGuide('vertical', v)} className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]">{v}</button>
                                 ))}
-                              </select>
-
-                              <button
-                                onClick={() => {
-                                  const suggestedName = `item_${item.name.ru.toLowerCase().replace(/\s+/g, '_')}`;
-                                  const newVar: Omit<Variable, 'id'> = {
-                                    name: suggestedName,
-                                    displayName: { ru: `Кол-во: ${item.name.ru}`, en: `Qty: ${item.name.en}` },
-                                    type: 'number',
-                                    defaultValue: 0,
-                                    category: 'inventory',
-                                  };
-                                  addVariable(newVar);
-                                  const createdVar = variables.find(v => v.name === suggestedName) || 
-                                                    useStudioStore.getState().variables.find(v => v.name === suggestedName);
-                                  if (createdVar) {
-                                    updateItem(item.id, { quantityVariableId: createdVar.id });
-                                  }
-                                }}
-                                className="text-[10px] px-2 py-1 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] whitespace-nowrap"
-                                title="Создать новую переменную для количества этого предмета"
-                              >
-                                + Переменная
-                              </button>
+                              </div>
                             </div>
+                            {guides.vertical.length === 0 && <div className="text-[10px] text-[var(--studio-text-muted)] italic py-1">Нет направляющих</div>}
+                            {guides.vertical.map((pos, idx) => (
+                              <div key={idx} className="flex items-center gap-2 mb-1.5">
+                                <input
+                                  type="number" step="0.5" min="0" max="100" value={pos}
+                                  onChange={(e) => { const nv = parseFloat(e.target.value); if (!isNaN(nv)) { removeGuide('vertical', pos); addGuide('vertical', Math.max(0, Math.min(100, nv))); } }}
+                                  className="w-16 rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
+                                />
+                                <span className="text-xs text-[var(--studio-text-muted)]">%</span>
+                                <button onClick={() => removeGuide('vertical', pos)} className="ml-auto text-[var(--studio-danger)] hover:text-red-400 p-1" title="Удалить">✕</button>
+                              </div>
+                            ))}
                           </div>
-                        </>
+
+                          <button
+                            onClick={() => clearGuides()}
+                            className="mt-3 w-full text-[10px] text-[var(--studio-text-muted)] hover:text-[var(--studio-danger)] border border-[var(--studio-border)] rounded py-1 hover:border-[var(--studio-danger)]/50"
+                          >
+                            Удалить все направляющие
+                          </button>
+                        </div>
                       )}
                     </div>
-                  );
-                })}
-                </div>
-                </>
-              )}
-
-            </div>
-
-            {/* === ФОНЫ (отдельный глубокий блок, как Items / Inventory) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={toggleBackgroundsCollapsed}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-              >
-                <span>ФОНЫ</span>
-                <span className="text-xs">{backgroundsCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!backgroundsCollapsed && (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <button
-                      onClick={() => {
-                        const newBg: any = {
-                          name: { ru: 'Новый фон', en: 'New Background' },
-                          url: '',
-                          settings: {
-                            scale: 1,
-                            offsetX: 0,
-                            offsetY: 0,
-                            brightness: 1,
-                            opacity: 1,
-                            fitMode: 'cover',
-                            parallax: { enabled: false, speedX: 0.5, speedY: 0.3, reverse: false },
-                          },
-                        };
-                        const { addBackground, backgrounds: currentBgs } = useStudioStore.getState();
-                        addBackground(newBg);
-                        // Select the newly added one for editing
-                        setTimeout(() => {
-                          const latest = useStudioStore.getState().backgrounds.slice(-1)[0];
-                          if (latest) setEditingBackgroundId(latest.id);
-                        }, 0);
-                      }}
-                      className="flex items-center gap-1 rounded bg-[var(--studio-accent)] px-3 py-1.5 text-sm font-medium text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full justify-center"
-                    >
-                      + Новый фон (изображение / градиент)
-                    </button>
-                  </div>
-
-                  {backgrounds.length === 0 && (
-                    <p className="text-[11px] text-[var(--studio-text-muted)] italic">
-                      Нет фонов. Добавьте свой (URL картинки) или используйте встроенные градиенты.
-                    </p>
-                  )}
-
-                  <div className="space-y-2 max-h-72 overflow-auto pr-1">
-                    {backgrounds.map((bg) => {
-                      const isEditing = editingBackgroundId === bg.id;
-
-                      return (
-                        <div
-                          key={bg.id}
-                          className={`rounded border px-2 py-1.5 text-xs ${isEditing ? 'border-[var(--studio-accent)] bg-[var(--studio-bg-elevated)]' : 'border-[var(--studio-border)] bg-[#1C1814]'}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <button
-                              onClick={() => setEditingBackgroundId(isEditing ? null : bg.id)}
-                              className="flex-1 text-left font-medium truncate hover:underline"
-                            >
-                              {bg.name.ru} {bg.url ? '🖼️' : '🎨'}
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirm(`Удалить фон "${bg.name.ru}"?`)) {
-                                  const { deleteBackground } = useStudioStore.getState();
-                                  deleteBackground(bg.id);
-                                  if (editingBackgroundId === bg.id) setEditingBackgroundId(null);
-                                }
-                              }}
-                              className="text-[var(--studio-danger)] hover:text-red-400"
-                              title="Удалить фон"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          {isEditing && (
-                            <div className="mt-2 space-y-2 border-t border-[var(--studio-border)] pt-2">
-                              {/* Name */}
-                              <div>
-                                <label className="text-[9px] text-[var(--studio-text-muted)]">Название (РУ)</label>
-                                <input
-                                  value={bg.name.ru}
-                                  onChange={(e) => {
-                                    const { updateBackground } = useStudioStore.getState();
-                                    updateBackground(bg.id, { name: { ...bg.name, ru: e.target.value } });
-                                  }}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[9px] text-[var(--studio-text-muted)]">Название (EN)</label>
-                                <input
-                                  value={bg.name.en}
-                                  onChange={(e) => {
-                                    const { updateBackground } = useStudioStore.getState();
-                                    updateBackground(bg.id, { name: { ...bg.name, en: e.target.value } });
-                                  }}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs"
-                                />
-                              </div>
-
-                              {/* URL */}
-                              <div>
-                                <label className="text-[9px] text-[var(--studio-text-muted)]">URL изображения (прямая ссылка)</label>
-                                <input
-                                  value={bg.url || ''}
-                                  placeholder="https://... или /bg/intro_forest.png (от корня public, с / в начале)"
-                                  onChange={(e) => {
-                                    let val = e.target.value.trim().replace(/\\/g, '/');
-                                    if (val && !val.startsWith('http') && !val.startsWith('/')) {
-                                      val = '/' + val;
-                                    }
-                                    const { updateBackground } = useStudioStore.getState();
-                                    updateBackground(bg.id, { url: val || undefined });
-                                  }}
-                                  className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-0.5 text-xs font-mono"
-                                />
-                                <p className="mt-0.5 text-[8px] text-[var(--studio-text-muted)]">
-                                  Указывай путь от корня public, например /bg/intro_forest.png или /chara/hero.png (всегда с ведущим /)
-                                  <br />Внешние http/https работают для теста. Абсолютные локальные пути (C:\...) не работают в браузере.
-                                </p>
-                                {bg.url && (
-                                  <div className="mt-1">
-                                    <img
-                                      src={bg.url}
-                                      style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', border: '1px solid #444', background: '#111' }}
-                                      alt="bg preview"
-                                      onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).style.border = '1px solid #c25d3a';
-                                        (e.currentTarget as HTMLImageElement).style.opacity = '0.5';
-                                      }}
-                                    />
-                                    <div className="text-[8px] text-[var(--studio-text-muted)]">Preview — красная рамка = путь неверный или файл не найден</div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Basic advanced settings */}
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Масштаб</label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={bg.settings.scale}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, { settings: { ...bg.settings, scale: parseFloat(e.target.value) || 1 } });
-                                    }}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Режим подгонки</label>
-                                  <select
-                                    value={bg.settings.fitMode || 'cover'}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, { settings: { ...bg.settings, fitMode: e.target.value as any } });
-                                    }}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
-                                  >
-                                    <option value="cover">Cover (заполнить, обрезать)</option>
-                                    <option value="contain">Contain (вписать полностью)</option>
-                                    <option value="fill">Fill (растянуть)</option>
-                                    <option value="manual">Manual (только масштаб)</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Прозрачность</label>
-                                  <input
-                                    type="number"
-                                    step="0.05"
-                                    min="0"
-                                    max="1"
-                                    value={bg.settings.opacity}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, { settings: { ...bg.settings, opacity: parseFloat(e.target.value) || 1 } });
-                                    }}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Яркость</label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={bg.settings.brightness}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, { settings: { ...bg.settings, brightness: parseFloat(e.target.value) || 1 } });
-                                    }}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] text-[var(--studio-text-muted)]">Смещение X</label>
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={bg.settings.offsetX}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, { settings: { ...bg.settings, offsetX: parseFloat(e.target.value) || 0 } });
-                                    }}
-                                    className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-0.5 text-xs"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Parallax mini */}
-                              <div className="pt-1 border-t border-[var(--studio-border)]">
-                                <label className="flex items-center gap-1 text-[9px] text-[var(--studio-text-muted)]">
-                                  <input
-                                    type="checkbox"
-                                    checked={bg.settings.parallax.enabled}
-                                    onChange={(e) => {
-                                      const { updateBackground } = useStudioStore.getState();
-                                      updateBackground(bg.id, {
-                                        settings: {
-                                          ...bg.settings,
-                                          parallax: { ...bg.settings.parallax, enabled: e.target.checked },
-                                        },
-                                      });
-                                    }}
-                                  />
-                                  Параллакс
-                                </label>
-                                {bg.settings.parallax.enabled && (
-                                  <div className="grid grid-cols-3 gap-1 mt-1">
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={bg.settings.parallax.speedX}
-                                      onChange={(e) => {
-                                        const { updateBackground } = useStudioStore.getState();
-                                        updateBackground(bg.id, {
-                                          settings: {
-                                            ...bg.settings,
-                                            parallax: { ...bg.settings.parallax, speedX: parseFloat(e.target.value) || 0 },
-                                          },
-                                        });
-                                      }}
-                                      className="text-xs px-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)]"
-                                      title="Скорость X"
-                                    />
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={bg.settings.parallax.speedY}
-                                      onChange={(e) => {
-                                        const { updateBackground } = useStudioStore.getState();
-                                        updateBackground(bg.id, {
-                                          settings: {
-                                            ...bg.settings,
-                                            parallax: { ...bg.settings.parallax, speedY: parseFloat(e.target.value) || 0 },
-                                          },
-                                        });
-                                      }}
-                                      className="text-xs px-1 rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)]"
-                                      title="Скорость Y"
-                                    />
-                                    <label className="text-[8px] flex items-center gap-1">
-                                      <input
-                                        type="checkbox"
-                                        checked={bg.settings.parallax.reverse}
-                                        onChange={(e) => {
-                                          const { updateBackground } = useStudioStore.getState();
-                                          updateBackground(bg.id, {
-                                            settings: {
-                                              ...bg.settings,
-                                              parallax: { ...bg.settings.parallax, reverse: e.target.checked },
-                                            },
-                                          });
-                                        }}
-                                      />
-                                      Обратный
-                                    </label>
-                                  </div>
-                                )}
-                              </div>
-
-                              <button
-                                onClick={() => setEditingBackgroundId(null)}
-                                className="w-full mt-1 text-[10px] py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                              >
-                                Закрыть редактор
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p className="mt-2 text-[9px] text-[var(--studio-text-muted)]">
-                    Фоны глобальные. Можно использовать на любых страницах. Для динамических изменений (диалог → смена яркости) используй действия на кнопках позже.
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* === UI АССЕТЫ (для виджетов диалога: скины кнопок, портреты, бары) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={() => setUiAssetsCollapsed(!uiAssetsCollapsed)}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-              >
-                <span>UI АССЕТЫ</span>
-                <span className="text-xs">{uiAssetsCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!uiAssetsCollapsed && (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <button
-                      onClick={() => {
-                        const nameRu = prompt('Название ассета (РУ):', 'Новый скин') || 'Новый ассет';
-                        const url = prompt('URL (от public, с /):', '/ui/button.png');
-                        if (url) {
-                          const { addUIAsset } = useStudioStore.getState();
-                          let finalUrl = url.trim().replace(/\\/g, '/');
-                          if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('/')) finalUrl = '/' + finalUrl;
-                          addUIAsset({
-                            name: { ru: nameRu, en: nameRu },
-                            type: 'buttonSkin',
-                            url: finalUrl,
-                          });
-                          setTimeout(() => {
-                            const latest = useStudioStore.getState().uiAssets.slice(-1)[0];
-                            if (latest) setEditingUIAssetId(latest.id);
-                          }, 0);
-                        }
-                      }}
-                      className="text-[10px] px-2 py-1 rounded bg-[var(--studio-accent)] text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full"
-                    >
-                      + Добавить ассет (PNG)
-                    </button>
-                  </div>
-
-                  {useStudioStore.getState().uiAssets.length === 0 && (
-                    <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет ассетов. Добавь скины кнопок / портреты (прозрачный PNG).</p>
-                  )}
-
-                  <div className="space-y-1.5 max-h-48 overflow-auto text-xs">
-                    {(useStudioStore.getState().uiAssets || []).map((asset: any) => {
-                      const isEd = editingUIAssetId === asset.id;
-                      return (
-                        <div key={asset.id} className={`rounded border p-1.5 ${isEd ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}>
-                          <div className="flex items-center justify-between">
-                            <button onClick={() => setEditingUIAssetId(isEd ? null : asset.id)} className="truncate flex-1 text-left hover:underline">
-                              {asset.name.ru} <span className="text-[9px] opacity-60">({asset.type})</span>
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); if (confirm('Удалить ассет?')) { const { deleteUIAsset } = useStudioStore.getState(); deleteUIAsset(asset.id); if (isEd) setEditingUIAssetId(null); } }}
-                              className="text-red-400 px-1"
-                            >×</button>
-                          </div>
-                          {isEd && (
-                            <div className="mt-1 space-y-1 border-t pt-1">
-                              <input
-                                value={asset.url || ''}
-                                placeholder="/ui/xxx.png"
-                                onChange={(e) => {
-                                  let v = e.target.value.trim().replace(/\\/g,'/');
-                                  if (v && !v.startsWith('http') && !v.startsWith('/')) v = '/' + v;
-                                  const { updateUIAsset } = useStudioStore.getState();
-                                  updateUIAsset(asset.id, { url: v });
-                                }}
-                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
-                              />
-                              <div className="text-[9px] text-[var(--studio-text-muted)]">Используй в виджетах (assetId) или кнопках (image)</div>
-                              {asset.url && (
-                                <img src={asset.url} className="max-h-8 border border-[var(--studio-border)] mt-0.5" alt="" onError={(e:any)=> e.currentTarget.style.opacity='0.3'} />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* === ПЕРСОНАЖИ (speakers registry) === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <button
-                onClick={() => setSpeakersCollapsed(!speakersCollapsed)}
-                className="flex w-full items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)] mb-2"
-              >
-                <span>ПЕРСОНАЖИ</span>
-                <span className="text-xs">{speakersCollapsed ? '▶' : '▼'}</span>
-              </button>
-
-              {!speakersCollapsed && (
-                <>
-                  <button
-                    onClick={() => {
-                      const nameRu = prompt('Имя персонажа (РУ):', 'Новый персонаж');
-                      if (!nameRu) return;
-                      const nameEn = prompt('Имя персонажа (EN):', nameRu) || nameRu;
-                      const rawId = prompt('ID (латиница, без пробелов):', nameRu.toLowerCase().replace(/\s+/g, '_')) || '';
-                      const id = rawId.trim().replace(/[^a-z0-9_]/gi, '_') || `spk_${Date.now().toString(36)}`;
-                      addSpeaker({ id, displayName: { ru: nameRu, en: nameEn } });
-                      setTimeout(() => setEditingSpeakerId(id), 0);
-                    }}
-                    className="text-[10px] px-2 py-1 rounded bg-[var(--studio-accent)] text-[#1C1814] hover:bg-[var(--studio-accent-hover)] w-full mb-2"
-                  >
-                    + Добавить персонажа
-                  </button>
-
-                  {speakers.length === 0 && (
-                    <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет персонажей. Добавь, чтобы выбирать в диалогах.</p>
-                  )}
-
-                  <div className="space-y-1.5 max-h-48 overflow-auto text-xs">
-                    {speakers.map((spk: Speaker) => {
-                      const isEd = editingSpeakerId === spk.id;
-                      return (
-                        <div key={spk.id} className={`rounded border p-1.5 ${isEd ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}>
-                          <div className="flex items-center justify-between">
-                            <button
-                              onClick={() => setEditingSpeakerId(isEd ? null : spk.id)}
-                              className="truncate flex-1 text-left hover:underline"
-                            >
-                              {spk.displayName.ru} <span className="text-[9px] opacity-60 font-mono">({spk.id})</span>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirm(`Удалить персонажа «${spk.displayName.ru}»?`)) {
-                                  deleteSpeaker(spk.id);
-                                  if (isEd) setEditingSpeakerId(null);
-                                }
-                              }}
-                              className="text-red-400 px-1"
-                            >×</button>
-                          </div>
-                          {isEd && (
-                            <div className="mt-1 space-y-1 border-t pt-1">
-                              <input
-                                value={spk.displayName.ru}
-                                placeholder="Имя (РУ)"
-                                onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, ru: e.target.value } })}
-                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
-                              />
-                              <input
-                                value={spk.displayName.en}
-                                placeholder="Имя (EN)"
-                                onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, en: e.target.value } })}
-                                className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
-                              />
-                              <div className="text-[9px] text-[var(--studio-text-muted)]">ID: <span className="font-mono">{spk.id}</span> (неизменяемый)</div>
-                              <div>
-                                <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Портрет (asset)</label>
-                                <select
-                                  value={spk.portraitAssetId || ''}
-                                  onChange={(e) => updateSpeaker(spk.id, { portraitAssetId: e.target.value || undefined })}
-                                  className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
-                                >
-                                  <option value="">— не задан —</option>
-                                  {uiAssets.map((a: any) => (
-                                    <option key={a.id} value={a.id}>{a.name || a.id}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* === ТЕМА ДИАЛОГА === */}
-            <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
-              <div className="text-sm font-medium text-[var(--studio-text-secondary)] mb-2">ТЕМА ДИАЛОГА</div>
-
-              {/* Пресеты */}
-              <div className="flex flex-wrap gap-1 mb-3">
-                {Object.entries(DIALOGUE_THEME_PRESETS).map(([key, preset]) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      const { label, ...themeValues } = preset;
-                      updateDialogueTheme(themeValues);
-                    }}
-                    className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-accent)] hover:text-[#1C1814] transition-colors"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Color pickers */}
-              <div className="space-y-1.5">
-                {([
-                  ['boxFill', 'Фон бокса'],
-                  ['boxStroke', 'Рамка'],
-                  ['textColor', 'Текст'],
-                  ['nameTagColor', 'Акцент / имя'],
-                ] as [keyof typeof dialogueTheme, string][]).map(([key, label]) => (
-                  <div key={key} className="flex items-center justify-between gap-2">
-                    <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">{label}</label>
-                    <input
-                      type="color"
-                      value={(() => {
-                        const v = dialogueTheme[key] as string;
-                        const hex = v.match(/#[0-9a-fA-F]{3,8}/);
-                        return hex ? hex[0].slice(0, 7) : '#888888';
-                      })()}
-                      onChange={(e) => updateDialogueTheme({ [key]: e.target.value })}
-                      className="w-7 h-5 cursor-pointer rounded border border-[var(--studio-border)] p-0"
-                    />
-                  </div>
-                ))}
-
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">Скруглние</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="range"
-                      min={0}
-                      max={20}
-                      value={dialogueTheme.boxCornerRadius}
-                      onChange={(e) => updateDialogueTheme({ boxCornerRadius: Number(e.target.value) })}
-                      className="w-16"
-                    />
-                    <span className="text-[9px] w-4 text-right">{dialogueTheme.boxCornerRadius}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-[10px] text-[var(--studio-text-muted)] flex-1">Шрифт</label>
-                  <select
-                    value={dialogueTheme.fontFamily}
-                    onChange={(e) => updateDialogueTheme({ fontFamily: e.target.value })}
-                    className="text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
-                  >
-                    {['Arial', 'Georgia', 'Verdana', 'Courier New', 'Times New Roman', 'Trebuchet MS'].map(f => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-                  </div>
-                  )}
-
-                  {/* === СТРАНИЦА tab: current page properties === */}
-                  {rightTab === 'page' && (
-                  <>
-                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-            <PageSection
-              noCard
-              currentPage={currentPage}
-              renamePage={renamePage}
-              updateCurrentPage={updateCurrentPage}
-              editingPageId={editingPageId}
-              setEditingPageId={setEditingPageId}
-              langTab={langTab}
-              setLangTab={setLangTab}
-              handleAddButton={handleAddButton}
-              selectedButtonId={selectedButtonId}
-              selectButton={selectButton}
-              handleDeleteButton={handleDeleteButton}
-              selectedButton={selectedButton}
-              updateSelectedButton={updateSelectedButton}
-              updateSelectedButtonLayout={updateSelectedButtonLayout}
-              handleCopyCoordinates={handleCopyCoordinates}
-              handlePasteCoordinates={handlePasteCoordinates}
-              coordinateClipboard={coordinateClipboard}
-              variables={variables}
-              items={items}
-            />
-          {/* === GUIDES PANEL - only show when there are guides */}
-          {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (
-          <div className="border-t border-[var(--studio-border)] mt-6 pt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-[var(--studio-text-secondary)]">НАПРАВЛЯЮЩИЕ</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => addGuide('horizontal', 25)}
-                  className="px-2 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  title="Добавить горизонтальную на 25%"
-                >
-                  25%
-                </button>
-                <button
-                  onClick={() => addGuide('horizontal', 50)}
-                  className="px-2 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  title="Добавить горизонтальную на 50%"
-                >
-                  50%
-                </button>
-                <button
-                  onClick={() => addGuide('horizontal', 75)}
-                  className="px-2 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  title="Добавить горизонтальную на 75%"
-                >
-                  75%
-                </button>
-              </div>
-            </div>
-
-            {/* Horizontal Guides */}
-            <div className="mb-4">
-              <div className="text-[10px] text-[var(--studio-text-muted)] mb-1.5">Горизонтальные (влияют на Y)</div>
-              {guides.horizontal.length === 0 && (
-                <div className="text-[10px] text-[var(--studio-text-muted)] italic py-1">Нет направляющих</div>
-              )}
-              {guides.horizontal.map((pos, idx) => (
-                <div key={idx} className="flex items-center gap-2 mb-1.5">
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="100"
-                    value={pos}
-                    onChange={(e) => {
-                      const newVal = parseFloat(e.target.value);
-                      if (!isNaN(newVal)) {
-                        removeGuide('horizontal', pos);
-                        addGuide('horizontal', Math.max(0, Math.min(100, newVal)));
-                      }
-                    }}
-                    className="w-16 rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
-                  <span className="text-xs text-[var(--studio-text-muted)]">%</span>
-                  <button
-                    onClick={() => removeGuide('horizontal', pos)}
-                    className="ml-auto text-[var(--studio-danger)] hover:text-red-400 p-1"
-                    title="Удалить"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Vertical Guides */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="text-[10px] text-[var(--studio-text-muted)]">Вертикальные (влияют на X)</div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => addGuide('vertical', 25)}
-                    className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  >
-                    25
-                  </button>
-                  <button
-                    onClick={() => addGuide('vertical', 50)}
-                    className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  >
-                    50
-                  </button>
-                  <button
-                    onClick={() => addGuide('vertical', 75)}
-                    className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--studio-bg-elevated)] hover:bg-[var(--studio-border)] border border-[var(--studio-border)]"
-                  >
-                    75
-                  </button>
-                </div>
-              </div>
-
-              {guides.vertical.length === 0 && (
-                <div className="text-[10px] text-[var(--studio-text-muted)] italic py-1">Нет направляющих</div>
-              )}
-              {guides.vertical.map((pos, idx) => (
-                <div key={idx} className="flex items-center gap-2 mb-1.5">
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="100"
-                    value={pos}
-                    onChange={(e) => {
-                      const newVal = parseFloat(e.target.value);
-                      if (!isNaN(newVal)) {
-                        removeGuide('vertical', pos);
-                        addGuide('vertical', Math.max(0, Math.min(100, newVal)));
-                      }
-                    }}
-                    className="w-16 rounded border border-[var(--studio-border)] bg-[#1C1814] px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--studio-accent)]"
-                  />
-                  <span className="text-xs text-[var(--studio-text-muted)]">%</span>
-                  <button
-                    onClick={() => removeGuide('vertical', pos)}
-                    className="ml-auto text-[var(--studio-danger)] hover:text-red-400 p-1"
-                    title="Удалить"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => clearGuides()}
-              className="mt-3 w-full text-[10px] text-[var(--studio-text-muted)] hover:text-[var(--studio-danger)] border border-[var(--studio-border)] rounded py-1 hover:border-[var(--studio-danger)]/50"
-            >
-              Удалить все направляющие
-            </button>
-          </div>
-          )}
-                  </div>
-                  </>
                   )}
                 </>
               )}
@@ -2416,265 +344,6 @@ export default function SlayStudio() {
           )}
         </div>
       </div>
-
-    </div>
-  );
-}
-
-// === Простой редактор одного условия ===
-function ConditionEditor({
-  label,
-  condition,
-  onChange,
-  variables,
-  items,
-}: {
-  label: string;
-  condition?: any;
-  onChange: (condition?: any) => void;
-  variables: any[];
-  items: any[];
-}) {
-  const hasCondition = !!condition;
-
-  const toggleCondition = () => {
-    if (hasCondition) {
-      onChange(undefined);
-    } else {
-      const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
-      if (firstVar) {
-        onChange({
-          type: 'variable',
-          variableId: firstVar.id,
-          operator: '>=',
-          value: firstVar.type === 'number' ? 1 : true,
-        });
-      } else {
-        onChange({
-          type: 'variable',
-          variableId: '',
-          operator: '>=',
-          value: 0,
-        });
-      }
-    }
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] font-medium text-[var(--studio-text-secondary)]">{label}</label>
-        <button
-          onClick={toggleCondition}
-          className={`text-[10px] px-2 py-0.5 rounded transition ${
-            hasCondition
-              ? 'bg-[var(--studio-accent)] text-[#1C1814]'
-              : 'border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]'
-          }`}
-        >
-          {hasCondition ? 'Есть условие' : 'Всегда'}
-        </button>
-      </div>
-
-      {hasCondition && (
-        <div className="space-y-2 rounded border border-[var(--studio-border)] bg-[#1C1814] p-2">
-          <select
-            value={condition.type}
-            onChange={(e) => {
-              const newType = e.target.value as any;
-
-              if (['variable', 'itemQuantity', 'relationship', 'reputation', 'playerStat', 'resource'].includes(newType)) {
-                // Leaf types (existing logic)
-                if (newType === 'variable') {
-                  const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
-                  onChange({ type: 'variable', variableId: firstVar?.id || '', operator: '>=', value: firstVar?.type === 'number' ? 1 : true });
-                } else if (newType === 'itemQuantity') {
-                  onChange({ type: 'itemQuantity', itemId: items[0]?.id || '', operator: '>=', value: 1 });
-                } else if (newType === 'relationship') {
-                  onChange({ type: 'relationship', characterId: 'mila', operator: '>=', value: 0 });
-                } else if (newType === 'reputation') {
-                  onChange({ type: 'reputation', operator: '>=', value: 0 });
-                } else if (newType === 'playerStat') {
-                  onChange({ type: 'playerStat', stat: 'level', operator: '>=', value: 1 });
-                } else if (newType === 'resource') {
-                  onChange({ type: 'resource', resource: 'coins', operator: '>=', value: 0 });
-                }
-              } else if (newType === 'and' || newType === 'or') {
-                // Create logical group. If current condition exists, wrap it.
-                const children = condition ? [condition] : [];
-                onChange({ type: newType, conditions: children });
-              } else if (newType === 'not') {
-                onChange({ type: 'not', condition: condition || { type: 'variable', variableId: '', operator: '>=', value: 0 } });
-              }
-            }}
-            className="w-full rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs"
-          >
-            <option value="variable">Переменная</option>
-            <option value="itemQuantity">Количество предмета</option>
-            <option value="relationship">Отношения с персонажем</option>
-            <option value="reputation">Репутация в городе</option>
-            <option value="playerStat">Характеристика игрока</option>
-            <option value="resource">Ресурс</option>
-            <option value="and">Группа И (AND)</option>
-            <option value="or">Группа ИЛИ (OR)</option>
-            <option value="not">Отрицание (NOT)</option>
-          </select>
-
-          {/* Variable */}
-          {condition.type === 'variable' && (
-            <div className="grid grid-cols-3 gap-1">
-              <select value={condition.variableId} onChange={(e) => onChange({ ...condition, variableId: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                {variables.length === 0 && <option value="">Нет переменных</option>}
-                {variables.map((v: any) => <option key={v.id} value={v.id}>{v.displayName.ru}</option>)}
-              </select>
-              <select value={condition.operator} onChange={(e) => onChange({ ...condition, operator: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value="!=">≠</option>
-              </select>
-              <input type={variables.find((v:any)=>v.id===condition.variableId)?.type==='number'?'number':'text'} value={condition.value} onChange={(e) => { const vt = variables.find((v:any)=>v.id===condition.variableId)?.type; onChange({...condition, value: vt==='number' ? parseFloat(e.target.value)||0 : e.target.value}); }} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-            </div>
-          )}
-
-          {/* Item Quantity */}
-          {condition.type === 'itemQuantity' && (
-            <div className="grid grid-cols-3 gap-1">
-              <select value={condition.itemId} onChange={(e)=>onChange({...condition, itemId:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                {items.length===0 && <option value="">Нет предметов</option>}
-                {items.map((i:any)=><option key={i.id} value={i.id}>{i.name.ru}</option>)}
-              </select>
-              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
-              </select>
-              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-            </div>
-          )}
-
-          {/* Relationship */}
-          {condition.type === 'relationship' && (
-            <div className="grid grid-cols-3 gap-1">
-              <input value={condition.characterId} onChange={(e)=>onChange({...condition, characterId:e.target.value})} placeholder="mila / zyrk / ..." className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
-              </select>
-              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-            </div>
-          )}
-
-          {/* Reputation / PlayerStat / Resource */}
-          {(['reputation','playerStat','resource'] as const).includes(condition.type) && (
-            <div className="grid grid-cols-3 gap-1">
-              {condition.type === 'playerStat' && (
-                <select value={condition.stat} onChange={(e)=>onChange({...condition, stat:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                  <option value="level">Уровень</option><option value="strength">Сила</option>
-                </select>
-              )}
-              {condition.type === 'resource' && (
-                <select value={condition.resource} onChange={(e)=>onChange({...condition, resource:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                  <option value="coins">Монеты</option><option value="gasoline">Бензин</option><option value="gems">Драгоценности</option>
-                </select>
-              )}
-              {condition.type === 'reputation' && <div className="text-xs text-[var(--studio-text-muted)] self-center">Репутация</div>}
-
-              <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
-              </select>
-              <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
-            </div>
-          )}
-
-          {/* Logical Groups: AND / OR */}
-          {(condition.type === 'and' || condition.type === 'or') && (
-            <div className="space-y-2 border-l-2 border-[var(--studio-accent)] pl-3">
-              <div className="text-[10px] font-medium text-[var(--studio-accent)]">
-                {condition.type === 'and' ? 'И (все условия должны быть истинны)' : 'ИЛИ (хотя бы одно условие истинно)'}
-              </div>
-
-              {(condition.conditions || []).map((subCondition: any, index: number) => (
-                <div key={index} className="rounded border border-[var(--studio-border)] bg-[#161310] p-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-[var(--studio-text-muted)]">Условие #{index + 1}</span>
-                    <button
-                      onClick={() => {
-                        const newConditions = [...condition.conditions];
-                        newConditions.splice(index, 1);
-                        onChange({ ...condition, conditions: newConditions.length > 0 ? newConditions : undefined });
-                      }}
-                      className="text-[var(--studio-danger)] text-xs hover:underline"
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                  <ConditionEditor
-                    label=""
-                    condition={subCondition}
-                    onChange={(updatedSub) => {
-                      const newConditions = [...condition.conditions];
-                      newConditions[index] = updatedSub;
-                      onChange({ ...condition, conditions: newConditions });
-                    }}
-                    variables={variables}
-                    items={items}
-                  />
-                </div>
-              ))}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
-                    const newCond = firstVar
-                      ? { type: 'variable', variableId: firstVar.id, operator: '>=', value: firstVar.type === 'number' ? 0 : false }
-                      : { type: 'variable', variableId: '', operator: '>=', value: 0 };
-
-                    onChange({
-                      ...condition,
-                      conditions: [...(condition.conditions || []), newCond],
-                    });
-                  }}
-                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                >
-                  + Условие
-                </button>
-                <button
-                  onClick={() => {
-                    onChange({
-                      ...condition,
-                      conditions: [...(condition.conditions || []), { type: 'and', conditions: [] }],
-                    });
-                  }}
-                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                >
-                  + Группа И
-                </button>
-                <button
-                  onClick={() => {
-                    onChange({
-                      ...condition,
-                      conditions: [...(condition.conditions || []), { type: 'or', conditions: [] }],
-                    });
-                  }}
-                  className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)]"
-                >
-                  + Группа ИЛИ
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* NOT */}
-          {condition.type === 'not' && (
-            <div className="border-l-2 border-[var(--studio-danger)] pl-3">
-              <div className="text-[10px] text-[var(--studio-danger)] mb-1">НЕ (отрицание)</div>
-              <ConditionEditor
-                label=""
-                condition={condition.condition}
-                onChange={(updated) => onChange({ ...condition, condition: updated })}
-                variables={variables}
-                items={items}
-              />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
