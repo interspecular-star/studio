@@ -982,22 +982,26 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                 if (selectedWidgetId) {
                   const node = widgetNodeRefs.current.get(selectedWidgetId);
                   if (node) {
+                    const newX = (node.x() / width) * 100;
+                    const newY = (node.y() / height) * 100;
                     const newW = (node.width() * node.scaleX() / width) * 100;
                     const newH = (node.height() * node.scaleY() / height) * 100;
                     node.scaleX(1);
                     node.scaleY(1);
-                    useStudioStore.getState().updateUIWidgetLayout(pageId, selectedWidgetId, { width: newW, height: newH });
+                    useStudioStore.getState().updateUIWidgetLayout(pageId, selectedWidgetId, { x: newX, y: newY, width: newW, height: newH });
                   }
                 }
 
                 if (selectedButtonId) {
                   const node = buttonNodeRefs.current.get(selectedButtonId);
                   if (node) {
+                    const newX = (node.x() / width) * 100;
+                    const newY = (node.y() / height) * 100;
                     const newW = (node.width() * node.scaleX() / width) * 100;
                     const newH = (node.height() * node.scaleY() / height) * 100;
                     node.scaleX(1);
                     node.scaleY(1);
-                    useStudioStore.getState().updateButtonLayout(pageId, selectedButtonId, { width: newW, height: newH });
+                    useStudioStore.getState().updateButtonLayout(pageId, selectedButtonId, { x: newX, y: newY, width: newW, height: newH });
                   }
                 }
               }}

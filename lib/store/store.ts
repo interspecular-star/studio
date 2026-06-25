@@ -1055,10 +1055,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (!page) return;
     if (state.selectedWidgetId) {
       const widget = (page.uiWidgets || []).find((w) => w.id === state.selectedWidgetId);
-      if (widget) set({ widgetClipboard: { kind: 'widget', item: { ...widget } } });
+      if (widget) set({ widgetClipboard: { kind: 'widget', item: JSON.parse(JSON.stringify(widget)) } });
     } else if (state.selectedButtonId) {
       const button = page.buttons.find((b) => b.id === state.selectedButtonId);
-      if (button) set({ widgetClipboard: { kind: 'button', item: { ...button } } });
+      if (button) set({ widgetClipboard: { kind: 'button', item: JSON.parse(JSON.stringify(button)) } });
     }
   },
 

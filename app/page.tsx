@@ -36,16 +36,11 @@ export default function SlayStudio() {
     clearGuides,
     canvasWidth,
     canvasHeight,
-    setCanvasSize,
     variables,
     items,
     playtestState,
     mode,
-    enterPlaytest,
     exitPlaytest,
-    loadPlaytestProgress,
-    clearPlaytestSave,
-    resetPlaytestState,
     openWidgetLibrary,
     rightSidebarCollapsed,
     toggleRightSidebar,
@@ -116,26 +111,11 @@ export default function SlayStudio() {
           {/* Playtest Mode Banner */}
           {mode === 'playtest' && (
             <div className="flex items-center justify-between bg-[#C25D3A] px-4 py-2 text-sm text-white shadow-inner">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">▶ PLAYTEST РЕЖИМ</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { const ok = loadPlaytestProgress(); if (!ok) alert('Нет сохранённого прогресса'); }}
-                  className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
-                  title="Загрузить сохранённый прогресс вручную"
-                >Загрузить</button>
-                <button
-                  onClick={() => { clearPlaytestSave(); resetPlaytestState(); }}
-                  className="rounded-md bg-white/10 px-3 py-1 text-sm font-medium hover:bg-white/20 active:bg-white/30 transition-colors"
-                  title="Сбросить прогресс и начать заново"
-                >Сброс</button>
-                <div className="w-px h-4 bg-white/30" />
-                <button
-                  onClick={exitPlaytest}
-                  className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
-                >Выйти в редактор</button>
-              </div>
+              <span className="font-semibold">▶ PLAYTEST РЕЖИМ</span>
+              <button
+                onClick={exitPlaytest}
+                className="rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors"
+              >Выйти в редактор</button>
             </div>
           )}
 
@@ -157,32 +137,18 @@ export default function SlayStudio() {
               )}
             </div>
             <div className="flex items-center gap-2 text-[var(--studio-text-muted)]">
-              <span className="font-mono">{canvasWidth} × {canvasHeight}</span>
-              <select
-                value={`${canvasWidth}x${canvasHeight}`}
-                onChange={(e) => { const [w, h] = e.target.value.split('x').map(Number); setCanvasSize(w, h); }}
-                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] px-1 py-0.5 text-[9px] text-[var(--studio-text-muted)]"
-                title="Разрешение игрового холста"
+              <button
+                onClick={() => {
+                  const order: Array<'auto' | 'force-show' | 'force-hide'> = ['auto', 'force-show', 'force-hide'];
+                  setHudOverride(order[(order.indexOf(hudOverride) + 1) % order.length]);
+                }}
+                className={`rounded border px-1.5 py-0.5 text-[9px] transition-colors ${hudOverride !== 'auto' ? 'border-[var(--studio-accent)] text-[var(--studio-accent)]' : 'border-[var(--studio-border)] hover:border-[var(--studio-accent)]'}`}
+                title="Видимость игрового HUD (TopResourceBar)"
               >
-                <option value="960x600">960×600 (старый 16:10)</option>
-                <option value="1280x720">1280×720 (16:9 HD)</option>
-                <option value="1600x900">1600×900 (16:9)</option>
-                <option value="1920x1080">1920×1080 (16:9 FullHD)</option>
-              </select>
-              {mode === 'playtest' && (
-                <button
-                  onClick={() => {
-                    const order: Array<'auto' | 'force-show' | 'force-hide'> = ['auto', 'force-show', 'force-hide'];
-                    setHudOverride(order[(order.indexOf(hudOverride) + 1) % order.length]);
-                  }}
-                  className="ml-1 rounded border border-[var(--studio-border)] px-1.5 py-0.5 text-[9px] hover:border-[var(--studio-accent)]"
-                  title="HUD override для тестирования"
-                >
-                  {hudOverride === 'auto' && 'HUD: auto'}
-                  {hudOverride === 'force-show' && 'HUD: force show'}
-                  {hudOverride === 'force-hide' && 'HUD: force hide'}
-                </button>
-              )}
+                {hudOverride === 'auto' && 'HUD: авто'}
+                {hudOverride === 'force-show' && 'HUD: показать'}
+                {hudOverride === 'force-hide' && 'HUD: скрыть'}
+              </button>
             </div>
           </div>
 
