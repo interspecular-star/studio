@@ -15,6 +15,7 @@ import ItemRewardModal from '@/components/editor/ItemRewardModal';
 import TopResourceBar from '@/components/editor/TopResourceBar';
 import LeftSidebar from '@/components/editor/LeftSidebar';
 import WidgetLibrary from '@/components/editor/WidgetLibrary';
+import CombatOverlay from '@/components/editor/CombatOverlay';
 
 export default function SlayStudio() {
   const {
@@ -152,6 +153,7 @@ export default function SlayStudio() {
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
                 {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
                 {playtestState.itemRewardModal && <ItemRewardModal />}
+                <CombatOverlay currentPageId={selectedPageId} />
               </div>
             ) : (
               <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
