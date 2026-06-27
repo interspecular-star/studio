@@ -1049,7 +1049,7 @@ export default function WorldPanel() {
         </button>
 
         {!speakersCollapsed && (
-          <SpeakersSection speakers={speakers} uiAssets={uiAssets} addSpeaker={addSpeaker} updateSpeaker={updateSpeaker} deleteSpeaker={deleteSpeaker} />
+          <SpeakersSection speakers={speakers} uiAssets={uiAssets} quests={quests as any[]} variables={variables} addSpeaker={addSpeaker} updateSpeaker={updateSpeaker} deleteSpeaker={deleteSpeaker} addVariable={addVariable} />
         )}
       </div>
 
@@ -1276,17 +1276,24 @@ export default function WorldPanel() {
 function SpeakersSection({
   speakers,
   uiAssets,
+  quests,
+  variables,
   addSpeaker,
   updateSpeaker,
   deleteSpeaker,
+  addVariable,
 }: {
   speakers: Speaker[];
   uiAssets: any[];
+  quests: any[];
+  variables: any[];
   addSpeaker: (s: Omit<Speaker, never>) => void;
   updateSpeaker: (id: string, updates: Partial<Omit<Speaker, 'id'>>) => void;
   deleteSpeaker: (id: string) => void;
+  addVariable: (v: any) => void;
 }) {
   const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
+  const [newVariantName, setNewVariantName] = useState<Record<string, string>>({});
 
   return (
     <>
@@ -1309,14 +1316,21 @@ function SpeakersSection({
         <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет персонажей. Добавь, чтобы выбирать в диалогах.</p>
       )}
 
-      <div className="space-y-1.5 max-h-48 overflow-auto text-xs">
+      <div className="space-y-1.5 text-xs">
         {speakers.map((spk) => {
           const isEd = editingSpeakerId === spk.id;
+          const relVarName = `relationship_${spk.id}`;
+          const relVar = variables.find((v: any) => v.name === relVarName);
+          const variants: Record<string, string> = spk.portraitVariants || {};
+          const variantEntries = Object.entries(variants);
+
           return (
             <div key={spk.id} className={`rounded border p-1.5 ${isEd ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}>
               <div className="flex items-center justify-between">
                 <button onClick={() => setEditingSpeakerId(isEd ? null : spk.id)} className="truncate flex-1 text-left hover:underline">
-                  {spk.displayName.ru} <span className="text-[9px] opacity-60 font-mono">({spk.id})</span>
+                  {spk.displayName.ru}
+                  <span className="text-[9px] opacity-60 font-mono ml-1">({spk.id})</span>
+                  {relVar && <span className="ml-1 text-[8px] text-[var(--studio-accent)]">♥</span>}
                 </button>
                 <button
                   onClick={(e) => {
@@ -1329,17 +1343,23 @@ function SpeakersSection({
                   className="text-red-400 px-1"
                 >×</button>
               </div>
+
               {isEd && (
-                <div className="mt-1 space-y-1 border-t pt-1">
-                  <input value={spk.displayName.ru} placeholder="Имя (РУ)" onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, ru: e.target.value } })} className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]" />
-                  <input value={spk.displayName.en} placeholder="Имя (EN)" onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, en: e.target.value } })} className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]" />
-                  <div className="text-[9px] text-[var(--studio-text-muted)]">ID: <span className="font-mono">{spk.id}</span> (неизменяемый)</div>
+                <div className="mt-1 space-y-2 border-t border-[var(--studio-border)] pt-1.5">
+                  {/* Имя */}
+                  <div className="grid grid-cols-2 gap-1">
+                    <input value={spk.displayName.ru} placeholder="Имя (РУ)" onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, ru: e.target.value } })} className="text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded" />
+                    <input value={spk.displayName.en} placeholder="Имя (EN)" onChange={(e) => updateSpeaker(spk.id, { displayName: { ...spk.displayName, en: e.target.value } })} className="text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded" />
+                  </div>
+                  <div className="text-[9px] text-[var(--studio-text-muted)]">ID: <span className="font-mono">{spk.id}</span></div>
+
+                  {/* Портрет (default) */}
                   <div>
-                    <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Портрет (asset)</label>
+                    <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Портрет (default)</label>
                     <select
                       value={spk.portraitAssetId || ''}
                       onChange={(e) => updateSpeaker(spk.id, { portraitAssetId: e.target.value || undefined })}
-                      className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)]"
+                      className="w-full text-[10px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
                     >
                       <option value="">— не задан —</option>
                       {uiAssets.map((a: any) => (
@@ -1347,6 +1367,109 @@ function SpeakersSection({
                       ))}
                     </select>
                   </div>
+
+                  {/* Варианты портрета */}
+                  <div>
+                    <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Варианты портрета</label>
+                    <div className="space-y-0.5 mb-1">
+                      {variantEntries.map(([varName, assetId]) => (
+                        <div key={varName} className="grid grid-cols-[80px_1fr_auto] gap-1 items-center">
+                          <span className="text-[9px] font-mono text-[var(--studio-accent)] truncate">{varName}</span>
+                          <select
+                            value={assetId}
+                            onChange={(e) => {
+                              updateSpeaker(spk.id, { portraitVariants: { ...variants, [varName]: e.target.value } });
+                            }}
+                            className="text-[9px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
+                          >
+                            <option value="">— asset —</option>
+                            {uiAssets.map((a: any) => <option key={a.id} value={a.id}>{a.name?.ru || a.id}</option>)}
+                          </select>
+                          <button
+                            onClick={() => {
+                              const next = { ...variants };
+                              delete next[varName];
+                              updateSpeaker(spk.id, { portraitVariants: next });
+                            }}
+                            className="text-red-400 text-[10px] px-1"
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      <input
+                        value={newVariantName[spk.id] || ''}
+                        onChange={(e) => setNewVariantName(prev => ({ ...prev, [spk.id]: e.target.value }))}
+                        placeholder="variant (angry, happy…)"
+                        className="flex-1 text-[9px] px-1 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
+                      />
+                      <button
+                        onClick={() => {
+                          const vname = (newVariantName[spk.id] || '').trim();
+                          if (!vname) return;
+                          updateSpeaker(spk.id, { portraitVariants: { ...variants, [vname]: '' } });
+                          setNewVariantName(prev => ({ ...prev, [spk.id]: '' }));
+                        }}
+                        className="text-[9px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)]"
+                      >+ Вариант</button>
+                    </div>
+                  </div>
+
+                  {/* Отношения */}
+                  <div>
+                    <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Переменная отношений</label>
+                    {relVar ? (
+                      <div className="flex items-center gap-1">
+                        <span className="flex-1 text-[9px] font-mono text-[var(--studio-accent)]">{relVar.name}</span>
+                        <span className="text-[9px] text-[var(--studio-text-muted)]">= {relVar.defaultValue}</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          addVariable({
+                            name: relVarName,
+                            displayName: { ru: `Отношения: ${spk.displayName.ru}`, en: `Relationship: ${spk.displayName.en}` },
+                            type: 'number',
+                            defaultValue: 0,
+                            category: 'custom',
+                          });
+                        }}
+                        className="w-full text-[9px] px-2 py-0.5 border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)]"
+                      >
+                        + Создать переменную {relVarName}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Связанные квесты */}
+                  {quests.length > 0 && (
+                    <div>
+                      <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Связанные квесты</label>
+                      <div className="space-y-0.5 max-h-20 overflow-auto">
+                        {quests.map((q: any) => {
+                          const linked = (spk.questIds || []).includes(q.id);
+                          return (
+                            <label key={q.id} className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={linked}
+                                onChange={(e) => {
+                                  const ids = spk.questIds || [];
+                                  updateSpeaker(spk.id, {
+                                    questIds: e.target.checked
+                                      ? [...ids, q.id]
+                                      : ids.filter((id: string) => id !== q.id),
+                                  });
+                                }}
+                                className="accent-[var(--studio-accent)]"
+                              />
+                              <span className="text-[9px] truncate">{q.title?.ru || q.id}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

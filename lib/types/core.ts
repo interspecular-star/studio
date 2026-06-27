@@ -7,6 +7,9 @@ export type Speaker = {
   id: string;
   displayName: LocalizedString;
   portraitAssetId?: string;
+  portraitVariants?: Record<string, string>; // variant name → UIAsset ID
+  relationshipVariableId?: string;
+  questIds?: string[];
 };
 
 export type DialogueTheme = {

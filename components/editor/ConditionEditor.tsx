@@ -9,6 +9,7 @@ interface ConditionEditorProps {
   variables: any[];
   items: any[];
   quests?: any[];
+  speakers?: any[];
 }
 
 export default function ConditionEditor({
@@ -18,6 +19,7 @@ export default function ConditionEditor({
   variables,
   items,
   quests = [],
+  speakers = [],
 }: ConditionEditorProps) {
   const hasCondition = !!condition;
 
@@ -154,9 +156,16 @@ export default function ConditionEditor({
           {/* Relationship */}
           {condition.type === 'relationship' && (
             <div className="grid grid-cols-3 gap-1">
-              <input value={condition.characterId} onChange={(e)=>onChange({...condition, characterId:e.target.value})} placeholder="mila / zyrk / ..." className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+              {speakers.length > 0 ? (
+                <select value={condition.characterId || ''} onChange={(e) => onChange({ ...condition, characterId: e.target.value })} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
+                  <option value="">— персонаж —</option>
+                  {speakers.map((s: any) => <option key={s.id} value={s.id}>{s.displayName?.ru || s.id}</option>)}
+                </select>
+              ) : (
+                <input value={condition.characterId || ''} onChange={(e)=>onChange({...condition, characterId:e.target.value})} placeholder="mila / zyrk / ..." className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
+              )}
               <select value={condition.operator} onChange={(e)=>onChange({...condition, operator:e.target.value})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs">
-                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option>
+                <option value=">=">&gt;=</option><option value="<=">&lt;=</option><option value="==">=</option><option value="!=">≠</option>
               </select>
               <input type="number" value={condition.value} onChange={(e)=>onChange({...condition, value:parseInt(e.target.value)||0})} className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-2 py-1 text-xs" />
             </div>
@@ -244,6 +253,7 @@ export default function ConditionEditor({
                     variables={variables}
                     items={items}
                     quests={quests}
+                    speakers={speakers}
                   />
                 </div>
               ))}
@@ -302,6 +312,7 @@ export default function ConditionEditor({
                 variables={variables}
                 items={items}
                 quests={quests}
+                speakers={speakers}
               />
             </div>
           )}

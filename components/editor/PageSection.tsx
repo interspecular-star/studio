@@ -70,6 +70,7 @@ function SlotEditor({
             variables={variables}
             items={items}
             quests={quests}
+            speakers={speakers}
           />
           <div>
             <label className="text-[10px] text-[var(--studio-text-secondary)] block mb-1">ДЕЙСТВИЯ</label>
@@ -964,7 +965,7 @@ export default function PageSection({
 
                   {!(w.type === 'choiceButton' && w.data?.items) && (
                     <div className="pt-2 border-t border-[var(--studio-border)]">
-                      <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} quests={quests} />
+                      <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} quests={quests} speakers={speakers} />
                     </div>
                   )}
                 </div>

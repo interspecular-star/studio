@@ -28,21 +28,42 @@ export function evaluateCondition(
     }
 
     case 'relationship': {
+      const varName = `relationship_${condition.characterId}`;
+      const relVar = variables.find(v => v.name === varName);
+      if (relVar) {
+        const val = getVariableValue(relVar.id);
+        return compareValues(typeof val === 'number' ? val : 0, condition.operator, condition.value);
+      }
       const current = previewState[`relationship_${condition.characterId}`] ?? 0;
       return compareValues(current, condition.operator, condition.value);
     }
 
     case 'reputation': {
+      const repVar = variables.find(v => v.name === 'reputation');
+      if (repVar) {
+        const val = getVariableValue(repVar.id);
+        return compareValues(typeof val === 'number' ? val : 0, condition.operator, condition.value);
+      }
       const current = previewState.reputation ?? 0;
       return compareValues(current, condition.operator, condition.value);
     }
 
     case 'playerStat': {
+      const statVar = variables.find(v => v.name === condition.stat);
+      if (statVar) {
+        const val = getVariableValue(statVar.id);
+        return compareValues(typeof val === 'number' ? val : 0, condition.operator, condition.value);
+      }
       const current = previewState[condition.stat] ?? 0;
       return compareValues(current, condition.operator, condition.value);
     }
 
     case 'resource': {
+      const resVar = variables.find(v => v.name === condition.resource);
+      if (resVar) {
+        const val = getVariableValue(resVar.id);
+        return compareValues(typeof val === 'number' ? val : 0, condition.operator, condition.value);
+      }
       const current = previewState[condition.resource] ?? 0;
       return compareValues(current, condition.operator, condition.value);
     }
