@@ -8,7 +8,7 @@ import type { UIWidget } from '@/lib/store';
 
 // ── Per-slot editor for choiceButton group ─────────────────────────────────────
 function SlotEditor({
-  index, item, variables, items, widgets, speakers = [],
+  index, item, variables, items, widgets, speakers = [], quests = [],
   onTextChange, onActionsChange, onConditionChange, onRemove,
 }: {
   index: number;
@@ -17,6 +17,7 @@ function SlotEditor({
   items: any[];
   widgets: any[];
   speakers?: any[];
+  quests?: any[];
   onTextChange: (ru: string) => void;
   onActionsChange: (acts: any[]) => void;
   onConditionChange: (cond: any) => void;
@@ -68,6 +69,7 @@ function SlotEditor({
             onChange={onConditionChange}
             variables={variables}
             items={items}
+            quests={quests}
           />
           <div>
             <label className="text-[10px] text-[var(--studio-text-secondary)] block mb-1">ДЕЙСТВИЯ</label>
@@ -90,6 +92,7 @@ function SlotEditor({
                     items={items}
                     widgets={widgets}
                     speakers={speakers}
+                    quests={quests}
                   />
                 </div>
               ))}
@@ -127,6 +130,7 @@ interface PageSectionProps {
   coordinateClipboard: any;
   variables: any[];
   items: any[];
+  quests?: any[];
   noCard?: boolean;
 }
 
@@ -150,6 +154,7 @@ export default function PageSection({
   coordinateClipboard,
   variables,
   items,
+  quests = [],
   noCard = false,
 }: PageSectionProps) {
   const { backgrounds, selectedWidgetId: currentSelectedWidgetId, speakers } = useStudioStore();
@@ -412,6 +417,7 @@ export default function PageSection({
                           items={items}
                           widgets={currentPage?.uiWidgets || []}
                           speakers={speakers}
+                          quests={quests}
                         />
                       </div>
                     ))}
@@ -470,7 +476,7 @@ export default function PageSection({
                           <span className="text-[10px] text-[var(--studio-text-muted)] font-mono">#{i + 1}</span>
                           <button onClick={() => removeAction(i)} className="text-[10px] text-[var(--studio-danger,#ef4444)] hover:underline">Удалить</button>
                         </div>
-                        <ActionEditor action={action} onChange={(a: any) => updateAction(i, a)} variables={variables} items={items} widgets={currentPage?.uiWidgets || []} speakers={speakers} />
+                        <ActionEditor action={action} onChange={(a: any) => updateAction(i, a)} variables={variables} items={items} widgets={currentPage?.uiWidgets || []} speakers={speakers} quests={quests} />
                       </div>
                     ))}
                     <button
@@ -782,6 +788,7 @@ export default function PageSection({
                             items={st.items || []}
                             widgets={currentPage?.uiWidgets || []}
                             speakers={speakers}
+                            quests={quests}
                             onTextChange={(ru) => updateSlotText(i, ru)}
                             onActionsChange={(acts) => updateSlotActions(i, acts)}
                             onConditionChange={(cond) => updateSlotCondition(i, cond)}
@@ -957,7 +964,7 @@ export default function PageSection({
 
                   {!(w.type === 'choiceButton' && w.data?.items) && (
                     <div className="pt-2 border-t border-[var(--studio-border)]">
-                      <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} />
+                      <ConditionEditor label="Видим когда" condition={w.visibleWhen} onChange={(c) => updateW({ visibleWhen: c })} variables={variables} items={items} quests={quests} />
                     </div>
                   )}
                 </div>

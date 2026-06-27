@@ -18,6 +18,7 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       speakers: state.speakers,
       dialogueTheme: state.dialogueTheme,
       startingInventory: state.startingInventory,
+      quests: state.quests,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
     };
@@ -103,6 +104,7 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         speakers: parsed.speakers || createDefaultSpeakers(),
         dialogueTheme: parsed.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: parsed.startingInventory || {},
+        quests: parsed.quests || [],
         canvasWidth: parsed.canvasWidth || 1280,
         canvasHeight: parsed.canvasHeight || 720,
       });
@@ -128,6 +130,7 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       speakers: state.speakers,
       dialogueTheme: state.dialogueTheme,
       startingInventory: state.startingInventory,
+      quests: state.quests,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
     };
@@ -189,6 +192,7 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         speakers: data.speakers || createDefaultSpeakers(),
         dialogueTheme: data.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: data.startingInventory || {},
+        quests: data.quests || [],
         canvasWidth: data.canvasWidth || 1280,
         canvasHeight: data.canvasHeight || 720,
       });

@@ -7,9 +7,10 @@ interface ActionEditorProps {
   items: any[];
   widgets?: any[];
   speakers?: any[];
+  quests?: any[];
 }
 
-export default function ActionEditor({ action, onChange, variables, items, widgets = [], speakers = [] }: ActionEditorProps) {
+export default function ActionEditor({ action, onChange, variables, items, widgets = [], speakers = [], quests = [] }: ActionEditorProps) {
   const type = action.type;
 
   const portraitWidgets = widgets.filter((w: any) => w.type === 'portrait');
@@ -20,7 +21,9 @@ export default function ActionEditor({ action, onChange, variables, items, widge
     let newAction: any = { type: newType };
 
     if (newType === 'goToPage') newAction = { type: 'goToPage', pageId: '' };
-    else if (newType === 'startQuest') newAction = { type: 'startQuest', questId: '' };
+    else if (newType === 'startQuest') newAction = { type: 'startQuest', questId: quests[0]?.id || '' };
+    else if (newType === 'advanceQuest') newAction = { type: 'advanceQuest', questId: quests[0]?.id || '' };
+    else if (newType === 'completeQuest') newAction = { type: 'completeQuest', questId: quests[0]?.id || '' };
     else if (newType === 'setVariable') newAction = { type: 'setVariable', variableId: variables[0]?.id || '', value: 0 };
     else if (newType === 'addToVariable') newAction = { type: 'addToVariable', variableId: variables[0]?.id || '', amount: 1 };
     else if (newType === 'subtractFromVariable') newAction = { type: 'subtractFromVariable', variableId: variables[0]?.id || '', amount: 1 };
@@ -63,7 +66,11 @@ export default function ActionEditor({ action, onChange, variables, items, widge
         className={inputCls}
       >
         <option value="goToPage">Перейти на страницу</option>
-        <option value="startQuest">Начать квест</option>
+        <optgroup label="Квесты">
+          <option value="startQuest">Начать квест</option>
+          <option value="advanceQuest">Продвинуть квест</option>
+          <option value="completeQuest">Завершить квест</option>
+        </optgroup>
         <optgroup label="Переменные">
           <option value="setVariable">Установить переменную</option>
           <option value="addToVariable">Добавить к переменной</option>
@@ -103,6 +110,28 @@ export default function ActionEditor({ action, onChange, variables, items, widge
           value={action.pageId || ''}
           onChange={(e) => onChange({ ...action, pageId: e.target.value })}
         />
+      )}
+
+      {(type === 'startQuest' || type === 'advanceQuest' || type === 'completeQuest') && (
+        <div className="space-y-1">
+          {quests.length > 0 ? (
+            <select
+              value={action.questId || ''}
+              onChange={(e) => onChange({ ...action, questId: e.target.value })}
+              className={'w-full ' + selectCls}
+            >
+              <option value="">— выбери квест —</option>
+              {quests.map((q: any) => (
+                <option key={q.id} value={q.id}>{q.title?.ru || q.id}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-[10px] text-[var(--studio-text-muted)] italic">Нет квестов. Добавь квест в разделе Мира.</p>
+          )}
+          {type === 'startQuest' && <p className="text-[10px] text-[var(--studio-text-muted)] italic">Переводит квест из состояния «не начат» в стадию 1.</p>}
+          {type === 'advanceQuest' && <p className="text-[10px] text-[var(--studio-text-muted)] italic">Переходит на следующую стадию квеста (если в процессе).</p>}
+          {type === 'completeQuest' && <p className="text-[10px] text-[var(--studio-text-muted)] italic">Переводит квест сразу в завершённое состояние.</p>}
+        </div>
       )}
 
       {(type === 'setVariable' || type === 'addToVariable' || type === 'subtractFromVariable') && (() => {

@@ -38,6 +38,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
     speakers,
     advanceDialogueLine,
     dialogueTheme,
+    quests,
     copySelectedToWidgetClipboard,
     pasteFromWidgetClipboard,
     duplicateSelected,
@@ -418,6 +419,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
       })
     : pageWidgets;
 
+  const getQuestState = isPlaytest
+    ? (questId: string) => {
+        const progress = playtestState.questProgress?.[questId] ?? 0;
+        const quest = (quests as any[]).find((q: any) => q.id === questId);
+        if (!quest) return 'not_started' as const;
+        if (progress === 0) return 'not_started' as const;
+        if (progress >= quest.stages.length + 1) return 'completed' as const;
+        return 'in_progress' as const;
+      }
+    : undefined;
+
   // Filter widgets by visibleWhen (same logic as buttons). In editor always show for authoring.
   const visibleWidgets = effectiveWidgets.filter((widget: UIWidget) => {
     if (!widget.visibleWhen) return true;
@@ -434,7 +446,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
       widget.visibleWhen,
       useStudioStore.getState().variables,
       useStudioStore.getState().items,
-      getVarValue
+      getVarValue,
+      {},
+      getQuestState
     );
   });
 
@@ -936,7 +950,9 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                 button.visibleWhen,
                 useStudioStore.getState().variables,
                 useStudioStore.getState().items,
-                getVarValue
+                getVarValue,
+                {},
+                getQuestState
               );
             })
             .map((button) => (

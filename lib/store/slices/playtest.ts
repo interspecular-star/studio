@@ -21,6 +21,7 @@ export const createPlaytestSlice = (set: any, get: any) => ({
         dialogueLineIndex: 0,
         dialogueStarted: false,
         itemRewardModal: null,
+        questProgress: {},
       },
       snappingGuide: null,
     });
@@ -288,6 +289,41 @@ export const createPlaytestSlice = (set: any, get: any) => ({
           currentValues[intensityVar.id] = Math.max(0, Math.min(100, newVal));
         }
         break;
+      }
+      case 'startQuest': {
+        const questId = (action as any).questId;
+        const quest = state.quests?.find((q: any) => q.id === questId);
+        if (!quest) break;
+        const currentProgress = state.playtestState.questProgress[questId] ?? 0;
+        if (currentProgress === 0) {
+          set((s: any) => ({
+            playtestState: { ...s.playtestState, questProgress: { ...s.playtestState.questProgress, [questId]: 1 } },
+          }));
+        }
+        return;
+      }
+      case 'advanceQuest': {
+        const questId = (action as any).questId;
+        const quest = state.quests?.find((q: any) => q.id === questId);
+        if (!quest) break;
+        const currentProgress = state.playtestState.questProgress[questId] ?? 0;
+        const maxStage = quest.stages.length;
+        if (currentProgress > 0 && currentProgress <= maxStage) {
+          set((s: any) => ({
+            playtestState: { ...s.playtestState, questProgress: { ...s.playtestState.questProgress, [questId]: currentProgress + 1 } },
+          }));
+        }
+        return;
+      }
+      case 'completeQuest': {
+        const questId = (action as any).questId;
+        const quest = state.quests?.find((q: any) => q.id === questId);
+        if (!quest) break;
+        const completedValue = quest.stages.length + 1;
+        set((s: any) => ({
+          playtestState: { ...s.playtestState, questProgress: { ...s.playtestState.questProgress, [questId]: completedValue } },
+        }));
+        return;
       }
       default:
         break;

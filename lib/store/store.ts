@@ -6,6 +6,7 @@ import type {
   Item, EquipmentSlot,
   UIWidget, UIAsset,
   Background, StudioButton, StudioPage,
+  Quest,
 } from '../types';
 import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers } from './defaults';
 import { createUISlice } from './slices/ui';
@@ -54,6 +55,7 @@ type StudioState = {
   uiAssets: UIAsset[];
   speakers: Speaker[];
   dialogueTheme: DialogueTheme;
+  quests: Quest[];
 
   // === Playtest / Preview State ===
   playtestState: {
@@ -66,6 +68,7 @@ type StudioState = {
     dialogueLineIndex: number;
     dialogueStarted: boolean;
     itemRewardModal: { items: Array<{ itemId: string; amount: number }>; afterCollect?: ButtonAction[] } | null;
+    questProgress: Record<string, number>;
   };
 
   // Actions
@@ -129,6 +132,11 @@ type StudioState = {
   updateUIAsset: (id: string, updates: Partial<Omit<UIAsset, 'id'>>) => void;
   deleteUIAsset: (id: string) => void;
   getUIAsset: (id: string) => UIAsset | undefined;
+
+  // === Quests ===
+  addQuest: (quest: Omit<Quest, 'id'>) => void;
+  updateQuest: (id: string, updates: Partial<Omit<Quest, 'id'>>) => void;
+  deleteQuest: (id: string) => void;
 
   // === Speakers ===
   addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
@@ -232,6 +240,9 @@ type StudioState = {
   backgroundsCollapsed: boolean;
   toggleBackgroundsCollapsed: () => void;
 
+  questsCollapsed: boolean;
+  toggleQuestsCollapsed: () => void;
+
   collapsedItemIds: string[];
   toggleItemCollapsed: (itemId: string) => void;
 
@@ -286,6 +297,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   uiAssets: [],
   speakers: createDefaultSpeakers(),
   dialogueTheme: { ...DIALOGUE_THEME_PRESETS.darkFantasy },
+  quests: [],
 
   playtestState: {
     variableValues: {},
@@ -297,6 +309,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     itemRewardModal: null,
     dialogueLineIndex: 0,
     dialogueStarted: false,
+    questProgress: {},
   },
 
   canvasHistory: [],
@@ -319,6 +332,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   variablesCollapsed: true,
   itemsCollapsed: true,
   backgroundsCollapsed: true,
+  questsCollapsed: true,
   collapsedItemIds: [],
 
   startingInventory: {},

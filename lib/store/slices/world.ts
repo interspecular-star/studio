@@ -1,4 +1,4 @@
-import type { Item, Variable, Background, UIAsset, Speaker } from '../../types';
+import type { Item, Variable, Background, UIAsset, Speaker, Quest, QuestStage } from '../../types';
 
 export const createWorldSlice = (set: any, get: any) => ({
   // === Items ===
@@ -306,5 +306,28 @@ export const createWorldSlice = (set: any, get: any) => ({
       set((s: any) => ({ variables: [...s.variables, ...newCrits] }));
       get().saveToLocalStorage();
     }
+  },
+
+  // === Quests ===
+  addQuest: (questData: Omit<Quest, 'id'>) => {
+    const newQuest: Quest = {
+      id: `quest_${Date.now().toString(36)}`,
+      title: questData.title ?? { ru: 'Новый квест', en: 'New Quest' },
+      description: questData.description ?? { ru: '', en: '' },
+      stages: questData.stages ?? [],
+      rewards: questData.rewards ?? [],
+    };
+    set((s: any) => ({ quests: [...s.quests, newQuest] }));
+    get().saveToLocalStorage();
+  },
+
+  updateQuest: (id: string, updates: Partial<Omit<Quest, 'id'>>) => {
+    set((s: any) => ({ quests: s.quests.map((q: Quest) => q.id === id ? { ...q, ...updates } : q) }));
+    get().saveToLocalStorage();
+  },
+
+  deleteQuest: (id: string) => {
+    set((s: any) => ({ quests: s.quests.filter((q: Quest) => q.id !== id) }));
+    get().saveToLocalStorage();
   },
 });

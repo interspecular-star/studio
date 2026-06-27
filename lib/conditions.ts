@@ -1,17 +1,12 @@
-import type { Condition, Variable, Item, ComparisonOperator } from './store';
+import type { Condition, Variable, Item, ComparisonOperator, QuestStateValue } from './store';
 
-/**
- * Оценивает условие.
- * Для превью используем defaultValue переменных + простой mock state.
- */
 export function evaluateCondition(
   condition: Condition | undefined,
   variables: Variable[],
   items: Item[],
-  // Для превью: возвращает значение переменной (обычно defaultValue)
   getVariableValue: (variableId: string) => number | boolean | string | undefined,
-  // Опциональный mock state для превью (уровень, репутация и т.д.)
-  previewState: Record<string, number> = {}
+  previewState: Record<string, number> = {},
+  getQuestState?: (questId: string) => QuestStateValue
 ): boolean {
   if (!condition) return true;
 
@@ -52,18 +47,24 @@ export function evaluateCondition(
       return compareValues(current, condition.operator, condition.value);
     }
 
+    case 'questState': {
+      if (!getQuestState) return true;
+      const actual = getQuestState(condition.questId);
+      return actual === condition.state;
+    }
+
     case 'and':
       return condition.conditions.every(c =>
-        evaluateCondition(c, variables, items, getVariableValue, previewState)
+        evaluateCondition(c, variables, items, getVariableValue, previewState, getQuestState)
       );
 
     case 'or':
       return condition.conditions.some(c =>
-        evaluateCondition(c, variables, items, getVariableValue, previewState)
+        evaluateCondition(c, variables, items, getVariableValue, previewState, getQuestState)
       );
 
     case 'not':
-      return !evaluateCondition(condition.condition, variables, items, getVariableValue, previewState);
+      return !evaluateCondition(condition.condition, variables, items, getVariableValue, previewState, getQuestState);
 
     default:
       return true;

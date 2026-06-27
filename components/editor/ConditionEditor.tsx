@@ -8,6 +8,7 @@ interface ConditionEditorProps {
   onChange: (condition?: any) => void;
   variables: any[];
   items: any[];
+  quests?: any[];
 }
 
 export default function ConditionEditor({
@@ -16,6 +17,7 @@ export default function ConditionEditor({
   onChange,
   variables,
   items,
+  quests = [],
 }: ConditionEditorProps) {
   const hasCondition = !!condition;
 
@@ -34,6 +36,8 @@ export default function ConditionEditor({
           operator: firstVar.type === 'boolean' ? '==' : '>=',
           value: firstVar.type === 'boolean' ? true : firstVar.type === 'number' ? 1 : true,
         });
+      } else if (quests.length > 0) {
+        onChange({ type: 'questState', questId: quests[0].id, state: 'not_started' });
       } else {
         onChange({ type: 'variable', variableId: '', operator: '==', value: true });
       }
@@ -63,7 +67,7 @@ export default function ConditionEditor({
             onChange={(e) => {
               const newType = e.target.value as any;
 
-              if (['variable', 'itemQuantity', 'relationship', 'reputation', 'playerStat', 'resource'].includes(newType)) {
+              if (['variable', 'itemQuantity', 'relationship', 'reputation', 'playerStat', 'resource', 'questState'].includes(newType)) {
                 if (newType === 'variable') {
                   const firstVar = variables.find((v: any) => v.type === 'number') || variables[0];
                   onChange({ type: 'variable', variableId: firstVar?.id || '', operator: '>=', value: firstVar?.type === 'number' ? 1 : true });
@@ -77,6 +81,8 @@ export default function ConditionEditor({
                   onChange({ type: 'playerStat', stat: 'level', operator: '>=', value: 1 });
                 } else if (newType === 'resource') {
                   onChange({ type: 'resource', resource: 'coins', operator: '>=', value: 0 });
+                } else if (newType === 'questState') {
+                  onChange({ type: 'questState', questId: quests[0]?.id || '', state: 'not_started' });
                 }
               } else if (newType === 'and' || newType === 'or') {
                 const children = condition ? [condition] : [];
@@ -93,6 +99,7 @@ export default function ConditionEditor({
             <option value="reputation">Репутация в городе</option>
             <option value="playerStat">Характеристика игрока</option>
             <option value="resource">Ресурс</option>
+            <option value="questState">Состояние квеста</option>
             <option value="and">Группа И (AND)</option>
             <option value="or">Группа ИЛИ (OR)</option>
             <option value="not">Отрицание (NOT)</option>
@@ -155,6 +162,33 @@ export default function ConditionEditor({
             </div>
           )}
 
+          {/* Quest State */}
+          {condition.type === 'questState' && (
+            <div className="grid grid-cols-2 gap-1">
+              {quests.length > 0 ? (
+                <select
+                  value={condition.questId || ''}
+                  onChange={(e) => onChange({ ...condition, questId: e.target.value })}
+                  className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+                >
+                  <option value="">— квест —</option>
+                  {quests.map((q: any) => <option key={q.id} value={q.id}>{q.title?.ru || q.id}</option>)}
+                </select>
+              ) : (
+                <div className="text-[10px] text-[var(--studio-text-muted)] self-center italic">Нет квестов</div>
+              )}
+              <select
+                value={condition.state || 'not_started'}
+                onChange={(e) => onChange({ ...condition, state: e.target.value })}
+                className="rounded border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-1 py-1 text-xs"
+              >
+                <option value="not_started">Не начат</option>
+                <option value="in_progress">В процессе</option>
+                <option value="completed">Завершён</option>
+              </select>
+            </div>
+          )}
+
           {/* Reputation / PlayerStat / Resource */}
           {(['reputation','playerStat','resource'] as const).includes(condition.type) && (
             <div className="grid grid-cols-3 gap-1">
@@ -209,6 +243,7 @@ export default function ConditionEditor({
                     }}
                     variables={variables}
                     items={items}
+                    quests={quests}
                   />
                 </div>
               ))}
@@ -266,6 +301,7 @@ export default function ConditionEditor({
                 onChange={(updated) => onChange({ ...condition, condition: updated })}
                 variables={variables}
                 items={items}
+                quests={quests}
               />
             </div>
           )}

@@ -34,6 +34,8 @@ export default function WorldPanel() {
     toggleItemsCollapsed,
     backgroundsCollapsed,
     toggleBackgroundsCollapsed,
+    questsCollapsed,
+    toggleQuestsCollapsed,
     collapsedItemIds,
     toggleItemCollapsed,
     addDefaultPlayerStats,
@@ -48,6 +50,10 @@ export default function WorldPanel() {
     addSpeaker,
     updateSpeaker,
     deleteSpeaker,
+    quests,
+    addQuest,
+    updateQuest,
+    deleteQuest,
     addBackground,
     updateBackground,
     deleteBackground,
@@ -70,6 +76,7 @@ export default function WorldPanel() {
   const [editingItemIds, setEditingItemIds] = useState<Record<string, string>>({});
   const [uiAssetsCollapsed, setUiAssetsCollapsed] = useState(false);
   const [speakersCollapsed, setSpeakersCollapsed] = useState(false);
+  const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null);
 
   const numberVariables = variables.filter(v => v.type === 'number');
 
@@ -1043,6 +1050,154 @@ export default function WorldPanel() {
 
         {!speakersCollapsed && (
           <SpeakersSection speakers={speakers} uiAssets={uiAssets} addSpeaker={addSpeaker} updateSpeaker={updateSpeaker} deleteSpeaker={deleteSpeaker} />
+        )}
+      </div>
+
+      {/* === КВЕСТЫ === */}
+      <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+        <div
+          onClick={toggleQuestsCollapsed}
+          className="flex w-full cursor-pointer items-center justify-between text-sm font-medium text-[var(--studio-text-secondary)]"
+        >
+          <span className="flex items-center gap-2">
+            КВЕСТЫ
+            {quests.length > 0 && (
+              <span className="text-[10px] rounded-full bg-[var(--studio-accent)] text-[#1C1814] px-1.5 py-0.5 leading-none font-bold">{quests.length}</span>
+            )}
+          </span>
+          <span className="text-xs">{questsCollapsed ? '▶' : '▼'}</span>
+        </div>
+
+        {!questsCollapsed && (
+          <div className="mt-3 space-y-2">
+            {quests.length === 0 && (
+              <p className="text-[11px] text-[var(--studio-text-muted)] italic">
+                Нет квестов. Создай первый квест.
+              </p>
+            )}
+
+            {(quests as any[]).map((quest: any) => {
+              const isExpanded = expandedQuestId === quest.id;
+              return (
+                <div
+                  key={quest.id}
+                  className={`rounded border ${isExpanded ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'} bg-[#1C1814]`}
+                >
+                  <div
+                    className="flex items-center justify-between px-2 py-1.5 cursor-pointer"
+                    onClick={() => setExpandedQuestId(isExpanded ? null : quest.id)}
+                  >
+                    <span className="text-xs truncate flex-1">{quest.title?.ru || quest.id}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-[var(--studio-text-muted)]">{quest.stages?.length ?? 0} ст.</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Удалить квест «${quest.title?.ru || quest.id}»?`)) {
+                            deleteQuest(quest.id);
+                            if (isExpanded) setExpandedQuestId(null);
+                          }
+                        }}
+                        className="text-red-400 px-1 text-[10px] hover:underline"
+                      >✕</button>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t border-[var(--studio-border)] px-2 py-2 space-y-2">
+                      <div className="text-[9px] text-[var(--studio-text-muted)] font-mono">ID: {quest.id}</div>
+
+                      <div className="grid grid-cols-2 gap-1">
+                        <div>
+                          <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Название (РУ)</label>
+                          <input
+                            value={quest.title?.ru || ''}
+                            onChange={(e) => updateQuest(quest.id, { title: { ...quest.title, ru: e.target.value } })}
+                            className="w-full text-[10px] px-1.5 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Название (EN)</label>
+                          <input
+                            value={quest.title?.en || ''}
+                            onChange={(e) => updateQuest(quest.id, { title: { ...quest.title, en: e.target.value } })}
+                            className="w-full text-[10px] px-1.5 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] text-[var(--studio-text-muted)] block mb-0.5">Описание (РУ)</label>
+                        <textarea
+                          value={quest.description?.ru || ''}
+                          onChange={(e) => updateQuest(quest.id, { description: { ...quest.description, ru: e.target.value } })}
+                          rows={2}
+                          className="w-full text-[10px] px-1.5 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded resize-none"
+                        />
+                      </div>
+
+                      {/* Stages */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[9px] text-[var(--studio-text-muted)] font-medium">СТАДИИ</label>
+                          <button
+                            onClick={() => {
+                              const stages = [...(quest.stages || [])];
+                              stages.push({ id: `stage_${Date.now().toString(36)}`, description: { ru: '', en: '' } });
+                              updateQuest(quest.id, { stages });
+                            }}
+                            className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--studio-border)] hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)]"
+                          >+ Стадия</button>
+                        </div>
+                        {(quest.stages || []).length === 0 && (
+                          <p className="text-[9px] text-[var(--studio-text-muted)] italic">Нет стадий. Стадия 0 = не начат.</p>
+                        )}
+                        {(quest.stages || []).map((stage: any, si: number) => (
+                          <div key={stage.id} className="mb-1 flex gap-1 items-start">
+                            <span className="text-[9px] text-[var(--studio-accent)] font-mono mt-1 w-4 shrink-0">{si + 1}</span>
+                            <input
+                              value={stage.description?.ru || ''}
+                              onChange={(e) => {
+                                const stages = [...(quest.stages || [])];
+                                stages[si] = { ...stage, description: { ...stage.description, ru: e.target.value } };
+                                updateQuest(quest.id, { stages });
+                              }}
+                              placeholder="Описание стадии (РУ)"
+                              className="flex-1 text-[10px] px-1.5 py-0.5 bg-[#161310] border border-[var(--studio-border)] rounded"
+                            />
+                            <button
+                              onClick={() => {
+                                const stages = (quest.stages || []).filter((_: any, i: number) => i !== si);
+                                updateQuest(quest.id, { stages });
+                              }}
+                              className="text-red-400 text-[10px] px-1 mt-0.5 hover:underline shrink-0"
+                            >✕</button>
+                          </div>
+                        ))}
+                        {(quest.stages || []).length > 0 && (
+                          <p className="text-[9px] text-[var(--studio-text-muted)] italic mt-1">
+                            Стадия {(quest.stages?.length ?? 0) + 1} = завершён
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => {
+                const nameRu = prompt('Название квеста (РУ):', 'Новый квест');
+                if (!nameRu) return;
+                const nameEn = prompt('Название квеста (EN):', nameRu) || nameRu;
+                addQuest({ title: { ru: nameRu, en: nameEn }, description: { ru: '', en: '' }, stages: [] });
+              }}
+              className="w-full text-xs px-2 py-1.5 border border-dashed border-[var(--studio-border)] rounded hover:border-[var(--studio-accent)] text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] transition-colors"
+            >
+              + Новый квест
+            </button>
+          </div>
         )}
       </div>
 

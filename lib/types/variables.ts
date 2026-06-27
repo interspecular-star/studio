@@ -21,6 +21,8 @@ export type Variable = {
 
 export type ComparisonOperator = '==' | '!=' | '>' | '>=' | '<' | '<=';
 
+export type QuestStateValue = 'not_started' | 'in_progress' | 'completed';
+
 export type Condition =
   | { type: 'variable'; variableId: string; operator: ComparisonOperator; value: number | boolean | string }
   | { type: 'itemQuantity'; itemId: string; operator: ComparisonOperator; value: number }
@@ -28,6 +30,7 @@ export type Condition =
   | { type: 'reputation'; operator: ComparisonOperator; value: number }
   | { type: 'playerStat'; stat: 'level' | 'strength'; operator: ComparisonOperator; value: number }
   | { type: 'resource'; resource: 'coins' | 'gasoline' | 'gems'; operator: ComparisonOperator; value: number }
+  | { type: 'questState'; questId: string; state: QuestStateValue }
   | { type: 'and'; conditions: Condition[] }
   | { type: 'or'; conditions: Condition[] }
   | { type: 'not'; condition: Condition };

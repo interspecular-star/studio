@@ -38,6 +38,7 @@ export default function SlayStudio() {
     canvasHeight,
     variables,
     items,
+    quests,
     playtestState,
     mode,
     exitPlaytest,
@@ -234,6 +235,7 @@ export default function SlayStudio() {
                         coordinateClipboard={coordinateClipboard}
                         variables={variables}
                         items={items}
+                        quests={quests}
                       />
 
                       {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (

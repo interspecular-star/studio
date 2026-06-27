@@ -1,6 +1,8 @@
 export type ButtonAction =
   | { type: 'goToPage'; pageId: string }
   | { type: 'startQuest'; questId: string }
+  | { type: 'advanceQuest'; questId: string }
+  | { type: 'completeQuest'; questId: string }
 
   | { type: 'setVariable'; variableId: string; value: number | boolean | string }
   | { type: 'addToVariable'; variableId: string; amount: number }
