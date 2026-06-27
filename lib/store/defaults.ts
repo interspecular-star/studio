@@ -143,51 +143,6 @@ export const createDefaultPages = (): StudioPage[] => [
     uiWidgets: [],
     uiLayoutPreset: 'freeform',
   },
-  {
-    id: 'tavern_01',
-    title: { ru: 'Таверна. Мила', en: 'The Tavern. Mila' },
-    background: '',
-    speaker: 'mila',
-    text: {
-      ru: 'Ого, Слэй... Давно не заходил. Выглядишь, будто тебя переехал грузовик. **Что случилось?** [red]Ты в порядке?[/red]',
-      en: 'Well, well, Slay... Haven\'t seen you in a while. You look like you got hit by a truck. **What happened?** [red]Are you okay?[/red]',
-    },
-    buttons: [
-      {
-        id: 'btn_angry',
-        text: { ru: 'Разозлить Милу', en: 'Make Mila angry' },
-        layout: { x: 70, y: 85, width: 25, height: 8, style: 'danger' },
-        action: { type: 'setPortraitVariant', variant: 'angry' },
-      },
-      {
-        id: 'btn_neutral',
-        text: { ru: 'Успокоить', en: 'Calm down' },
-        layout: { x: 40, y: 85, width: 25, height: 8, style: 'default' },
-        action: { type: 'setPortraitVariant', variant: 'neutral' },
-      },
-      {
-        id: 'btn_int_high',
-        text: { ru: 'Поднять накал', en: 'Raise intensity' },
-        layout: { x: 10, y: 92, width: 20, height: 5, style: 'important' },
-        action: { type: 'setIntensity', value: 85 },
-      },
-      {
-        id: 'btn_dramatic',
-        text: { ru: 'Драматический текст', en: 'Dramatic text' },
-        layout: { x: 32, y: 92, width: 20, height: 5, style: 'default' },
-        action: { type: 'setWidgetProperty', pageId: 'tavern_01', widgetId: 'w_dlg1', key: 'text', value: { ru: 'Ты... **предатель**! [red]Убирайся отсюда![/red]', en: 'You... **traitor**! [red]Get out of here![/red]' } },
-      },
-    ] as StudioButton[],
-    showTopResourceBar: false,
-    sceneType: 'dialog',
-    uiWidgets: [
-      { id: 'w_dlg1', type: 'dialogueBox', layout: { x: 16, y: 78, width: 68, height: 12, z: 20 }, style: 'default', data: { textSource: 'page' }, text: { ru: '', en: '' } },
-      { id: 'w_port1', type: 'portrait', layout: { x: 75, y: 30, width: 20, height: 40, z: 5 }, data: { speakerId: 'mila' } },
-      { id: 'w_port2', type: 'portrait', layout: { x: 2, y: 30, width: 20, height: 40, z: 5 }, data: { speakerId: 'slay' } },
-      { id: 'w_q1', type: 'quickAction', layout: { x: 2, y: 15, width: 7, height: 7, z: 30 }, data: { actionType: 'inventory' } },
-    ],
-    uiLayoutPreset: 'classic_vn',
-  },
 ];
 
 export const createInitialMeta = (): ProjectMeta => ({
