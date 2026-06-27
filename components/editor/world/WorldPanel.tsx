@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useStudioStore, DIALOGUE_THEME_PRESETS, type Variable, type StatModifier, type Speaker } from '@/lib/store';
 import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import CombatPanel from './CombatPanel';
+import BalancePanel from './BalancePanel';
 
 const protectedPlayerStats = [
   'health', 'health_max',
@@ -71,7 +72,7 @@ export default function WorldPanel() {
     mode,
   } = useStudioStore();
 
-  const [worldTab, setWorldTab] = useState<'world' | 'combat'>('world');
+  const [worldTab, setWorldTab] = useState<'world' | 'combat' | 'balance'>('world');
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
   const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
@@ -101,9 +102,14 @@ export default function WorldPanel() {
           onClick={() => setWorldTab('combat')}
           className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'combat' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
         >БОЁВКА</button>
+        <button
+          onClick={() => setWorldTab('balance')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'balance' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+        >БАЛАНС</button>
       </div>
 
-      {worldTab === 'combat' && <div className="flex-1 overflow-y-auto"><CombatPanel /></div>}
+      {worldTab === 'combat'  && <div className="flex-1 overflow-y-auto"><CombatPanel /></div>}
+      {worldTab === 'balance' && <div className="flex-1 overflow-y-auto"><BalancePanel /></div>}
 
       <div className={worldTab !== 'world' ? 'hidden' : 'flex-1 overflow-y-auto p-4 space-y-6'}>
 
