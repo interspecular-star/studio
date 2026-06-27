@@ -8,8 +8,9 @@ import type {
   Background, StudioButton, StudioPage,
   Quest,
   Enemy, Boss, Wave, InstinctDef, ScenarioDef,
+  Building, BuildingId, Mercenary, RewardEntry, MineConfig, Difficulty,
 } from '../types';
-import { DEFAULT_INSTINCTS, DEFAULT_SCENARIOS } from '../types';
+import { DEFAULT_INSTINCTS, DEFAULT_SCENARIOS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../types';
 import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers } from './defaults';
 import { createUISlice } from './slices/ui';
 import { createCanvasSlice } from './slices/canvas';
@@ -18,6 +19,7 @@ import { createPagesSlice } from './slices/pages';
 import { createPlaytestSlice } from './slices/playtest';
 import { createPersistenceSlice } from './slices/persistence';
 import { createCombatSlice } from './slices/combat';
+import { createEconomySlice } from './slices/economy';
 
 // Suppress unused import warnings — these are referenced by StudioState type below
 type _Unused = Condition | LocalizedString;
@@ -168,6 +170,25 @@ type StudioState = {
 
   combatCollapsed: boolean;
   toggleCombatCollapsed: () => void;
+
+  // === Economy ===
+  buildings: Building[];
+  mercenaries: Mercenary[];
+  rewardTables: RewardEntry[];
+  mineConfig: MineConfig;
+
+  updateBuilding: (id: BuildingId, updates: Partial<Omit<Building, 'id'>>) => void;
+  resetBuildingsToDefault: () => void;
+
+  addMercenary: (data: Omit<Mercenary, 'id'>) => void;
+  updateMercenary: (id: string, updates: Partial<Omit<Mercenary, 'id'>>) => void;
+  deleteMercenary: (id: string) => void;
+
+  updateRewardEntry: (difficulty: Difficulty, updates: Partial<Omit<RewardEntry, 'difficulty'>>) => void;
+  resetRewardTablesToDefault: () => void;
+
+  updateMineConfig: (updates: Partial<MineConfig>) => void;
+  resetMineConfigToDefault: () => void;
 
   // === Speakers ===
   addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
@@ -373,6 +394,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   instincts: DEFAULT_INSTINCTS,
   scenarios: DEFAULT_SCENARIOS,
 
+  buildings: DEFAULT_BUILDINGS,
+  mercenaries: DEFAULT_MERCENARIES,
+  rewardTables: DEFAULT_REWARD_TABLES,
+  mineConfig: DEFAULT_MINE_CONFIG,
+
   startingInventory: {},
 
   // === Slice Implementations ===
@@ -383,6 +409,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   ...createPlaytestSlice(set, get),
   ...createPersistenceSlice(set, get),
   ...createCombatSlice(set, get),
+  ...createEconomySlice(set, get),
 }));
 
 // Helper to get current page

@@ -1,5 +1,5 @@
 import type { StudioAct } from '../../types';
-import { DIALOGUE_THEME_PRESETS } from '../../types';
+import { DIALOGUE_THEME_PRESETS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../../types';
 import { createInitialMeta, createDefaultSpeakers, createDefaultPages } from '../defaults';
 
 export const createPersistenceSlice = (set: any, get: any) => ({
@@ -24,6 +24,10 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       waves: state.waves,
       instincts: state.instincts,
       scenarios: state.scenarios,
+      buildings: state.buildings,
+      mercenaries: state.mercenaries,
+      rewardTables: state.rewardTables,
+      mineConfig: state.mineConfig,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
     };
@@ -115,6 +119,10 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         waves: parsed.waves || [],
         instincts: parsed.instincts || [],
         scenarios: parsed.scenarios || [],
+        buildings: parsed.buildings?.length ? parsed.buildings : DEFAULT_BUILDINGS,
+        mercenaries: parsed.mercenaries || DEFAULT_MERCENARIES,
+        rewardTables: parsed.rewardTables?.length ? parsed.rewardTables : DEFAULT_REWARD_TABLES,
+        mineConfig: parsed.mineConfig || DEFAULT_MINE_CONFIG,
         canvasWidth: parsed.canvasWidth || 1280,
         canvasHeight: parsed.canvasHeight || 720,
       });
@@ -146,6 +154,10 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       waves: state.waves,
       instincts: state.instincts,
       scenarios: state.scenarios,
+      buildings: state.buildings,
+      mercenaries: state.mercenaries,
+      rewardTables: state.rewardTables,
+      mineConfig: state.mineConfig,
       canvasWidth: state.canvasWidth,
       canvasHeight: state.canvasHeight,
     };
@@ -213,6 +225,10 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         waves: data.waves || [],
         instincts: data.instincts || [],
         scenarios: data.scenarios || [],
+        buildings: data.buildings?.length ? data.buildings : DEFAULT_BUILDINGS,
+        mercenaries: data.mercenaries || DEFAULT_MERCENARIES,
+        rewardTables: data.rewardTables?.length ? data.rewardTables : DEFAULT_REWARD_TABLES,
+        mineConfig: data.mineConfig || DEFAULT_MINE_CONFIG,
         canvasWidth: data.canvasWidth || 1280,
         canvasHeight: data.canvasHeight || 720,
       });

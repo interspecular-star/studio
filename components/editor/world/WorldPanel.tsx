@@ -6,6 +6,7 @@ import { useStudioStore, DIALOGUE_THEME_PRESETS, type Variable, type StatModifie
 import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import CombatPanel from './CombatPanel';
 import BalancePanel from './BalancePanel';
+import EconomyPanel from './EconomyPanel';
 
 const protectedPlayerStats = [
   'health', 'health_max',
@@ -72,7 +73,7 @@ export default function WorldPanel() {
     mode,
   } = useStudioStore();
 
-  const [worldTab, setWorldTab] = useState<'world' | 'combat' | 'balance'>('world');
+  const [worldTab, setWorldTab] = useState<'world' | 'combat' | 'balance' | 'economy'>('world');
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
   const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
@@ -106,10 +107,15 @@ export default function WorldPanel() {
           onClick={() => setWorldTab('balance')}
           className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'balance' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
         >БАЛАНС</button>
+        <button
+          onClick={() => setWorldTab('economy')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'economy' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+        >ЭКОНОМИКА</button>
       </div>
 
       {worldTab === 'combat'  && <div className="flex-1 overflow-y-auto"><CombatPanel /></div>}
       {worldTab === 'balance' && <div className="flex-1 overflow-y-auto"><BalancePanel /></div>}
+      {worldTab === 'economy' && <div className="flex-1 overflow-y-auto"><EconomyPanel /></div>}
 
       <div className={worldTab !== 'world' ? 'hidden' : 'flex-1 overflow-y-auto p-4 space-y-6'}>
 
