@@ -278,7 +278,7 @@ export const createPersistenceSlice = (set: any, get: any) => ({
     set({
       meta: { ...createInitialMeta(), name: 'Новый проект' },
       pages: defaultPages,
-      selectedPageId: 'intro_01',
+      selectedPageId: 'village',
       selectedButtonId: null,
       selectedWidgetId: null,
       coordinateClipboard: null,

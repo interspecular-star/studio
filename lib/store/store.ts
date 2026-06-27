@@ -331,7 +331,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   // === Initial State ===
   meta: createInitialMeta(),
   pages: _initialPages,
-  selectedPageId: 'intro_01',
+  selectedPageId: 'village',
   selectedButtonId: null,
   selectedWidgetId: null,
   widgetClipboard: null,
