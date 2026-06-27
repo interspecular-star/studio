@@ -6,7 +6,6 @@ import {
   playerAttack as engineAttack,
   playerReact as engineReact,
   activateShowtime as engineShowtime,
-  generateEnemySignal,
   tick as engineTick,
 } from '../../combat/engine';
 
@@ -79,13 +78,8 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     const { combatSession } = state;
     if (!combatSession || combatSession.status !== 'active') return;
 
+    // Engine tick handles cooldowns + signal generation internally (C3)
     let next = engineTick(combatSession);
-
-    // Auto-generate signal every ~5 ticks when no signal is pending and enemies are alive
-    if (!next.pendingSignal && next.enemies.length > 0 && next.tick % 5 === 0) {
-      const activeEnemy = next.enemies.find(e => !e.isStaggered) ?? next.enemies[0];
-      next = generateEnemySignal(next, activeEnemy);
-    }
 
     // Auto-spawn next enemy when screen is clear and queue has more
     if (next.enemies.length === 0 && next.spawnQueue.length > 0 && next.tick % 3 === 0) {

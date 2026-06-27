@@ -17,6 +17,7 @@ export type SpawnedEnemy = {
   hp: number;
   hpMax: number;
   atk: number;
+  tier: number;             // 1–5, drives AI aggression
   stagger: number;          // 0–100
   isStaggered: boolean;
   staggerTicksLeft: number;
@@ -25,6 +26,7 @@ export type SpawnedEnemy = {
   breakBar: number;         // 0–100 boss break bar
   isBoss: boolean;
   tickSinceSpawn: number;
+  attackCooldownTicks: number; // ticks until next attack signal
 };
 
 export type CombatLogEntry = {

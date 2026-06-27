@@ -76,6 +76,40 @@ export function initCombatSession(
   };
 }
 
+// ── Enemy AI helpers ─────────────────────────────────────────────────────────
+
+// Attack cooldown in ticks (200ms/tick → tier 1 = 1.6s, tier 5 = 0.8s)
+function baseCooldown(tier: number, isFury: boolean): number {
+  const base = [0, 8, 7, 6, 5, 4][Math.min(5, Math.max(1, tier))] ?? 6;
+  return isFury ? Math.max(2, base - 2) : base;
+}
+
+// Signal type distribution by tier + phase + fury
+// [blue%, yellow%, red%]
+const TIER_SIGNAL: Record<number, [number, number, number]> = {
+  1: [60, 30, 10],
+  2: [45, 35, 20],
+  3: [30, 35, 35],
+  4: [20, 30, 50],
+  5: [10, 20, 70],
+};
+
+function pickSignalType(tier: number, phase: number, isFury: boolean): AttackSignal['type'] {
+  let [b, y, r] = TIER_SIGNAL[Math.min(5, Math.max(1, tier))] ?? [35, 35, 30];
+
+  // Boss phase 1 (+15% yellow from blue)
+  if (phase >= 1) { const s = Math.min(b, 15); b -= s; y += s; }
+  // Boss phase 2 (+20% red from blue+yellow)
+  if (phase >= 2) { const s = 20; const rb = Math.min(b, s); b -= rb; y -= Math.min(y, s - rb); r += s; }
+  // Fury (+15% red from blue)
+  if (isFury) { const s = Math.min(b, 15); b -= s; r += s; }
+
+  const roll = Math.random() * 100;
+  if (roll < b) return 'blue';
+  if (roll < b + y) return 'yellow';
+  return 'red';
+}
+
 // ── Spawn queue ───────────────────────────────────────────────────────────────
 
 function buildSpawnQueue(wave: Wave, difficulty: Difficulty): string[] {
@@ -109,12 +143,14 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
   const [, ...rest] = session.spawnQueue;
   const isBoss = 'isBoss' in enemy && enemy.isBoss;
 
+  const tier = (enemy as any).tier ?? 1;
   const spawned: SpawnedEnemy = {
     instanceId: `e_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
     enemyId: enemy.id,
     hp: enemy.hp,
     hpMax: enemy.hp,
     atk: enemy.atk,
+    tier,
     stagger: 0,
     isStaggered: false,
     staggerTicksLeft: 0,
@@ -123,6 +159,7 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
     breakBar: 0,
     isBoss,
     tickSinceSpawn: 0,
+    attackCooldownTicks: baseCooldown(tier, false),
   };
 
   return {
@@ -242,9 +279,11 @@ export function activateShowtime(session: CombatSession): CombatSession {
 export function generateEnemySignal(session: CombatSession, enemy: SpawnedEnemy): CombatSession {
   if (session.pendingSignal || enemy.isStaggered || session.status !== 'active') return session;
 
-  const r = Math.random();
-  const type: AttackSignal['type'] = r < 0.35 ? 'blue' : r < 0.7 ? 'yellow' : 'red';
-  const window = type === 'red' ? 4 : 3;
+  const type = pickSignalType(enemy.tier, enemy.currentPhase, enemy.isFuryMode);
+  // Red signals give less time; higher tier bosses also tighten the window
+  const baseWindow = type === 'red' ? 3 : type === 'yellow' ? 4 : 5;
+  const tierBonus = enemy.isBoss && enemy.currentPhase >= 2 ? -1 : 0;
+  const window = Math.max(2, baseWindow + tierBonus);
 
   const signal: AttackSignal = {
     instanceId: `sig_${Date.now().toString(36)}`,
@@ -273,9 +312,17 @@ export function playerReact(session: CombatSession, reaction: 'dodge' | 'parry')
     ? Math.round(session.playerMpMax * 0.03) : 0;
   const showtimeGain = reaction === 'parry' ? 14 : 10;
 
+  // Reset attacker's cooldown after the signal is resolved
+  const newEnemies = session.enemies.map(e =>
+    e.instanceId === signal.enemyInstanceId
+      ? { ...e, attackCooldownTicks: baseCooldown(e.tier, e.isFuryMode) }
+      : e
+  );
+
   return {
     ...session,
     pendingSignal: null,
+    enemies: newEnemies,
     momentum: newMomentum,
     playerMp: Math.min(session.playerMpMax, session.playerMp + mpGain),
     showtime: Math.min(100, session.showtime + showtimeGain),
@@ -302,9 +349,17 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
   const newHp = Math.max(0, session.playerHp - finalDmg);
   const died = newHp <= 0;
 
+  // Reset attacker's cooldown after the hit lands
+  const enemiesAfterHit = session.enemies.map(e =>
+    e.instanceId === signal.enemyInstanceId
+      ? { ...e, attackCooldownTicks: baseCooldown(e.tier, e.isFuryMode) }
+      : e
+  );
+
   let next: CombatSession = {
     ...session,
     pendingSignal: null,
+    enemies: enemiesAfterHit,
     playerHp: newHp,
     momentum: 1,          // momentum resets on taking damage
     noDamageTicks: 0,
@@ -344,19 +399,54 @@ export function tick(session: CombatSession): CombatSession {
       : { ...next, pendingSignal: { ...next.pendingSignal, ticksLeft: tl } };
   }
 
-  // Enemy stagger countdown + spawn tick
+  // Enemy tick: stagger countdown + attack cooldown + spawn timer
   next = {
     ...next,
-    enemies: next.enemies.map(e => ({
-      ...e,
-      tickSinceSpawn: e.tickSinceSpawn + 1,
-      ...(e.isStaggered
-        ? e.staggerTicksLeft > 1
-          ? { staggerTicksLeft: e.staggerTicksLeft - 1 }
-          : { isStaggered: false, staggerTicksLeft: 0, stagger: 0 }
-        : {}),
-    })),
+    enemies: next.enemies.map(e => {
+      let updated = { ...e, tickSinceSpawn: e.tickSinceSpawn + 1 };
+
+      // Stagger countdown — when stagger ends, enemy enters Fury Mode
+      if (updated.isStaggered) {
+        if (updated.staggerTicksLeft > 1) {
+          updated = { ...updated, staggerTicksLeft: updated.staggerTicksLeft - 1 };
+        } else {
+          // Stagger recovered → Fury and immediate attack
+          updated = {
+            ...updated,
+            isStaggered: false,
+            staggerTicksLeft: 0,
+            stagger: 0,
+            isFuryMode: true,
+            attackCooldownTicks: 0, // attack immediately on recovery
+          };
+        }
+      } else {
+        // Decrement attack cooldown
+        updated = { ...updated, attackCooldownTicks: Math.max(0, updated.attackCooldownTicks - 1) };
+      }
+
+      return updated;
+    }),
   };
+
+  // Auto-generate signal: find the first ready enemy (cooldown = 0, not staggered)
+  if (!next.pendingSignal && next.status === 'active') {
+    const ready = next.enemies.find(e => e.attackCooldownTicks === 0 && !e.isStaggered);
+    if (ready) {
+      next = generateEnemySignal(next, ready);
+      // Pre-set cooldown so it won't immediately trigger again (signal resolving will also reset it)
+      if (next.pendingSignal) {
+        next = {
+          ...next,
+          enemies: next.enemies.map(e =>
+            e.instanceId === ready.instanceId
+              ? { ...e, attackCooldownTicks: baseCooldown(e.tier, e.isFuryMode) }
+              : e
+          ),
+        };
+      }
+    }
+  }
 
   return next;
 }
