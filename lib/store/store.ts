@@ -20,6 +20,8 @@ import { createPlaytestSlice } from './slices/playtest';
 import { createPersistenceSlice } from './slices/persistence';
 import { createCombatSlice } from './slices/combat';
 import { createEconomySlice } from './slices/economy';
+import { createCombatSessionSlice } from './slices/combatSession';
+import type { CombatSession } from '../types/combat-session';
 
 // Suppress unused import warnings — these are referenced by StudioState type below
 type _Unused = Condition | LocalizedString;
@@ -305,6 +307,17 @@ type StudioState = {
   removeFromStartingInventory: (itemId: string) => void;
   setStartingInventoryQuantity: (itemId: string, quantity: number) => void;
 
+  // === Combat Session (runtime) ===
+  combatSession: CombatSession | null;
+  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string) => void;
+  combatPlayerAttack: (targetInstanceId: string, isWeakSpot?: boolean) => void;
+  combatPlayerDodge: () => void;
+  combatPlayerParry: () => void;
+  combatActivateShowtime: () => void;
+  combatSpawnNext: () => void;
+  combatTick: () => void;
+  endCombat: () => void;
+
   addPage: (actId?: string | null) => void;
   duplicatePage: (id: string) => void;
   deletePage: (id: string) => void;
@@ -411,6 +424,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   ...createPersistenceSlice(set, get),
   ...createCombatSlice(set, get),
   ...createEconomySlice(set, get),
+  ...createCombatSessionSlice(set, get),
 }));
 
 // Helper to get current page
