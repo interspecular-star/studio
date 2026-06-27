@@ -110,6 +110,7 @@ type StudioState = {
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => boolean;
   exportProject: () => void;
+  exportCombatPack: () => void;
   importProject: (data: any) => boolean;
   setProjectName: (name: string) => void;
   createNewProject: () => void;

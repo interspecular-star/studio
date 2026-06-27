@@ -1,6 +1,7 @@
 import type { StudioAct } from '../../types';
 import { DIALOGUE_THEME_PRESETS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../../types';
 import { createInitialMeta, createDefaultSpeakers, createDefaultPages } from '../defaults';
+import { buildCombatPack } from '../../validation/validate';
 
 export const createPersistenceSlice = (set: any, get: any) => ({
   saveToLocalStorage: () => {
@@ -168,6 +169,32 @@ export const createPersistenceSlice = (set: any, get: any) => ({
     const a = document.createElement('a');
     a.href = url;
     a.download = `${safeName}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  exportCombatPack: () => {
+    const state = get();
+    const pack = buildCombatPack({
+      enemies:      state.enemies,
+      bosses:       state.bosses,
+      waves:        state.waves,
+      instincts:    state.instincts,
+      scenarios:    state.scenarios,
+      buildings:    state.buildings,
+      mercenaries:  state.mercenaries,
+      rewardTables: state.rewardTables,
+      mineConfig:   state.mineConfig,
+    });
+    const json = JSON.stringify(pack, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const safeName = state.meta.name.replace(/[^\wа-яё]/gi, '_');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}_combat_pack_${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

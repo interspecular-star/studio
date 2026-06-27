@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStudioStore } from '@/lib/store';
+import { validateCombatPack, type ValidationIssue } from '@/lib/validation/validate';
 import {
   DIFFICULTY_LABELS, MERCENARY_RARITY_LABELS, MERCENARY_RARITY_COLORS,
   buildingUpgradeCost,
@@ -10,7 +11,7 @@ import {
   type RewardEntry,
 } from '@/lib/types';
 
-type EcoTab = 'buildings' | 'mercenaries' | 'rewards' | 'mine';
+type EcoTab = 'buildings' | 'mercenaries' | 'rewards' | 'mine' | 'export';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -520,6 +521,139 @@ function MineTab() {
   );
 }
 
+// ── Tab: ЭКСПОРТ ──────────────────────────────────────────────────────────────
+
+function ExportTab() {
+  const {
+    enemies, bosses, waves, instincts, scenarios,
+    buildings, mercenaries, rewardTables, mineConfig,
+    items, exportCombatPack,
+  } = useStudioStore();
+
+  const [result, setResult] = useState<{ ok: boolean; issues: ValidationIssue[] } | null>(null);
+
+  const runValidation = useCallback(() => {
+    const r = validateCombatPack({
+      enemies, bosses, waves, instincts, scenarios,
+      buildings, mercenaries, rewardTables, mineConfig,
+      items,
+    });
+    setResult(r);
+  }, [enemies, bosses, waves, instincts, scenarios, buildings, mercenaries, rewardTables, mineConfig, items]);
+
+  const handleExport = () => {
+    runValidation();
+    exportCombatPack();
+  };
+
+  const errors   = result?.issues.filter(i => i.severity === 'error')   ?? [];
+  const warnings = result?.issues.filter(i => i.severity === 'warning')  ?? [];
+
+  const byCategory = (issues: ValidationIssue[]) => {
+    const map = new Map<string, ValidationIssue[]>();
+    for (const issue of issues) {
+      if (!map.has(issue.category)) map.set(issue.category, []);
+      map.get(issue.category)!.push(issue);
+    }
+    return map;
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Export buttons */}
+      <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3 space-y-2">
+        <p className="text-[10px] font-semibold text-[var(--studio-text-secondary)]">ЭКСПОРТ ДАННЫХ ДЛЯ ДВИЖКА</p>
+        <p className="text-[10px] text-[var(--studio-text-muted)]">
+          Отдельный JSON-файл с врагами, волнами, инстинктами, сценариями, зданиями, наёмниками, наградами и шахтой.
+          Перед скачиванием запускается автовалидация.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={runValidation}
+            className="flex-1 py-1.5 rounded text-xs font-medium border border-[var(--studio-border)] text-[var(--studio-text-muted)] hover:text-[var(--studio-text)] hover:border-[var(--studio-accent)] transition-colors"
+          >
+            Проверить
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex-1 py-1.5 rounded text-xs font-medium bg-[var(--studio-accent)] text-white hover:opacity-90 transition-opacity"
+          >
+            Экспорт combat pack ↓
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
+        <p className="text-[10px] font-semibold text-[var(--studio-text-secondary)] mb-2">СОДЕРЖИМОЕ ПАКЕТА</p>
+        {[
+          ['Враги',       enemies.length],
+          ['Боссы',       bosses.length],
+          ['Волны',       waves.length],
+          ['Инстинкты',   instincts.length],
+          ['Сценарии',    scenarios.length],
+          ['Здания',      buildings.length],
+          ['Наёмники',    mercenaries.length],
+          ['Таблицы наград', rewardTables.length],
+        ].map(([label, count]) => (
+          <div key={String(label)} className="flex justify-between text-[10px] py-0.5 border-b border-[var(--studio-border)] last:border-0">
+            <span className="text-[var(--studio-text-muted)]">{label}</span>
+            <span className={`font-mono font-semibold ${Number(count) === 0 ? 'text-amber-500' : 'text-[var(--studio-text)]'}`}>
+              {count}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Validation results */}
+      {result && (
+        <div className={`rounded-lg border p-3 ${result.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`text-sm ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {result.ok ? '✓' : '✗'}
+            </span>
+            <p className={`text-xs font-semibold ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {result.ok
+                ? `Валидация пройдена${warnings.length > 0 ? ` (${warnings.length} предупреждений)` : ''}`
+                : `${errors.length} ошибок, ${warnings.length} предупреждений`}
+            </p>
+          </div>
+
+          {errors.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {Array.from(byCategory(errors).entries()).map(([cat, catIssues]) => (
+                <div key={cat}>
+                  <p className="text-[10px] font-semibold text-red-400 mb-0.5">{cat}</p>
+                  {catIssues.map((issue, i) => (
+                    <p key={i} className="text-[10px] text-red-300 pl-2">• {issue.message}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div className="space-y-2">
+              {Array.from(byCategory(warnings).entries()).map(([cat, catIssues]) => (
+                <div key={cat}>
+                  <p className="text-[10px] font-semibold text-amber-400 mb-0.5">{cat}</p>
+                  {catIssues.map((issue, i) => (
+                    <p key={i} className="text-[10px] text-amber-300 pl-2">• {issue.message}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.ok && warnings.length === 0 && (
+            <p className="text-[10px] text-green-300">Все проверки пройдены — данные готовы для движка.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function EconomyPanel() {
@@ -530,6 +664,7 @@ export default function EconomyPanel() {
     { id: 'mercenaries',  label: 'НАЁМНИКИ' },
     { id: 'rewards',      label: 'НАГРАДЫ'  },
     { id: 'mine',         label: 'ШАХТА'    },
+    { id: 'export',       label: 'ЭКСПОРТ'  },
   ];
 
   return (
@@ -554,6 +689,7 @@ export default function EconomyPanel() {
         {tab === 'mercenaries' && <MercenariesTab />}
         {tab === 'rewards'     && <RewardsTab />}
         {tab === 'mine'        && <MineTab />}
+        {tab === 'export'      && <ExportTab />}
       </div>
     </div>
   );
