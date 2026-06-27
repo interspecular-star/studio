@@ -37,31 +37,21 @@ const villagePage = (): StudioPage => ({
   showTopResourceBar: true,
   uiLayoutPreset: 'freeform',
   uiWidgets: [
-    // Title
-    { id: 'vw_title',    type: 'textLabel', layout: { x: 10, y: 5,  width: 80, height: 9,  z: 10 }, text: { ru: '🎬 ТАБУРЕТКИНО', en: '🎬 TABURETKINO' } },
-    { id: 'vw_subtitle', type: 'textLabel', layout: { x: 15, y: 14, width: 70, height: 5,  z: 10 }, text: { ru: 'Самая кинематографичная деревня в округе', en: 'The most cinematic village around' } },
-    // Building cards
-    ...BUILDING_CARDS.flatMap(b => [
-      { id: `vw_${b.key}_bg`,   type: 'container' as const, layout: { x: b.x, y: 22, width: 17, height: 38, z: 5  } },
-      { id: `vw_${b.key}_icon`, type: 'textLabel' as const, layout: { x: b.x + 2, y: 25, width: 13, height: 12, z: 6 }, text: { ru: b.icon, en: b.icon } },
-      { id: `vw_${b.key}_name`, type: 'textLabel' as const, layout: { x: b.x,     y: 38, width: 17, height: 7,  z: 6 }, text: { ru: b.nameRu, en: b.nameEn } },
-      { id: `vw_${b.key}_npc`,  type: 'textLabel' as const, layout: { x: b.x,     y: 45, width: 17, height: 5,  z: 6 }, text: { ru: b.npcRu,  en: b.npcEn  } },
-      { id: `vw_${b.key}_lvl`,  type: 'textLabel' as const, layout: { x: b.x,     y: 51, width: 17, height: 5,  z: 6 }, text: { ru: 'ур. 1',  en: 'lv. 1'  } },
-    ]),
+    { id: 'vw_title', type: 'textLabel', layout: { x: 10, y: 4, width: 80, height: 10, z: 10 }, text: { ru: '🎬 ТАБУРЕТКИНО', en: '🎬 TABURETKINO' } },
   ],
   buttons: [
-    // Building nav (invisible overlay over each card)
+    // Buildings — one button each, clearly labeled
     ...BUILDING_CARDS.map(b => ({
       id: `vbtn_${b.key}`,
-      text: { ru: '', en: '' },
-      layout: { x: b.x, y: 22, width: 17, height: 38, style: 'subtle' as const },
+      text: { ru: `${b.icon} ${b.nameRu}`, en: `${b.icon} ${b.nameEn}` },
+      layout: { x: b.x, y: 18, width: 17, height: 44, style: 'default' as const },
       action: { type: 'goToPage' as const, pageId: b.pageId },
     })),
     // СЪЁМКА — combat entry
     {
       id: 'vbtn_combat',
       text: { ru: '🎬  СЪЁМКА', en: '🎬  SHOOT' },
-      layout: { x: 28, y: 66, width: 44, height: 14, style: 'important' as const },
+      layout: { x: 28, y: 68, width: 44, height: 14, style: 'important' as const },
       action: { type: 'goToPage' as const, pageId: 'combat_wave_select' },
     },
   ],

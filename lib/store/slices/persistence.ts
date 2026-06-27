@@ -3,10 +3,18 @@ import { DIALOGUE_THEME_PRESETS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT
 import { createInitialMeta, createDefaultSpeakers, createDefaultPages } from '../defaults';
 import { buildCombatPack } from '../../validation/validate';
 
+// Bump this when default system pages (village, building stubs, etc.) change structure.
+// loadFromLocalStorage will replace system pages when saved version is older.
+const SCHEMA_VERSION = 2;
+
+// Pages managed by the engine — replaced on schema upgrade, not user-authored
+const SYSTEM_PAGE_IDS = ['village', 'forge_01', 'tavern_01', 'shop_01', 'shaman_01', 'mine_01', 'combat_wave_select'];
+
 export const createPersistenceSlice = (set: any, get: any) => ({
   saveToLocalStorage: () => {
     const state = get();
     const dataToSave = {
+      schemaVersion: SCHEMA_VERSION,
       meta: { ...state.meta, lastSaved: new Date().toISOString() },
       pages: state.pages,
       selectedPageId: state.selectedPageId,
@@ -95,11 +103,24 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       const orphaned = sanitizedPages.map((p: any) => p.id).filter((pid: string) => !trackedIds.has(pid));
       const loadedUnassigned = [...rawUnassigned.filter((pid: string) => validPageIds.has(pid)), ...orphaned];
 
-      // Merge: prepend any default pages missing from the loaded project
+      // Merge defaults: add missing pages + replace system pages on schema upgrade
       const defaultPages = createDefaultPages();
+      const savedVersion: number = parsed.schemaVersion ?? 1;
+      const needsUpgrade = savedVersion < SCHEMA_VERSION;
+
       const loadedPageIds = new Set<string>(sanitizedPages.map((p: any) => p.id));
       const missingDefaults = defaultPages.filter(dp => !loadedPageIds.has(dp.id));
-      const finalPages = [...missingDefaults, ...sanitizedPages];
+
+      let mergedPages = needsUpgrade
+        ? sanitizedPages.map((p: any) => {
+            if (SYSTEM_PAGE_IDS.includes(p.id)) {
+              return defaultPages.find(dp => dp.id === p.id) ?? p;
+            }
+            return p;
+          })
+        : sanitizedPages;
+
+      const finalPages = [...missingDefaults, ...mergedPages];
       const finalUnassigned = [...missingDefaults.map(p => p.id), ...loadedUnassigned];
 
       set({
