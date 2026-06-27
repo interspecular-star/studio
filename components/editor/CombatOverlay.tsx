@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStudioStore } from '@/lib/store';
 import type { CombatSession, SpawnedEnemy, AttackSignal } from '@/lib/types/combat-session';
 import type { Difficulty } from '@/lib/types/combat';
@@ -53,10 +54,10 @@ function SignalFlash({ signal }: { signal: AttackSignal }) {
 // ── Wave Select ───────────────────────────────────────────────────────────────
 
 function WaveSelect() {
-  const { waves, startCombat } = useStudioStore(s => ({
+  const { waves, startCombat } = useStudioStore(useShallow(s => ({
     waves: s.waves,
     startCombat: s.startCombat,
-  }));
+  })));
   const [selectedWave, setSelectedWave] = useState<string>('');
   const [difficulty, setDifficulty] = useState<Difficulty>('amateur');
 
@@ -135,7 +136,7 @@ function WaveSelect() {
 // ── Enemy Card ────────────────────────────────────────────────────────────────
 
 function EnemyCard({ enemy, isTarget, onAttack }: { enemy: SpawnedEnemy; isTarget: boolean; onAttack: () => void }) {
-  const storeEnemies = useStudioStore(s => [...s.enemies, ...s.bosses]);
+  const storeEnemies = useStudioStore(useShallow(s => [...s.enemies, ...s.bosses]));
   const def = storeEnemies.find(e => e.id === enemy.enemyId);
 
   const hpPct = (enemy.hp / enemy.hpMax) * 100;
@@ -182,13 +183,13 @@ function CombatHUD({ session }: { session: CombatSession }) {
   const {
     combatPlayerAttack, combatPlayerDodge, combatPlayerParry,
     combatActivateShowtime, endCombat,
-  } = useStudioStore(s => ({
+  } = useStudioStore(useShallow(s => ({
     combatPlayerAttack: s.combatPlayerAttack,
     combatPlayerDodge: s.combatPlayerDodge,
     combatPlayerParry: s.combatPlayerParry,
     combatActivateShowtime: s.combatActivateShowtime,
     endCombat: s.endCombat,
-  }));
+  })));
 
   const targetEnemy = session.enemies[0] ?? null;
   const canParry = session.pendingSignal?.type === 'yellow';
@@ -357,12 +358,12 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function CombatOverlay({ currentPageId }: { currentPageId: string | null }) {
-  const { combatSession, combatTick, endCombat, selectPage } = useStudioStore(s => ({
+  const { combatSession, combatTick, endCombat, selectPage } = useStudioStore(useShallow(s => ({
     combatSession: s.combatSession,
     combatTick: s.combatTick,
     endCombat: s.endCombat,
     selectPage: s.selectPage,
-  }));
+  })));
 
   const tickRef = useRef(combatTick);
   tickRef.current = combatTick;
