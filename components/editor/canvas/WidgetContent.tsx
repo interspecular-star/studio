@@ -29,6 +29,7 @@ export interface WidgetContentProps {
     dialogueStarted: boolean;
   };
   typewriterProgress: Record<string, number>;
+  waveTime: number;
   animValues: Record<string, number>;
   portraitSwapAnim: Record<string, number>;
   widgetImages: Record<string, HTMLImageElement>;
@@ -43,7 +44,7 @@ export interface WidgetContentProps {
 
 export default function WidgetContent({
   widget, wW, wH, isSelected, isHovered, isPlaytest, theme,
-  currentPage, playtestState, typewriterProgress, animValues, portraitSwapAnim,
+  currentPage, playtestState, typewriterProgress, waveTime, animValues, portraitSwapAnim,
   widgetImages, dlCurrentLine, dlIsLastLine, pressedWidgetId,
   hoveredItemKey, setHoveredItemKey, width, height,
 }: WidgetContentProps) {
@@ -141,7 +142,7 @@ export default function WidgetContent({
         )}
         <Group x={shakeX + innerPad} y={shakeY + textStartY}>
           {richWords.map((word, idx) => {
-            const waveY = word.wave ? Math.sin(Date.now() / 300 + idx * 0.5) * 2.5 : 0;
+            const waveY = word.wave ? Math.sin(waveTime / 300 + idx * 0.5) * 2.5 : 0;
             return (
               <Text
                 key={idx}
@@ -565,7 +566,7 @@ export default function WidgetContent({
         />
         <Group x={textOffsetX + innerPad} y={textOffsetY + innerPad}>
           {sbWords.map((word, idx) => {
-            const waveY = word.wave ? Math.sin(Date.now() / 300 + idx * 0.5) * 2.5 : 0;
+            const waveY = word.wave ? Math.sin(waveTime / 300 + idx * 0.5) * 2.5 : 0;
             return (
               <Text
                 key={idx}

@@ -201,6 +201,17 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
   // Pause timestamps: widgetId -> Date.now() value when the pause ends (set when [pause] tag is encountered)
   const typewriterPausedRef = useRef<Record<string, number>>({});
 
+  // Wave animation driver: independent of typewriter, ticks every 50ms when [wave] text is present
+  const [waveTime, setWaveTime] = useState(0);
+  useEffect(() => {
+    const hasWave = (currentPage?.text?.ru || '').includes('[wave]') ||
+      (currentPage?.uiWidgets || []).some((w: any) => (w.text?.ru || '').includes('[wave]')) ||
+      (currentPage?.dialogueLines || []).some((l: any) => (l.text?.ru || '').includes('[wave]'));
+    if (!hasWave) return;
+    const id = setInterval(() => setWaveTime(Date.now()), 50);
+    return () => clearInterval(id);
+  }, [currentPage]);
+
   // Mouse for live parallax in playtest
   const [mousePos, setMousePos] = useState({ x: width / 2, y: height / 2 });
 
@@ -892,6 +903,7 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
                     currentPage={currentPage}
                     playtestState={playtestState}
                     typewriterProgress={typewriterProgress}
+                    waveTime={waveTime}
                     animValues={animValues}
                     portraitSwapAnim={portraitSwapAnim}
                     widgetImages={widgetImages}
