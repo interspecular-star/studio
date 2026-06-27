@@ -95,15 +95,22 @@ export const createPersistenceSlice = (set: any, get: any) => ({
       const orphaned = sanitizedPages.map((p: any) => p.id).filter((pid: string) => !trackedIds.has(pid));
       const loadedUnassigned = [...rawUnassigned.filter((pid: string) => validPageIds.has(pid)), ...orphaned];
 
+      // Merge: prepend any default pages missing from the loaded project
+      const defaultPages = createDefaultPages();
+      const loadedPageIds = new Set<string>(sanitizedPages.map((p: any) => p.id));
+      const missingDefaults = defaultPages.filter(dp => !loadedPageIds.has(dp.id));
+      const finalPages = [...missingDefaults, ...sanitizedPages];
+      const finalUnassigned = [...missingDefaults.map(p => p.id), ...loadedUnassigned];
+
       set({
         meta: parsed.meta || createInitialMeta(),
-        pages: sanitizedPages,
-        selectedPageId: parsed.selectedPageId || migratedPages[0]?.id || null,
+        pages: finalPages,
+        selectedPageId: parsed.selectedPageId || finalPages[0]?.id || null,
         selectedButtonId: null,
         selectedWidgetId: null,
         coordinateClipboard: null,
         acts: loadedActs,
-        unassignedPageIds: loadedUnassigned,
+        unassignedPageIds: finalUnassigned,
         guides: parsed.guides || { horizontal: [], vertical: [] },
         snappingGuide: null,
         snapEnabled: parsed.snapEnabled ?? true,
