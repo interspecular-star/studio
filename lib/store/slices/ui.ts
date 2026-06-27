@@ -16,6 +16,7 @@ export const createUISlice = (set: any, _get: any) => ({
   toggleItemsCollapsed: () => set((s: any) => ({ itemsCollapsed: !s.itemsCollapsed })),
   toggleBackgroundsCollapsed: () => set((s: any) => ({ backgroundsCollapsed: !s.backgroundsCollapsed })),
   toggleQuestsCollapsed: () => set((s: any) => ({ questsCollapsed: !s.questsCollapsed })),
+  toggleCombatCollapsed: () => set((s: any) => ({ combatCollapsed: !s.combatCollapsed })),
 
   toggleItemCollapsed: (itemId: string) => set((s: any) => {
     const isExpanded = s.collapsedItemIds.includes(itemId);

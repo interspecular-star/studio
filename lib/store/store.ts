@@ -7,7 +7,9 @@ import type {
   UIWidget, UIAsset,
   Background, StudioButton, StudioPage,
   Quest,
+  Enemy, Boss, Wave, InstinctDef, ScenarioDef,
 } from '../types';
+import { DEFAULT_INSTINCTS, DEFAULT_SCENARIOS } from '../types';
 import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers } from './defaults';
 import { createUISlice } from './slices/ui';
 import { createCanvasSlice } from './slices/canvas';
@@ -15,6 +17,7 @@ import { createWorldSlice } from './slices/world';
 import { createPagesSlice } from './slices/pages';
 import { createPlaytestSlice } from './slices/playtest';
 import { createPersistenceSlice } from './slices/persistence';
+import { createCombatSlice } from './slices/combat';
 
 // Suppress unused import warnings — these are referenced by StudioState type below
 type _Unused = Condition | LocalizedString;
@@ -137,6 +140,34 @@ type StudioState = {
   addQuest: (quest: Omit<Quest, 'id'>) => void;
   updateQuest: (id: string, updates: Partial<Omit<Quest, 'id'>>) => void;
   deleteQuest: (id: string) => void;
+
+  // === Combat ===
+  enemies: Enemy[];
+  bosses: Boss[];
+  waves: Wave[];
+  instincts: InstinctDef[];
+  scenarios: ScenarioDef[];
+
+  addEnemy: (data: Omit<Enemy, 'id'>) => void;
+  updateEnemy: (id: string, updates: Partial<Omit<Enemy, 'id'>>) => void;
+  deleteEnemy: (id: string) => void;
+
+  addBoss: (data: Omit<Boss, 'id' | 'isBoss'>) => void;
+  updateBoss: (id: string, updates: Partial<Omit<Boss, 'id' | 'isBoss'>>) => void;
+  deleteBoss: (id: string) => void;
+
+  addWave: (data: Omit<Wave, 'id'>) => void;
+  updateWave: (id: string, updates: Partial<Omit<Wave, 'id'>>) => void;
+  deleteWave: (id: string) => void;
+
+  updateInstinct: (id: string, updates: Partial<Omit<InstinctDef, 'id'>>) => void;
+  resetInstinctsToDefault: () => void;
+
+  updateScenario: (id: string, updates: Partial<Omit<ScenarioDef, 'id'>>) => void;
+  resetScenariosToDefault: () => void;
+
+  combatCollapsed: boolean;
+  toggleCombatCollapsed: () => void;
 
   // === Speakers ===
   addSpeaker: (speaker: Omit<Speaker, 'id'> & { id?: string }) => void;
@@ -333,7 +364,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   itemsCollapsed: true,
   backgroundsCollapsed: true,
   questsCollapsed: true,
+  combatCollapsed: true,
   collapsedItemIds: [],
+
+  enemies: [],
+  bosses: [],
+  waves: [],
+  instincts: DEFAULT_INSTINCTS,
+  scenarios: DEFAULT_SCENARIOS,
 
   startingInventory: {},
 
@@ -344,6 +382,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   ...createPagesSlice(set, get),
   ...createPlaytestSlice(set, get),
   ...createPersistenceSlice(set, get),
+  ...createCombatSlice(set, get),
 }));
 
 // Helper to get current page

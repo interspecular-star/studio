@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useStudioStore, DIALOGUE_THEME_PRESETS, type Variable, type StatModifier, type Speaker } from '@/lib/store';
 import ItemCreationModal from '@/components/editor/ItemCreationModal';
+import CombatPanel from './CombatPanel';
 
 const protectedPlayerStats = [
   'health', 'health_max',
@@ -70,6 +71,7 @@ export default function WorldPanel() {
     mode,
   } = useStudioStore();
 
+  const [worldTab, setWorldTab] = useState<'world' | 'combat'>('world');
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingBackgroundId, setEditingBackgroundId] = useState<string | null>(null);
   const [editingUIAssetId, setEditingUIAssetId] = useState<string | null>(null);
@@ -88,7 +90,22 @@ export default function WorldPanel() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Tabs */}
+      <div className="flex border-b border-[var(--studio-border)] shrink-0">
+        <button
+          onClick={() => setWorldTab('world')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'world' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+        >МИР</button>
+        <button
+          onClick={() => setWorldTab('combat')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${worldTab === 'combat' ? 'text-[var(--studio-accent)] border-b-2 border-[var(--studio-accent)]' : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-text-secondary)]'}`}
+        >БОЁВКА</button>
+      </div>
+
+      {worldTab === 'combat' && <div className="flex-1 overflow-y-auto"><CombatPanel /></div>}
+
+      <div className={worldTab !== 'world' ? 'hidden' : 'flex-1 overflow-y-auto p-4 space-y-6'}>
 
       {/* === ХАРАКТЕРИСТИКИ === */}
       <div className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-elevated)] p-3">
@@ -1269,6 +1286,7 @@ export default function WorldPanel() {
         variables={variables}
         items={items}
       />
+      </div>
     </div>
   );
 }
