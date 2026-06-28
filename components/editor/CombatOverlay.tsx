@@ -829,6 +829,30 @@ function CombatHUD({ session }: { session: CombatSession }) {
   actRef.current = { combatPlayerAttack, combatPlayerDodge, combatPlayerParry, combatActivateShowtime, combatTick, combatUseSkill };
 
   useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isAuto) return;
+      const s = sessionRef.current;
+      const a = actRef.current;
+      if (s.status !== 'active') return;
+      switch (e.code) {
+        case 'Space': {
+          e.preventDefault();
+          const t = s.enemies[0];
+          if (t && !s.pendingSignal) a.combatPlayerAttack(t.instanceId, false);
+          break;
+        }
+        case 'ControlLeft': e.preventDefault(); a.combatPlayerDodge(); break;
+        case 'ShiftLeft':   e.preventDefault(); a.combatPlayerParry(); break;
+        case 'Digit1':      a.combatUseSkill(0); break;
+        case 'Digit2':      a.combatUseSkill(1); break;
+        case 'Digit3':      a.combatUseSkill(2); break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isAuto]);
+
+  useEffect(() => {
     if (!isAuto) return;
     const id = setInterval(() => {
       const s = sessionRef.current;
