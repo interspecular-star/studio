@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useStudioStore } from '@/lib/store';
 import type { CombatSession, SpawnedEnemy, AttackSignal } from '@/lib/types/combat-session';
 import type { Difficulty } from '@/lib/types/combat';
-import { DIFFICULTY_LABELS } from '@/lib/types/combat';
+import { DIFFICULTY_LABELS, DEFAULT_INSTINCTS, DEFAULT_SCENARIOS } from '@/lib/types/combat';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -51,22 +51,59 @@ function SignalFlash({ signal }: { signal: AttackSignal }) {
   );
 }
 
+// ── Scenario Panel ────────────────────────────────────────────────────────────
+
+function ScenarioPanel({ session }: { session: CombatSession }) {
+  if (session.scenarioProgress.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {session.scenarioProgress.map(sp => {
+        const def = DEFAULT_SCENARIOS.find(s => s.id === sp.scenarioId);
+        const label = def?.name.ru ?? sp.scenarioId;
+        const icon = sp.completed ? '✓' : sp.failed ? '✗' : '…';
+        const color = sp.completed ? '#5AE55A' : sp.failed ? '#E55A5A' : '#A89880';
+        return (
+          <div
+            key={sp.scenarioId}
+            title={def?.condition.ru}
+            className="rounded px-2 py-0.5 text-[9px] font-semibold"
+            style={{ background: color + '22', color, border: `1px solid ${color}44` }}
+          >
+            {icon} {label}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Wave Select ───────────────────────────────────────────────────────────────
 
 function WaveSelect() {
-  const { waves, startCombat } = useStudioStore(useShallow(s => ({
+  const { waves, startCombat, variables, playtestState } = useStudioStore(useShallow(s => ({
     waves: s.waves,
     startCombat: s.startCombat,
+    variables: s.variables,
+    playtestState: s.playtestState,
   })));
   const [selectedWave, setSelectedWave] = useState<string>('');
   const [difficulty, setDifficulty] = useState<Difficulty>('amateur');
+  const [instinctId, setInstinctId] = useState<string | null>(null);
 
-  const wave = waves.find(w => w.id === selectedWave);
+  // Derive player level from playtest vars
+  const levelVarId = variables.find((v: any) => v.name === 'level')?.id as string | undefined;
+  const playerLevel: number = levelVarId
+    ? ((playtestState.variableValues[levelVarId] as number | undefined) ?? 1)
+    : 1;
+
+  const unlockedInstincts = DEFAULT_INSTINCTS.filter(i => i.unlockLevel <= playerLevel);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 px-8">
+    <div className="flex flex-col items-center justify-center h-full gap-5 px-8 overflow-y-auto py-4">
       <div className="text-3xl font-black tracking-widest" style={{ color: '#F0EDE8' }}>🎬 СЪЁМКА</div>
-      <div className="text-sm" style={{ color: '#A89880' }}>Выберите волну и сложность</div>
+      <div className="text-sm" style={{ color: '#A89880' }}>
+        Выберите волну и сложность · Ур. {playerLevel}
+      </div>
 
       {waves.length === 0 ? (
         <div className="rounded-xl p-6 text-center max-w-sm" style={{ background: '#1A1612', border: '1px solid #3A3028' }}>
@@ -80,8 +117,8 @@ function WaveSelect() {
       ) : (
         <>
           {/* Wave list */}
-          <div className="flex flex-col gap-2 w-full max-w-xs">
-            {waves.map(w => (
+          <div className="flex flex-col gap-2 w-full max-w-sm">
+            {waves.map((w: any) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedWave(w.id)}
@@ -118,9 +155,54 @@ function WaveSelect() {
             ))}
           </div>
 
+          {/* Instinct picker */}
+          <div className="w-full max-w-sm">
+            <div className="text-xs font-semibold mb-2" style={{ color: '#A89880' }}>
+              Инстинкт {unlockedInstincts.length === 0 ? '(разблокируются с ур. 1)' : '(необязательно)'}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setInstinctId(null)}
+                className="rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-all"
+                style={{
+                  background: instinctId === null ? '#3A3028' : '#1A1612',
+                  color: instinctId === null ? '#F0EDE8' : '#5A4A38',
+                  border: `1px solid ${instinctId === null ? '#6A5A48' : '#2A2018'}`,
+                }}
+              >Нет</button>
+              {unlockedInstincts.map(inst => (
+                <button
+                  key={inst.id}
+                  onClick={() => setInstinctId(inst.id)}
+                  title={inst.passiveEffect.ru}
+                  className="rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-all"
+                  style={{
+                    background: instinctId === inst.id ? '#5A8AE522' : '#1A1612',
+                    color: instinctId === inst.id ? '#5A8AE5' : '#A89880',
+                    border: `1px solid ${instinctId === inst.id ? '#5A8AE5' : '#2A2018'}`,
+                  }}
+                >{inst.name.ru}</button>
+              ))}
+              {DEFAULT_INSTINCTS.filter(i => i.unlockLevel > playerLevel).map(inst => (
+                <button
+                  key={inst.id}
+                  disabled
+                  title={`Разблокируется на ур. ${inst.unlockLevel}`}
+                  className="rounded-lg px-2.5 py-1 text-[10px] font-semibold opacity-30 cursor-not-allowed"
+                  style={{ background: '#1A1612', color: '#5A4A38', border: '1px solid #2A2018' }}
+                >🔒 {inst.name.ru}</button>
+              ))}
+            </div>
+            {instinctId && (
+              <div className="mt-1.5 text-[9px] leading-relaxed" style={{ color: '#7A6A58' }}>
+                {DEFAULT_INSTINCTS.find(i => i.id === instinctId)?.passiveEffect.ru}
+              </div>
+            )}
+          </div>
+
           {/* Start */}
           <button
-            onClick={() => { if (selectedWave) startCombat(selectedWave, difficulty); }}
+            onClick={() => { if (selectedWave) startCombat(selectedWave, difficulty, instinctId ?? undefined); }}
             disabled={!selectedWave}
             className="rounded-xl px-10 py-4 text-lg font-black tracking-wide transition-all disabled:opacity-40"
             style={{ background: selectedWave ? '#C25D3A' : '#3A3028', color: '#F0EDE8', border: '2px solid #E0703E' }}
@@ -153,7 +235,7 @@ function EnemyCard({ enemy, isTarget, onAttack }: { enemy: SpawnedEnemy; isTarge
       }}
     >
       {/* Name + status */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-bold" style={{ color: '#F0EDE8' }}>
           {def ? def.name.ru : enemy.enemyId}
         </span>
@@ -195,11 +277,12 @@ function CombatHUD({ session }: { session: CombatSession }) {
   const canParry = session.pendingSignal?.type === 'yellow';
   const hasPendingSignal = !!session.pendingSignal;
   const canShowtime = session.showtime >= 100 && !session.showtimeActive;
+  const activeInstinct = DEFAULT_INSTINCTS.find(i => i.id === session.activeInstinctId);
 
   const recentLog = session.log.slice(-5).reverse();
 
   return (
-    <div className="flex flex-col h-full gap-3 p-4">
+    <div className="flex flex-col h-full gap-3 p-4 overflow-y-auto">
       {/* Player stats row */}
       <div className="flex gap-4 items-start">
         <div className="flex-1 flex flex-col gap-1.5">
@@ -219,7 +302,19 @@ function CombatHUD({ session }: { session: CombatSession }) {
           </div>
           {session.showtimeActive && <div className="text-[9px] font-black" style={{ color: '#FFDD22' }}>SHOWTIME!</div>}
         </div>
+
+        {/* Instinct badge */}
+        {activeInstinct && (
+          <div
+            className="rounded-lg px-2 py-1 text-[9px] font-semibold self-start"
+            style={{ background: '#5A8AE522', color: '#5A8AE5', border: '1px solid #5A8AE544' }}
+            title={activeInstinct.passiveEffect.ru}
+          >⚡ {activeInstinct.name.ru}</div>
+        )}
       </div>
+
+      {/* Scenarios */}
+      <ScenarioPanel session={session} />
 
       {/* Center: enemies + signal */}
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -320,6 +415,8 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
   const [levelUp, setLevelUp] = useState<{ leveledUp: boolean; newLevel: number } | null>(null);
 
   const isVictory = session.status === 'victory';
+  const completedScenarios = session.scenarioProgress.filter(s => s.completed);
+  const failedScenarios = session.scenarioProgress.filter(s => s.failed);
 
   const handleCollect = () => {
     const result = applyRewards();
@@ -328,7 +425,7 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-8">
+    <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-8 overflow-y-auto py-4">
       <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
       <div className="text-3xl font-black" style={{ color: isVictory ? '#5AE55A' : '#E55A5A' }}>
         {isVictory ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}
@@ -341,6 +438,7 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
         </div>
       )}
 
+      {/* Rewards */}
       {isVictory && (
         <div className="rounded-xl p-5 flex flex-col gap-2 w-full max-w-xs" style={{ background: '#1A1612', border: '1px solid #3A3028' }}>
           <div className="text-sm font-semibold mb-1" style={{ color: '#A89880' }}>НАГРАДА</div>
@@ -355,6 +453,34 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
           </div>
           {session.rewards.vhsDropped && (
             <div className="text-xs font-semibold mt-1" style={{ color: '#E5AA5A' }}>📼 VHS-кассета!</div>
+          )}
+        </div>
+      )}
+
+      {/* Scenario results */}
+      {session.scenarioProgress.length > 0 && (
+        <div className="w-full max-w-xs">
+          <div className="text-xs font-semibold mb-2" style={{ color: '#A89880' }}>СЦЕНАРИИ</div>
+          <div className="flex flex-col gap-1">
+            {session.scenarioProgress.map(sp => {
+              const def = DEFAULT_SCENARIOS.find(s => s.id === sp.scenarioId);
+              const icon = sp.completed ? '✓' : sp.failed ? '✗' : '—';
+              const color = sp.completed ? '#5AE55A' : sp.failed ? '#E55A5A' : '#5A4A38';
+              return (
+                <div key={sp.scenarioId} className="flex items-center gap-2 text-left">
+                  <span className="font-mono text-sm w-5 shrink-0" style={{ color }}>{icon}</span>
+                  <span className="text-xs" style={{ color }}>{def?.name.ru ?? sp.scenarioId}</span>
+                  {sp.completed && def && (
+                    <span className="text-[9px] ml-auto" style={{ color: '#7A9A7A' }}>{def.reward.ru}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {completedScenarios.length > 0 && (
+            <div className="mt-2 text-[10px]" style={{ color: '#5AE55A' }}>
+              {completedScenarios.length}/{session.scenarioProgress.length} выполнено
+            </div>
           )}
         </div>
       )}

@@ -257,14 +257,15 @@ export function playerAttack(
     log: [...session.log, ...logEntries],
   };
 
-  return checkWaveCompletion(next);
+  const withScenarios = checkScenarios(next, 'kill', { fastKill: enemyDied && target.tickSinceSpawn <= 15 });
+  return checkWaveCompletion(withScenarios);
 }
 
 // ── Activate Showtime ─────────────────────────────────────────────────────────
 
 export function activateShowtime(session: CombatSession): CombatSession {
   if (session.showtime < 100 || session.showtimeActive) return session;
-  return {
+  const next: CombatSession = {
     ...session,
     showtime: 0,
     showtimeActive: true,
@@ -272,6 +273,7 @@ export function activateShowtime(session: CombatSession): CombatSession {
     showtimeActivated: true,
     log: [...session.log, { tick: session.tick, type: 'showtime', text: 'SHOWTIME!' }],
   };
+  return checkScenarios(next, 'showtime');
 }
 
 // ── Enemy signal generation ───────────────────────────────────────────────────
@@ -373,7 +375,7 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
     next = { ...next, showtime: 100 };
   }
 
-  return next;
+  return checkScenarios(next, 'damage');
 }
 
 // ── Tick (advance time) ───────────────────────────────────────────────────────
@@ -451,16 +453,87 @@ export function tick(session: CombatSession): CombatSession {
   return next;
 }
 
+// ── Scenario evaluation ───────────────────────────────────────────────────────
+
+type ScenarioTrigger = 'kill' | 'showtime' | 'damage' | 'wave_end';
+
+function checkScenarios(
+  session: CombatSession,
+  trigger: ScenarioTrigger,
+  opts: { fastKill?: boolean } = {},
+): CombatSession {
+  if (session.scenarioProgress.length === 0) return session;
+
+  const directorsActive = session.activeInstinctId === 'directors_favorite';
+  let showtimeBonus = 0;
+
+  const updatedProgress = session.scenarioProgress.map(sp => {
+    if (sp.completed || sp.failed) return sp;
+
+    let completed = false;
+    let failed = false;
+
+    switch (sp.scenarioId) {
+      case 'method_actor':
+        completed = session.showtimeActivated;
+        break;
+      case 'combo_master':
+        completed = session.momentum >= 15;
+        break;
+      case 'weak_spot':
+        completed = session.weakSpotHits >= 5;
+        break;
+      case 'silent_killer':
+        completed = session.noHitStreak >= 3;
+        break;
+      case 'take':
+        if (trigger === 'kill') completed = !!opts.fastKill;
+        break;
+      case 'no_takes':
+        if (trigger === 'damage') failed = true;
+        if (trigger === 'wave_end') completed = session.noDamageTicks > 0 && !sp.failed;
+        break;
+      case 'bare_minimum':
+        if (trigger === 'wave_end') { completed = !session.potionUsed; failed = session.potionUsed; }
+        break;
+      case 'no_cheating':
+        // 'paused' status is not implemented yet — always satisfied
+        if (trigger === 'wave_end') { completed = true; }
+        break;
+      case 'on_the_edge':
+        if (trigger === 'wave_end' && session.bossSpawned) {
+          completed = session.playerHp / session.playerHpMax < 0.15;
+          failed = !completed;
+        }
+        break;
+      case 'full_chaos':
+        if (trigger === 'wave_end') failed = true; // random events not in C5
+        break;
+    }
+
+    if (completed && directorsActive) showtimeBonus += 20;
+
+    return { ...sp, completed: sp.completed || completed, failed: sp.failed || failed };
+  });
+
+  return {
+    ...session,
+    scenarioProgress: updatedProgress,
+    showtime: Math.min(100, session.showtime + showtimeBonus),
+  };
+}
+
 // ── Wave completion ───────────────────────────────────────────────────────────
 
 export function checkWaveCompletion(session: CombatSession): CombatSession {
   if (session.enemies.length > 0 || session.spawnQueue.length > 0) return session;
 
+  const evaluated = checkScenarios(session, 'wave_end');
   return {
-    ...session,
+    ...evaluated,
     status: 'victory',
-    rewards: calcRewards(session),
-    log: [...session.log, { tick: session.tick, type: 'waveComplete', text: 'Волна завершена!' }],
+    rewards: calcRewards(evaluated),
+    log: [...evaluated.log, { tick: session.tick, type: 'waveComplete', text: 'Волна завершена!' }],
   };
 }
 
