@@ -178,6 +178,7 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     set((s: any) => ({
       playtestState: { ...s.playtestState, variableValues: vals },
     }));
+    get().savePlaytestProgress();
 
     return { leveledUp, newLevel };
   },
