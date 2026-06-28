@@ -78,6 +78,54 @@ export type ScenarioDef = {
   availableDifficulties: Difficulty[];
 };
 
+export type RandomEventEffect =
+  | 'momentum_boost'
+  | 'showtime_boost'
+  | 'player_heal'
+  | 'player_damage'
+  | 'enemy_rage';
+
+export type RandomEventDef = {
+  id: string;
+  name: { ru: string; en: string };
+  description: { ru: string; en: string };
+  effect: RandomEventEffect;
+  magnitude: number; // % for heal/damage/showtime, flat for momentum; ticks for enemy_rage
+};
+
+export const DEFAULT_RANDOM_EVENTS: RandomEventDef[] = [
+  {
+    id: 'lucky_shot',
+    name: { ru: '🎯 Удачный выстрел!', en: 'Lucky Shot!' },
+    description: { ru: '+3 Momentum', en: '+3 Momentum' },
+    effect: 'momentum_boost', magnitude: 3,
+  },
+  {
+    id: 'crowd_cheers',
+    name: { ru: '📣 Трибуны ревут!', en: 'Crowd Cheers!' },
+    description: { ru: '+25 Showtime', en: '+25 Showtime' },
+    effect: 'showtime_boost', magnitude: 25,
+  },
+  {
+    id: 'stunt_double',
+    name: { ru: '🤸 Дублёр!', en: 'Stunt Double!' },
+    description: { ru: 'Восстановить 15% макс HP', en: 'Restore 15% max HP' },
+    effect: 'player_heal', magnitude: 15,
+  },
+  {
+    id: 'director_angry',
+    name: { ru: '😡 Режиссёр в ярости!', en: 'Director Furious!' },
+    description: { ru: 'Получить 8% макс HP урона', en: 'Take 8% max HP as damage' },
+    effect: 'player_damage', magnitude: 8,
+  },
+  {
+    id: 'camera_malfunction',
+    name: { ru: '📷 Камера сломалась!', en: 'Camera Malfunction!' },
+    description: { ru: 'Враги впадают в ярость на 8 тиков (+30% урон)', en: 'Enemies enrage for 8 ticks (+30% dmg)' },
+    effect: 'enemy_rage', magnitude: 8,
+  },
+];
+
 // Дефолтные инстинкты из CDD
 export const DEFAULT_INSTINCTS: InstinctDef[] = [
   {

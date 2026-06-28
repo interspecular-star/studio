@@ -43,6 +43,7 @@ export type CombatLogEntry = {
     | 'phaseChange'
     | 'waveComplete'
     | 'playerDeath'
+    | 'randomEvent'
     | 'info';
   actorId?: string;
   value?: number;
@@ -50,6 +51,8 @@ export type CombatLogEntry = {
   isWeakSpot?: boolean;
   text?: string;
 };
+
+export type EventFlash = { name: string; ticksLeft: number };
 
 export type CombatStatus = 'idle' | 'active' | 'paused' | 'victory' | 'defeat';
 
@@ -108,6 +111,11 @@ export type CombatSession = {
   showtimeActivated: boolean;
   potionUsed: boolean;
   noHitStreak: number;
+
+  // Random events
+  randomEventsTriggered: number;
+  activeEventFlash: EventFlash | null;
+  enragedTicks: number; // camera_malfunction: enemies deal +30% dmg
 
   rewards: CombatRewards;
   log: CombatLogEntry[];

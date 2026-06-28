@@ -3,7 +3,7 @@ import type {
   CombatSession, SpawnedEnemy, AttackSignal,
   CombatLogEntry, PlayerCombatStats, CombatRewards, ScenarioProgress,
 } from '../types/combat-session';
-import { DEFAULT_SCENARIOS } from '../types/combat';
+import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS } from '../types/combat';
 
 // ── Stat derivation (mirrors BalancePanel formulas) ──────────────────────────
 
@@ -70,6 +70,10 @@ export function initCombatSession(
     showtimeActivated: false,
     potionUsed: false,
     noHitStreak: 0,
+
+    randomEventsTriggered: 0,
+    activeEventFlash: null,
+    enragedTicks: 0,
 
     rewards: { coins: 0, stallonkas: 0, xp: 0, items: [], vhsDropped: false },
     log: [{ tick: 0, type: 'info', text: `Волна: ${wave.id} / сложность: ${difficulty}` }],
@@ -347,6 +351,9 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
   if (session.activeInstinctId === 'veteran' && session.playerHp / session.playerHpMax < 0.2) {
     finalDmg = Math.max(1, Math.round(finalDmg * 0.6));
   }
+  if (session.enragedTicks > 0) {
+    finalDmg = Math.round(finalDmg * 1.3);
+  }
 
   const newHp = Math.max(0, session.playerHp - finalDmg);
   const died = newHp <= 0;
@@ -383,7 +390,22 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
 export function tick(session: CombatSession): CombatSession {
   if (session.status !== 'active') return session;
 
-  let next: CombatSession = { ...session, tick: session.tick + 1, noDamageTicks: session.noDamageTicks + 1 };
+  let next: CombatSession = {
+    ...session,
+    tick: session.tick + 1,
+    noDamageTicks: session.noDamageTicks + 1,
+    enragedTicks: Math.max(0, session.enragedTicks - 1),
+    activeEventFlash: session.activeEventFlash
+      ? (session.activeEventFlash.ticksLeft > 1
+          ? { ...session.activeEventFlash, ticksLeft: session.activeEventFlash.ticksLeft - 1 }
+          : null)
+      : null,
+  };
+
+  // 2% chance per tick for a random event (not during active signal)
+  if (!next.pendingSignal && !next.activeEventFlash && Math.random() < 0.02) {
+    next = triggerRandomEvent(next);
+  }
 
   // Showtime countdown
   if (next.showtimeActive) {
@@ -453,6 +475,47 @@ export function tick(session: CombatSession): CombatSession {
   return next;
 }
 
+// ── Random events ─────────────────────────────────────────────────────────────
+
+export function triggerRandomEvent(session: CombatSession): CombatSession {
+  if (DEFAULT_RANDOM_EVENTS.length === 0) return session;
+  const def = DEFAULT_RANDOM_EVENTS[Math.floor(Math.random() * DEFAULT_RANDOM_EVENTS.length)];
+  const { effect, magnitude } = def;
+
+  let next: CombatSession = {
+    ...session,
+    randomEventsTriggered: session.randomEventsTriggered + 1,
+    activeEventFlash: { name: def.name.ru, ticksLeft: 8 },
+    log: [...session.log, { tick: session.tick, type: 'randomEvent', text: def.name.ru }],
+  };
+
+  switch (effect) {
+    case 'momentum_boost':
+      next = { ...next, momentum: Math.min(15, next.momentum + magnitude) };
+      break;
+    case 'showtime_boost':
+      next = { ...next, showtime: Math.min(100, next.showtime + magnitude) };
+      break;
+    case 'player_heal': {
+      const heal = Math.round(next.playerHpMax * magnitude / 100);
+      next = { ...next, playerHp: Math.min(next.playerHpMax, next.playerHp + heal) };
+      break;
+    }
+    case 'player_damage': {
+      const dmg = Math.max(1, Math.round(next.playerHpMax * magnitude / 100));
+      const newHp = Math.max(0, next.playerHp - dmg);
+      next = { ...next, playerHp: newHp };
+      if (newHp <= 0) next = { ...next, status: 'defeat' };
+      break;
+    }
+    case 'enemy_rage':
+      next = { ...next, enragedTicks: magnitude };
+      break;
+  }
+
+  return next;
+}
+
 // ── Scenario evaluation ───────────────────────────────────────────────────────
 
 type ScenarioTrigger = 'kill' | 'showtime' | 'damage' | 'wave_end';
@@ -507,7 +570,10 @@ function checkScenarios(
         }
         break;
       case 'full_chaos':
-        if (trigger === 'wave_end') failed = true; // random events not in C5
+        if (trigger === 'wave_end') {
+          completed = session.randomEventsTriggered >= 2;
+          failed = !completed;
+        }
         break;
     }
 
@@ -562,5 +628,87 @@ function calcRewards(session: CombatSession): CombatRewards {
     stallonkas: Math.round(8   * mult          * stallMult),
     items:      [],
     vhsDropped,
+  };
+}
+
+// ── Combat simulation (for balance testing) ───────────────────────────────────
+
+export type SimulationResult = {
+  iterations: number;
+  winRate: number;       // 0–100 %
+  avgKills: number;
+  avgTicks: number;
+  avgCoins: number;
+  avgXp: number;
+  scenarioRates: Record<string, number>; // scenarioId → completion %
+};
+
+export function simulateCombat(
+  wave: Wave,
+  difficulty: Difficulty,
+  enemies: Enemy[],
+  bosses: Boss[],
+  playerStats: PlayerCombatStats = DEFAULT_PLAYER_STATS,
+  instinctId: string | null = null,
+  iterations = 50,
+): SimulationResult {
+  let wins = 0, totalKills = 0, totalTicks = 0, totalCoins = 0, totalXp = 0;
+  const scenarioCounts: Record<string, number> = {};
+
+  for (let i = 0; i < iterations; i++) {
+    let s = initCombatSession(wave, difficulty, playerStats, instinctId);
+    const MAX_TICKS = 2000;
+
+    while (s.status === 'active' && s.tick < MAX_TICKS) {
+      // Auto-spawn
+      if (s.enemies.length === 0 && s.spawnQueue.length > 0) {
+        const nextId = s.spawnQueue[0];
+        const isBoss = nextId.startsWith('boss:');
+        const id = isBoss ? nextId.slice(5) : nextId;
+        const enemy = isBoss ? bosses.find(b => b.id === id) : enemies.find(e => e.id === id);
+        if (enemy) s = spawnNextEnemy(s, enemy);
+      }
+      // Auto-react to signal
+      if (s.pendingSignal) {
+        s = playerReact(s, s.pendingSignal.type === 'yellow' ? 'parry' : 'dodge');
+        continue;
+      }
+      // Auto-showtime
+      if (s.showtime >= 100 && !s.showtimeActive) {
+        s = activateShowtime(s);
+      }
+      // Auto-attack first enemy
+      if (s.enemies.length > 0) {
+        s = playerAttack(s, s.enemies[0].instanceId, false);
+      }
+      // Advance time
+      s = tick(s);
+    }
+
+    if (s.status === 'victory') {
+      wins++;
+      totalCoins += s.rewards.coins;
+      totalXp    += s.rewards.xp;
+      for (const sp of s.scenarioProgress) {
+        if (sp.completed) scenarioCounts[sp.scenarioId] = (scenarioCounts[sp.scenarioId] ?? 0) + 1;
+      }
+    }
+    totalKills += s.totalKilled;
+    totalTicks += s.tick;
+  }
+
+  const scenarioRates: Record<string, number> = {};
+  for (const [id, count] of Object.entries(scenarioCounts)) {
+    scenarioRates[id] = Math.round((count / iterations) * 100);
+  }
+
+  return {
+    iterations,
+    winRate:  Math.round((wins / iterations) * 100),
+    avgKills: Math.round(totalKills / iterations * 10) / 10,
+    avgTicks: Math.round(totalTicks / iterations),
+    avgCoins: Math.round(totalCoins / wins || 0),
+    avgXp:    Math.round(totalXp    / wins || 0),
+    scenarioRates,
   };
 }
