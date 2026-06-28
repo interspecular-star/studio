@@ -116,11 +116,12 @@ function ScenarioPanel({ session }: { session: CombatSession }) {
 
 // ── Simulation Panel ──────────────────────────────────────────────────────────
 
-function SimulationPanel({ waveId, difficulty, playerLevel }: {
-  waveId: string; difficulty: Difficulty; playerLevel: number;
+function SimulationPanel({ waveId, difficulty }: {
+  waveId: string; difficulty: Difficulty;
 }) {
-  const { waves, enemies, bosses } = useStudioStore(useShallow(s => ({
+  const { waves, enemies, bosses, variables, playtestState } = useStudioStore(useShallow(s => ({
     waves: s.waves, enemies: s.enemies, bosses: s.bosses,
+    variables: s.variables, playtestState: s.playtestState,
   })));
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -128,12 +129,27 @@ function SimulationPanel({ waveId, difficulty, playerLevel }: {
 
   const wave = waves.find((w: any) => w.id === waveId);
 
+  const numVar = (name: string, fallback: number): number => {
+    const v = variables.find((v: any) => v.name === name);
+    if (!v) return fallback;
+    const val = playtestState.variableValues[v.id];
+    if (typeof val === 'number') return val;
+    return typeof v.defaultValue === 'number' ? v.defaultValue : fallback;
+  };
+
   const runSim = () => {
     if (!wave) return;
     setRunning(true);
     setResult(null);
     setTimeout(() => {
-      const playerStats = { str: 6, agi: 5, end: 5, mag: 3, lck: 4, lvl: playerLevel };
+      const playerStats = {
+        str: numVar('strength', 6),
+        agi: numVar('agility', 5),
+        end: numVar('endurance', 5),
+        mag: numVar('magic', 3),
+        lck: numVar('luck', 4),
+        lvl: numVar('level', 1),
+      };
       const res = simulateCombat(wave, difficulty, enemies, bosses, playerStats, null, iters);
       setResult(res);
       setRunning(false);
@@ -336,7 +352,7 @@ function WaveSelect() {
                 {showSim ? '▲' : '▼'} Инструмент симуляции
               </button>
               {showSim && (
-                <SimulationPanel waveId={selectedWave} difficulty={difficulty} playerLevel={playerLevel} />
+                <SimulationPanel waveId={selectedWave} difficulty={difficulty} />
               )}
             </div>
           )}

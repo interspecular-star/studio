@@ -30,7 +30,27 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     const state = get();
     const wave = state.waves.find((w: any) => w.id === waveId);
     if (!wave) { console.warn(`[combat] wave "${waveId}" not found`); return; }
-    const session = initCombatSession(wave, difficulty, undefined, instinctId ?? null);
+
+    // Read player stats from playtest variable values (fall back to defaults for missing vars)
+    const { variables, playtestState } = state;
+    const numVar = (name: string, fallback: number): number => {
+      const v = variables.find((v: any) => v.name === name);
+      if (!v) return fallback;
+      const val = playtestState.variableValues[v.id];
+      if (typeof val === 'number') return val;
+      return typeof v.defaultValue === 'number' ? v.defaultValue : fallback;
+    };
+
+    const playerStats = {
+      str: numVar('strength', 6),
+      agi: numVar('agility', 5),
+      end: numVar('endurance', 5),
+      mag: numVar('magic', 3),
+      lck: numVar('luck', 4),
+      lvl: numVar('level', 1),
+    };
+
+    const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null);
     set(() => ({ combatSession: session }));
   },
 

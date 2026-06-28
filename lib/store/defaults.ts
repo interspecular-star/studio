@@ -1,6 +1,30 @@
 import type { StudioPage, StudioButton } from '../types/pages';
 import type { Speaker } from '../types/core';
 import type { ProjectMeta } from '../types/core';
+import type { Enemy, Wave } from '../types/combat';
+
+// ── Default test enemy ─────────────────────────────────────────────────────────
+// Tier 1 "Статист" balanced for naked lvl 1 hero (str:6 agi:5 end:5 mag:3 lck:4 lvl:1)
+// Hero: 160 HP, 34 ATK, 13 defFlat, 6% defPct
+// Enemy effective dmg: round(42*0.94-13) = 26 per signal hit → player dies in ~6 hits
+// Enemy HP 90 → dies in 3 non-crit player hits — wave of 3 is the lvl 1 naked ceiling
+export const DEFAULT_ENEMY_STATIST: Enemy = {
+  id: 'enemy_statist',
+  name: { ru: 'Статист', en: 'Extra' },
+  tier: 1,
+  hp: 90,
+  atk: 42,
+  weakPointTrigger: { ru: 'После 2 атак подряд', en: 'After 2 consecutive attacks' },
+  furyReply: { ru: 'Ах ты...!', en: 'Why you...!' },
+  drops: [],
+};
+
+export const DEFAULT_TEST_WAVE: Wave = {
+  id: 'wave_test_01',
+  name: { ru: 'Test Combat Wave', en: 'Test Combat Wave' },
+  enemyPool: [{ enemyId: 'enemy_statist', weight: 1 }],
+  difficulties: ['novice', 'amateur', 'professional'],
+};
 
 export const createDefaultPage = (id: string): StudioPage => ({
   id,

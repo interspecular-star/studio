@@ -11,7 +11,7 @@ import type {
   Building, BuildingId, Mercenary, RewardEntry, MineConfig, Difficulty,
 } from '../types';
 import { DEFAULT_INSTINCTS, DEFAULT_SCENARIOS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../types';
-import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers } from './defaults';
+import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers, DEFAULT_ENEMY_STATIST, DEFAULT_TEST_WAVE } from './defaults';
 import { createUISlice } from './slices/ui';
 import { createCanvasSlice } from './slices/canvas';
 import { createWorldSlice } from './slices/world';
@@ -403,9 +403,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   combatCollapsed: true,
   collapsedItemIds: [],
 
-  enemies: [],
+  enemies: [DEFAULT_ENEMY_STATIST],
   bosses: [],
-  waves: [],
+  waves: [DEFAULT_TEST_WAVE],
   instincts: DEFAULT_INSTINCTS,
   scenarios: DEFAULT_SCENARIOS,
 

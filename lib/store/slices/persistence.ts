@@ -1,14 +1,17 @@
 import type { StudioAct } from '../../types';
 import { DIALOGUE_THEME_PRESETS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../../types';
-import { createInitialMeta, createDefaultSpeakers, createDefaultPages } from '../defaults';
+import { createInitialMeta, createDefaultSpeakers, createDefaultPages, DEFAULT_ENEMY_STATIST, DEFAULT_TEST_WAVE } from '../defaults';
 import { buildCombatPack } from '../../validation/validate';
 
-// Bump this when default system pages (village, building stubs, etc.) change structure.
-// loadFromLocalStorage will replace system pages when saved version is older.
-const SCHEMA_VERSION = 2;
+// Bump when default system pages OR system enemies/waves change structure.
+const SCHEMA_VERSION = 3;
 
 // Pages managed by the engine — replaced on schema upgrade, not user-authored
 const SYSTEM_PAGE_IDS = ['village', 'forge_01', 'tavern_01', 'shop_01', 'shaman_01', 'mine_01', 'combat_wave_select'];
+
+// Default enemies/waves injected on first load or when missing
+const DEFAULT_ENEMIES = [DEFAULT_ENEMY_STATIST];
+const DEFAULT_WAVES   = [DEFAULT_TEST_WAVE];
 
 export const createPersistenceSlice = (set: any, get: any) => ({
   saveToLocalStorage: () => {
@@ -143,9 +146,23 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         dialogueTheme: parsed.dialogueTheme || { ...DIALOGUE_THEME_PRESETS.darkFantasy },
         startingInventory: parsed.startingInventory || {},
         quests: parsed.quests || [],
-        enemies: parsed.enemies || [],
+        enemies: (() => {
+          const loaded: any[] = parsed.enemies || [];
+          const missing = DEFAULT_ENEMIES.filter(de => !loaded.find((le: any) => le.id === de.id));
+          const upgraded = needsUpgrade
+            ? loaded.map((e: any) => DEFAULT_ENEMIES.find(de => de.id === e.id) ?? e)
+            : loaded;
+          return [...missing, ...upgraded];
+        })(),
         bosses: parsed.bosses || [],
-        waves: parsed.waves || [],
+        waves: (() => {
+          const loaded: any[] = parsed.waves || [];
+          const missing = DEFAULT_WAVES.filter(dw => !loaded.find((lw: any) => lw.id === dw.id));
+          const upgraded = needsUpgrade
+            ? loaded.map((w: any) => DEFAULT_WAVES.find(dw => dw.id === w.id) ?? w)
+            : loaded;
+          return [...missing, ...upgraded];
+        })(),
         instincts: parsed.instincts || [],
         scenarios: parsed.scenarios || [],
         buildings: parsed.buildings?.length ? parsed.buildings : DEFAULT_BUILDINGS,
