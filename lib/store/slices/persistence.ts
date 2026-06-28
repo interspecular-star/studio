@@ -1,16 +1,27 @@
 import type { StudioAct } from '../../types';
 import { DIALOGUE_THEME_PRESETS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../../types';
-import { createInitialMeta, createDefaultSpeakers, createDefaultPages, DEFAULT_ENEMY_STATIST, DEFAULT_TEST_WAVE } from '../defaults';
+import { createInitialMeta, createDefaultSpeakers, createDefaultPages, DEFAULT_ENEMY_STATIST, DEFAULT_ENEMY_GOBLIN_PAGER, DEFAULT_ENEMY_SKELETON_DRUNK, DEFAULT_ENEMY_RAT_HEADPHONES, DEFAULT_ENEMY_VHS_GHOST, DEFAULT_ENEMY_BEAR_RAPPER, DEFAULT_ENEMY_FRIDGE_MIMIC, DEFAULT_ENEMY_TV_CHICKEN, DEFAULT_ENEMY_ZOMBIE_DJ, DEFAULT_BOSS_DIRECTOR, DEFAULT_TEST_WAVE } from '../defaults';
 import { buildCombatPack } from '../../validation/validate';
 
 // Bump when default system pages OR system enemies/waves change structure.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 5;
 
 // Pages managed by the engine — replaced on schema upgrade, not user-authored
 const SYSTEM_PAGE_IDS = ['village', 'forge_01', 'tavern_01', 'shop_01', 'shaman_01', 'mine_01', 'combat_wave_select'];
 
 // Default enemies/waves injected on first load or when missing
-const DEFAULT_ENEMIES = [DEFAULT_ENEMY_STATIST];
+const DEFAULT_ENEMIES = [
+  DEFAULT_ENEMY_STATIST,
+  DEFAULT_ENEMY_GOBLIN_PAGER,
+  DEFAULT_ENEMY_SKELETON_DRUNK,
+  DEFAULT_ENEMY_RAT_HEADPHONES,
+  DEFAULT_ENEMY_VHS_GHOST,
+  DEFAULT_ENEMY_BEAR_RAPPER,
+  DEFAULT_ENEMY_FRIDGE_MIMIC,
+  DEFAULT_ENEMY_TV_CHICKEN,
+  DEFAULT_ENEMY_ZOMBIE_DJ,
+];
+const DEFAULT_BOSSES  = [DEFAULT_BOSS_DIRECTOR];
 const DEFAULT_WAVES   = [DEFAULT_TEST_WAVE];
 
 export const createPersistenceSlice = (set: any, get: any) => ({
@@ -154,7 +165,14 @@ export const createPersistenceSlice = (set: any, get: any) => ({
             : loaded;
           return [...missing, ...upgraded];
         })(),
-        bosses: parsed.bosses || [],
+        bosses: (() => {
+          const loaded: any[] = parsed.bosses || [];
+          const missing = DEFAULT_BOSSES.filter(db => !loaded.find((lb: any) => lb.id === db.id));
+          const upgraded = needsUpgrade
+            ? loaded.map((b: any) => DEFAULT_BOSSES.find(db => db.id === b.id) ?? b)
+            : loaded;
+          return [...missing, ...upgraded];
+        })(),
         waves: (() => {
           const loaded: any[] = parsed.waves || [];
           const missing = DEFAULT_WAVES.filter(dw => !loaded.find((lw: any) => lw.id === dw.id));

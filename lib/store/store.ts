@@ -11,7 +11,7 @@ import type {
   Building, BuildingId, Mercenary, RewardEntry, MineConfig, Difficulty,
 } from '../types';
 import { DEFAULT_INSTINCTS, DEFAULT_SCENARIOS, DEFAULT_BUILDINGS, DEFAULT_MERCENARIES, DEFAULT_REWARD_TABLES, DEFAULT_MINE_CONFIG } from '../types';
-import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers, DEFAULT_ENEMY_STATIST, DEFAULT_TEST_WAVE } from './defaults';
+import { createDefaultPage, createDefaultPages, createInitialMeta, createDefaultSpeakers, DEFAULT_ENEMY_STATIST, DEFAULT_ENEMY_GOBLIN_PAGER, DEFAULT_ENEMY_SKELETON_DRUNK, DEFAULT_ENEMY_RAT_HEADPHONES, DEFAULT_ENEMY_VHS_GHOST, DEFAULT_ENEMY_BEAR_RAPPER, DEFAULT_ENEMY_FRIDGE_MIMIC, DEFAULT_ENEMY_TV_CHICKEN, DEFAULT_ENEMY_ZOMBIE_DJ, DEFAULT_BOSS_DIRECTOR, DEFAULT_TEST_WAVE } from './defaults';
 import { createUISlice } from './slices/ui';
 import { createCanvasSlice } from './slices/canvas';
 import { createWorldSlice } from './slices/world';
@@ -403,8 +403,18 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   combatCollapsed: true,
   collapsedItemIds: [],
 
-  enemies: [DEFAULT_ENEMY_STATIST],
-  bosses: [],
+  enemies: [
+    DEFAULT_ENEMY_STATIST,
+    DEFAULT_ENEMY_GOBLIN_PAGER,
+    DEFAULT_ENEMY_SKELETON_DRUNK,
+    DEFAULT_ENEMY_RAT_HEADPHONES,
+    DEFAULT_ENEMY_VHS_GHOST,
+    DEFAULT_ENEMY_BEAR_RAPPER,
+    DEFAULT_ENEMY_FRIDGE_MIMIC,
+    DEFAULT_ENEMY_TV_CHICKEN,
+    DEFAULT_ENEMY_ZOMBIE_DJ,
+  ],
+  bosses: [DEFAULT_BOSS_DIRECTOR],
   waves: [DEFAULT_TEST_WAVE],
   instincts: DEFAULT_INSTINCTS,
   scenarios: DEFAULT_SCENARIOS,
