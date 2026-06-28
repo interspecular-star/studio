@@ -315,26 +315,43 @@ function CombatHUD({ session }: { session: CombatSession }) {
 // ── Results ───────────────────────────────────────────────────────────────────
 
 function ResultsView({ session, onExit }: { session: CombatSession; onExit: () => void }) {
+  const { applyRewards } = useStudioStore(useShallow(s => ({ applyRewards: s.applyRewards })));
+  const [collected, setCollected] = useState(false);
+  const [levelUp, setLevelUp] = useState<{ leveledUp: boolean; newLevel: number } | null>(null);
+
   const isVictory = session.status === 'victory';
 
+  const handleCollect = () => {
+    const result = applyRewards();
+    setLevelUp(result);
+    setCollected(true);
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-8">
+    <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-8">
       <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
       <div className="text-3xl font-black" style={{ color: isVictory ? '#5AE55A' : '#E55A5A' }}>
         {isVictory ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ'}
       </div>
 
+      {/* Level-up banner */}
+      {levelUp?.leveledUp && (
+        <div className="rounded-xl px-6 py-3 font-black text-lg animate-pulse" style={{ background: '#E5AA5A22', border: '2px solid #E5AA5A', color: '#E5AA5A' }}>
+          🎉 УРОВЕНЬ UP! → УР.{levelUp.newLevel}
+        </div>
+      )}
+
       {isVictory && (
         <div className="rounded-xl p-5 flex flex-col gap-2 w-full max-w-xs" style={{ background: '#1A1612', border: '1px solid #3A3028' }}>
           <div className="text-sm font-semibold mb-1" style={{ color: '#A89880' }}>НАГРАДА</div>
           <div className="flex justify-between text-sm" style={{ color: '#F0EDE8' }}>
-            <span>💰 Монеты</span><span className="font-mono">{session.rewards.coins}</span>
+            <span>💰 Монеты</span><span className="font-mono">+{session.rewards.coins}</span>
           </div>
           <div className="flex justify-between text-sm" style={{ color: '#F0EDE8' }}>
-            <span>⭐ Опыт</span><span className="font-mono">{session.rewards.xp}</span>
+            <span>⭐ Опыт</span><span className="font-mono">+{session.rewards.xp}</span>
           </div>
           <div className="flex justify-between text-sm" style={{ color: '#F0EDE8' }}>
-            <span>🎞 Сталлонки</span><span className="font-mono">{session.rewards.stallonkas}</span>
+            <span>🎞 Сталлонки</span><span className="font-mono">+{session.rewards.stallonkas}</span>
           </div>
           {session.rewards.vhsDropped && (
             <div className="text-xs font-semibold mt-1" style={{ color: '#E5AA5A' }}>📼 VHS-кассета!</div>
@@ -343,14 +360,28 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
       )}
 
       <div className="text-xs" style={{ color: '#5A4A38' }}>
-        Убито врагов: {session.totalKilled} · Тиков: {session.tick}
+        Убито: {session.totalKilled} · Тиков: {session.tick}
       </div>
 
-      <button
-        onClick={onExit}
-        className="rounded-xl px-10 py-3 font-black text-base transition-all"
-        style={{ background: '#C25D3A', color: '#F0EDE8', border: '2px solid #E0703E' }}
-      >← Деревня</button>
+      <div className="flex gap-3">
+        {isVictory && !collected && (
+          <button
+            onClick={handleCollect}
+            className="rounded-xl px-7 py-3 font-black text-base transition-all"
+            style={{ background: '#5AE55A22', color: '#5AE55A', border: '2px solid #5AE55A' }}
+          >✓ Забрать</button>
+        )}
+        {collected && !levelUp?.leveledUp && (
+          <div className="rounded-xl px-5 py-3 text-sm font-semibold" style={{ color: '#5AE55A', border: '2px solid #5AE55A22' }}>
+            ✓ Получено!
+          </div>
+        )}
+        <button
+          onClick={onExit}
+          className="rounded-xl px-7 py-3 font-black text-base transition-all"
+          style={{ background: '#C25D3A', color: '#F0EDE8', border: '2px solid #E0703E' }}
+        >← Деревня</button>
+      </div>
     </div>
   );
 }

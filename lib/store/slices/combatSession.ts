@@ -18,6 +18,8 @@ export interface CombatSessionSlice {
   combatActivateShowtime: () => void;
   combatSpawnNext: () => void;
   combatTick: () => void;
+  /** Apply combat rewards to playtest variable values (coins/gems/exp/level). */
+  applyRewards: () => { leveledUp: boolean; newLevel: number };
   endCombat: () => void;
 }
 
@@ -93,6 +95,62 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     }
 
     set(() => ({ combatSession: next }));
+  },
+
+  applyRewards: () => {
+    const state = get();
+    const { combatSession, variables, playtestState } = state;
+    if (!combatSession || combatSession.status !== 'victory') {
+      return { leveledUp: false, newLevel: 1 };
+    }
+
+    const { rewards } = combatSession;
+    const vals: Record<string, number | boolean | string> = { ...playtestState.variableValues };
+
+    const varId = (name: string) => variables.find((v: any) => v.name === name)?.id as string | undefined;
+    const numVal = (id: string | undefined, fallback = 0): number => {
+      if (!id) return fallback;
+      return typeof vals[id] === 'number' ? (vals[id] as number) : fallback;
+    };
+
+    const coinsId    = varId('coins');
+    const gemsId     = varId('gems');
+    const expId      = varId('exp');
+    const levelId    = varId('level');
+    const hpId       = varId('health');
+    const hpMaxId    = varId('health_max');
+
+    if (coinsId) vals[coinsId] = numVal(coinsId) + rewards.coins;
+    if (gemsId)  vals[gemsId]  = numVal(gemsId)  + rewards.stallonkas;
+
+    // XP + level-up
+    let leveledUp = false;
+    let newLevel = numVal(levelId, 1);
+    if (expId && levelId) {
+      let xp  = numVal(expId) + rewards.xp;
+      let lvl = newLevel;
+      let threshold = Math.max(80, Math.floor(lvl * 80 + 20));
+      while (xp >= threshold) {
+        xp -= threshold;
+        lvl += 1;
+        leveledUp = true;
+        threshold = Math.max(80, Math.floor(lvl * 80 + 20));
+      }
+      vals[expId]   = xp;
+      vals[levelId] = lvl;
+      newLevel = lvl;
+
+      // Restore HP to max on level up
+      if (leveledUp && hpId && hpMaxId) {
+        vals[hpId] = numVal(hpMaxId, 100);
+      }
+    }
+
+    set((s: any) => ({
+      playtestState: { ...s.playtestState, variableValues: vals },
+    }));
+
+    return { leveledUp, newLevel };
   },
 
   endCombat: () => {

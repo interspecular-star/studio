@@ -316,6 +316,7 @@ type StudioState = {
   combatActivateShowtime: () => void;
   combatSpawnNext: () => void;
   combatTick: () => void;
+  applyRewards: () => { leveledUp: boolean; newLevel: number };
   endCombat: () => void;
 
   addPage: (actId?: string | null) => void;
