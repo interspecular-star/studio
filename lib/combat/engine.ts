@@ -37,13 +37,17 @@ export function initCombatSession(
   playerStats: PlayerCombatStats = DEFAULT_PLAYER_STATS,
   instinctId: string | null = null,
   skillSlots: [SkillId | null, SkillId | null, SkillId | null] = DEFAULT_SKILL_SLOTS,
+  scenarioIds?: string[],
 ): CombatSession {
   const derived = derivePlayerStats(playerStats);
   const spawnQueue = buildSpawnQueue(wave, difficulty);
 
-  const scenarioProgress: ScenarioProgress[] = DEFAULT_SCENARIOS
-    .filter(s => s.availableDifficulties.includes(difficulty))
-    .map(s => ({ scenarioId: s.id, completed: false, failed: false }));
+  const availableScenarios = DEFAULT_SCENARIOS.filter(s => s.availableDifficulties.includes(difficulty));
+  const scenarioProgress: ScenarioProgress[] = (
+    scenarioIds !== undefined
+      ? availableScenarios.filter(s => scenarioIds.includes(s.id))
+      : availableScenarios
+  ).map(s => ({ scenarioId: s.id, completed: false, failed: false }));
 
   return {
     id: `session_${Date.now()}`,
@@ -81,6 +85,7 @@ export function initCombatSession(
     showtimeActivated: false,
     potionUsed: false,
     noHitStreak: 0,
+    maxMomentum: 1,
 
     randomEventsTriggered: 0,
     activeEventFlash: null,
@@ -302,6 +307,7 @@ export function playerAttack(
   const next: CombatSession = {
     ...session,
     momentum: newMomentum,
+    maxMomentum: Math.max(session.maxMomentum, newMomentum),
     showtime: newShowtime,
     enemies: newEnemies,
     totalKilled,

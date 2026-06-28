@@ -123,6 +123,7 @@ export type CombatSession = {
   showtimeActivated: boolean;
   potionUsed: boolean;
   noHitStreak: number;
+  maxMomentum: number;
 
   // Random events
   randomEventsTriggered: number;

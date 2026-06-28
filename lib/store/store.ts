@@ -309,7 +309,7 @@ type StudioState = {
 
   // === Combat Session (runtime) ===
   combatSession: CombatSession | null;
-  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string, skillSlots?: [SkillId | null, SkillId | null, SkillId | null]) => void;
+  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string, skillSlots?: [SkillId | null, SkillId | null, SkillId | null], scenarioIds?: string[]) => void;
   combatPlayerAttack: (targetInstanceId: string, isWeakSpot?: boolean) => void;
   combatPlayerDodge: () => void;
   combatPlayerParry: () => void;

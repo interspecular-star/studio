@@ -13,7 +13,7 @@ import type { SkillId } from '../../types/combat';
 
 export interface CombatSessionSlice {
   combatSession: CombatSession | null;
-  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string, skillSlots?: [SkillId | null, SkillId | null, SkillId | null]) => void;
+  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string, skillSlots?: [SkillId | null, SkillId | null, SkillId | null], scenarioIds?: string[]) => void;
   combatPlayerAttack: (targetInstanceId: string, isWeakSpot?: boolean) => void;
   combatPlayerDodge: () => void;
   combatPlayerParry: () => void;
@@ -29,7 +29,7 @@ export interface CombatSessionSlice {
 export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice => ({
   combatSession: null,
 
-  startCombat: (waveId, difficulty, instinctId, skillSlots) => {
+  startCombat: (waveId, difficulty, instinctId, skillSlots, scenarioIds) => {
     const state = get();
     const wave = state.waves.find((w: any) => w.id === waveId);
     if (!wave) { console.warn(`[combat] wave "${waveId}" not found`); return; }
@@ -53,7 +53,7 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
       lvl: numVar('level', 1),
     };
 
-    const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null, skillSlots);
+    const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null, skillSlots, scenarioIds);
     set(() => ({ combatSession: session }));
   },
 

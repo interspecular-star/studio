@@ -90,15 +90,189 @@ function SimulationPanel({ waveId, difficulty }: { waveId: string; difficulty: D
 
 // ── Wave Select ───────────────────────────────────────────────────────────────
 
+function SkillPicker({
+  skillSlots, setSkillSlots,
+}: {
+  skillSlots: [SkillId | null, SkillId | null, SkillId | null];
+  setSkillSlots: (s: [SkillId | null, SkillId | null, SkillId | null]) => void;
+}) {
+  const [activeSlot, setActiveSlot] = useState<0 | 1 | 2 | null>(null);
+  const ALL_SKILLS = Object.values(DEFAULT_SKILLS) as typeof DEFAULT_SKILLS[SkillId][];
+
+  const assignSkill = (skillId: SkillId) => {
+    if (activeSlot === null) return;
+    const next = [...skillSlots] as [SkillId | null, SkillId | null, SkillId | null];
+    next[activeSlot] = skillId;
+    setSkillSlots(next);
+    setActiveSlot(null);
+  };
+
+  return (
+    <div className="w-full max-w-sm flex flex-col gap-2">
+      <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>НАВЫКИ — ВЫБЕРИ 3 СЛОТА</div>
+
+      {/* Current slots */}
+      <div className="flex gap-2">
+        {([0, 1, 2] as const).map(i => {
+          const skillId = skillSlots[i];
+          const skill   = skillId ? DEFAULT_SKILLS[skillId] : null;
+          const color   = SLOT_COLORS[i];
+          const isActive = activeSlot === i;
+          return (
+            <button key={i} onClick={() => setActiveSlot(isActive ? null : i)}
+              className="flex-1 rounded-xl py-2 px-1 flex flex-col items-center gap-0.5 transition-all"
+              style={{
+                border: `2px solid ${isActive ? color : color + '55'}`,
+                background: isActive ? color + '22' : color + '0a',
+                boxShadow: isActive ? `0 0 12px ${color}55` : 'none',
+              }}>
+              <span className="text-[8px] font-bold" style={{ color }}>{i + 1}</span>
+              <span className="text-[9px] font-semibold text-center leading-tight" style={{ color: skill ? C.text : C.muted }}>
+                {skill?.name.ru ?? '—'}
+              </span>
+              {skill && <span className="text-[8px]" style={{ color: C.muted }}>{skill.mpCost} MP</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeSlot !== null && (
+        <div className="text-[9px] text-center" style={{ color: SLOT_COLORS[activeSlot] }}>
+          ↑ Слот {activeSlot + 1} выбран — нажми навык ниже
+        </div>
+      )}
+
+      {/* Skill grid */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {ALL_SKILLS.map(skill => {
+          const inSlot = skillSlots.indexOf(skill.id as SkillId);
+          return (
+            <button key={skill.id} onClick={() => assignSkill(skill.id as SkillId)}
+              disabled={activeSlot === null}
+              title={skill.description.ru}
+              className="rounded-lg px-2 py-2 flex flex-col items-center gap-0.5 transition-all disabled:opacity-40"
+              style={{
+                background: inSlot >= 0 ? SLOT_COLORS[inSlot] + '22' : C.dim,
+                border: `1px solid ${inSlot >= 0 ? SLOT_COLORS[inSlot] + '88' : 'transparent'}`,
+              }}>
+              <span className="text-[9px] font-bold text-center leading-tight" style={{ color: C.text }}>
+                {skill.name.ru}
+              </span>
+              <span className="text-[8px]" style={{ color: C.muted }}>{skill.mpCost}MP · {(skill.cooldownTicks * 0.2).toFixed(0)}с</span>
+              {inSlot >= 0 && (
+                <span className="text-[7px] font-black" style={{ color: SLOT_COLORS[inSlot] }}>▲{inSlot + 1}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ScenarioPicker({
+  difficulty, selected, setSelected,
+}: {
+  difficulty: Difficulty;
+  selected: string[];
+  setSelected: (ids: string[]) => void;
+}) {
+  const available = DEFAULT_SCENARIOS.filter(s => s.availableDifficulties.includes(difficulty));
+  const toggle = (id: string) => {
+    if (selected.includes(id)) {
+      setSelected(selected.filter(s => s !== id));
+    } else if (selected.length < 2) {
+      setSelected([...selected, id]);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-sm flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>СЦЕНАРИИ (до 2)</span>
+        <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.yellow + '22', color: C.yellow }}>
+          {selected.length}/2
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {available.map(s => {
+          const isOn = selected.includes(s.id);
+          const full = !isOn && selected.length >= 2;
+          return (
+            <button key={s.id} onClick={() => toggle(s.id)} disabled={full}
+              className="rounded-lg px-3 py-2 text-left transition-all disabled:opacity-30 flex items-start gap-2"
+              style={{
+                background: isOn ? C.cyan + '15' : C.dim,
+                border: `1px solid ${isOn ? C.cyan + '66' : 'transparent'}`,
+              }}>
+              <span className="text-xs font-bold mt-0.5 shrink-0" style={{ color: isOn ? C.cyan : C.muted }}>
+                {isOn ? '☑' : '☐'}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold" style={{ color: isOn ? C.text : C.muted + 'cc' }}>
+                  {s.name.ru}
+                </span>
+                <span className="text-[8px]" style={{ color: C.muted }}>
+                  {s.condition.ru}
+                </span>
+                <span className="text-[8px]" style={{ color: C.yellow + 'cc' }}>
+                  → {s.reward.ru}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EnemyPoolPreview({ waveData, enemies, bosses }: { waveData: any; enemies: any[]; bosses: any[] }) {
+  if (!waveData) return null;
+  const allDefs = [...enemies, ...bosses];
+  const pool: Array<{ id: string; name: string; weight: number; pct: number }> = waveData.enemyPool.map((e: any) => {
+    const total = waveData.enemyPool.reduce((s: number, x: any) => s + x.weight, 0);
+    const def = allDefs.find((d: any) => d.id === e.enemyId);
+    return { id: e.enemyId, name: def?.name?.ru ?? e.enemyId, weight: e.weight, pct: Math.round((e.weight / total) * 100) };
+  }).sort((a: any, b: any) => b.weight - a.weight);
+
+  const boss = waveData.bossId ? allDefs.find((d: any) => d.id === waveData.bossId) : null;
+
+  return (
+    <div className="w-full max-w-sm flex flex-col gap-2">
+      <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ВРАГИ В ПУЛЕ</div>
+      <div className="flex flex-wrap gap-1.5">
+        {pool.map(e => (
+          <div key={e.id} className="rounded px-2 py-1 flex items-center gap-1"
+            style={{ background: C.pink + '15', border: `1px solid ${C.pink}33` }}>
+            <span className="text-[9px] font-semibold" style={{ color: C.text }}>{e.name}</span>
+            <span className="text-[8px]" style={{ color: C.muted }}>{e.pct}%</span>
+          </div>
+        ))}
+        {boss && (
+          <div className="rounded px-2 py-1 flex items-center gap-1"
+            style={{ background: C.yellow + '15', border: `1px solid ${C.yellow}55` }}>
+            <span className="text-[8px] font-bold" style={{ color: C.yellow }}>⚡</span>
+            <span className="text-[9px] font-semibold" style={{ color: C.text }}>{boss.name?.ru ?? boss.id}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WaveSelect() {
-  const { waves, startCombat, variables, playtestState } = useStudioStore(useShallow(s => ({
-    waves: s.waves, startCombat: s.startCombat, variables: s.variables, playtestState: s.playtestState,
+  const { waves, startCombat, variables, playtestState, enemies, bosses } = useStudioStore(useShallow(s => ({
+    waves: s.waves, startCombat: s.startCombat, variables: s.variables,
+    playtestState: s.playtestState, enemies: s.enemies, bosses: s.bosses,
   })));
 
-  const [selectedWave, setSelectedWave] = useState('');
-  const [difficulty, setDifficulty]     = useState<Difficulty>('stuntman');
-  const [instinctId, setInstinctId]     = useState<string | null>(null);
-  const [showSim, setShowSim]           = useState(false);
+  const [selectedWave, setSelectedWave]       = useState('');
+  const [difficulty, setDifficulty]           = useState<Difficulty>('stuntman');
+  const [instinctId, setInstinctId]           = useState<string | null>(null);
+  const [showSim, setShowSim]                 = useState(false);
+  const [skillSlots, setSkillSlots]           = useState<[SkillId | null, SkillId | null, SkillId | null]>([...DEFAULT_SKILL_SLOTS]);
+  const [selectedScenarios, setSelectedScenarios] = useState<string[]>([]);
 
   const levelVarId = variables.find((v: any) => v.name === 'level')?.id as string | undefined;
   const playerLevel = levelVarId ? ((playtestState.variableValues[levelVarId] as number | undefined) ?? 1) : 1;
@@ -107,23 +281,32 @@ function WaveSelect() {
   const waveData: any = waves.find((w: any) => w.id === selectedWave);
   const availableDiffs: Difficulty[] = waveData?.difficulties ?? (['novice', 'amateur', 'professional', 'stuntman', 'hollywood'] as Difficulty[]);
 
-  // Если при выборе волны текущая сложность недоступна — переключаем на последнюю доступную
   useEffect(() => {
     if (waveData && !availableDiffs.includes(difficulty)) {
       setDifficulty(availableDiffs[availableDiffs.length - 1]);
     }
+    // Reset scenarios on wave change (available set may differ)
+    setSelectedScenarios([]);
   }, [selectedWave]);
+
+  // Also reset invalid scenarios when difficulty changes
+  useEffect(() => {
+    const stillAvail = DEFAULT_SCENARIOS
+      .filter(s => s.availableDifficulties.includes(difficulty))
+      .map(s => s.id);
+    setSelectedScenarios(prev => prev.filter(id => stillAvail.includes(id)));
+  }, [difficulty]);
 
   const hasBoss = waveData?.bossId && BOSS_DIFFS.includes(difficulty);
   const enemyCount = DIFF_COUNT[difficulty];
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-5 px-6 overflow-y-auto py-4"
+    <div className="flex flex-col items-center h-full gap-4 px-6 overflow-y-auto py-5"
       style={{ background: C.bg, color: C.text }}>
       <div className="text-3xl font-black tracking-widest" style={{ color: C.cyan, letterSpacing: '0.25em' }}>
         🎬 СЪЁМКА
       </div>
-      <div className="text-xs" style={{ color: C.muted }}>Ур. {playerLevel} · выбери волну и сложность</div>
+      <div className="text-xs" style={{ color: C.muted }}>Ур. {playerLevel} · выбери волну и настрой бой</div>
 
       {waves.length === 0 ? (
         <div className="rounded-xl p-6 text-center max-w-xs" style={{ background: C.dim, border: `1px solid ${C.dim}` }}>
@@ -136,6 +319,7 @@ function WaveSelect() {
         <>
           {/* Волны */}
           <div className="flex flex-col gap-2 w-full max-w-sm">
+            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ВОЛНА</div>
             {waves.map((w: any) => (
               <button key={w.id} onClick={() => setSelectedWave(w.id)}
                 className="rounded-xl px-4 py-3 text-left transition-all"
@@ -152,38 +336,56 @@ function WaveSelect() {
           </div>
 
           {/* Сложность */}
-          <div className="flex flex-wrap gap-2 justify-center">
-            {availableDiffs.map(d => {
-              const count = DIFF_COUNT[d];
-              const boss  = waveData?.bossId && BOSS_DIFFS.includes(d);
-              const isOn  = difficulty === d;
-              return (
-                <button key={d} onClick={() => setDifficulty(d)}
-                  className="rounded-lg px-3 py-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5"
-                  style={{
-                    background: isOn ? C.yellow + '22' : C.dim,
-                    color: isOn ? C.yellow : C.muted,
-                    border: `1px solid ${isOn ? C.yellow : 'transparent'}`,
-                  }}>
-                  <span>{DIFFICULTY_LABELS[d]}</span>
-                  <span className="text-[9px] font-normal" style={{ color: isOn ? C.yellow + 'bb' : C.muted + '99' }}>
-                    {count} моб.{boss ? '+босс' : ''}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="w-full max-w-sm flex flex-col gap-2">
+            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>СЛОЖНОСТЬ</div>
+            <div className="flex flex-wrap gap-2">
+              {availableDiffs.map(d => {
+                const count = DIFF_COUNT[d];
+                const boss  = waveData?.bossId && BOSS_DIFFS.includes(d);
+                const isOn  = difficulty === d;
+                return (
+                  <button key={d} onClick={() => setDifficulty(d)}
+                    className="rounded-lg px-3 py-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5"
+                    style={{
+                      background: isOn ? C.yellow + '22' : C.dim,
+                      color: isOn ? C.yellow : C.muted,
+                      border: `1px solid ${isOn ? C.yellow : 'transparent'}`,
+                    }}>
+                    <span>{DIFFICULTY_LABELS[d]}</span>
+                    <span className="text-[9px] font-normal" style={{ color: isOn ? C.yellow + 'bb' : C.muted + '99' }}>
+                      {count} моб.{boss ? '+босс' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedWave && (
+              <div className="text-xs" style={{ color: C.yellow }}>
+                Итого: {enemyCount} {hasBoss ? `мобов + 1 босс = ${enemyCount + 1} врагов` : 'мобов'}
+              </div>
+            )}
           </div>
 
-          {/* Инфо о выбранной волне */}
+          {/* Enemy pool preview */}
           {selectedWave && (
-            <div className="text-xs text-center" style={{ color: C.yellow }}>
-              {enemyCount} {hasBoss ? `мобов + 1 босс = ${enemyCount + 1} всего` : 'мобов'}
-            </div>
+            <EnemyPoolPreview waveData={waveData} enemies={enemies} bosses={bosses} />
+          )}
+
+          {/* Skill picker */}
+          <SkillPicker skillSlots={skillSlots} setSkillSlots={setSkillSlots} />
+
+          {/* Scenario picker */}
+          {selectedWave && (
+            <ScenarioPicker
+              difficulty={difficulty}
+              selected={selectedScenarios}
+              setSelected={setSelectedScenarios}
+            />
           )}
 
           {/* Инстинкт */}
-          <div className="w-full max-w-sm">
-            <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>Инстинкт (необязательно)</div>
+          <div className="w-full max-w-sm flex flex-col gap-2">
+            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ИНСТИНКТ</div>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setInstinctId(null)}
                 className="rounded-lg px-2.5 py-1 text-[10px] font-semibold"
@@ -199,8 +401,7 @@ function WaveSelect() {
               ))}
               {DEFAULT_INSTINCTS.filter(i => i.unlockLevel > playerLevel).map(inst => (
                 <button key={inst.id} disabled className="rounded-lg px-2.5 py-1 text-[10px] opacity-25 cursor-not-allowed"
-                  style={{ color: C.muted }}>🔒 {inst.name.ru}
-                </button>
+                  style={{ color: C.muted }}>🔒 {inst.name.ru}</button>
               ))}
             </div>
           </div>
@@ -218,7 +419,14 @@ function WaveSelect() {
 
           {/* Старт */}
           <button
-            onClick={() => { if (selectedWave) startCombat(selectedWave, difficulty, instinctId ?? undefined, DEFAULT_SKILL_SLOTS); }}
+            onClick={() => {
+              if (selectedWave) startCombat(
+                selectedWave, difficulty,
+                instinctId ?? undefined,
+                skillSlots,
+                selectedScenarios,
+              );
+            }}
             disabled={!selectedWave}
             className="rounded-xl px-12 py-4 text-lg font-black tracking-widest transition-all disabled:opacity-30"
             style={{ background: selectedWave ? C.pink : 'transparent', color: C.text, border: `2px solid ${selectedWave ? C.pink : C.muted}` }}>
@@ -712,18 +920,37 @@ function CombatHUD({ session }: { session: CombatSession }) {
 
 // ── Results ───────────────────────────────────────────────────────────────────
 
+function fmtTime(ticks: number) {
+  const s = Math.floor(ticks * 0.2);
+  return s >= 60 ? `${Math.floor(s / 60)}м ${s % 60}с` : `${s}с`;
+}
+
 function ResultsView({ session, onExit }: { session: CombatSession; onExit: () => void }) {
   const { applyRewards } = useStudioStore(useShallow(s => ({ applyRewards: s.applyRewards })));
   const [collected, setCollected] = useState(false);
   const [levelUp, setLevelUp] = useState<{ leveledUp: boolean; newLevel: number } | null>(null);
   const isVictory = session.status === 'victory';
 
+  const showtimeCount = session.log.filter(e => e.type === 'showtime').length;
+  const weakSpotCount = session.weakSpotHits;
+  const timeFmt = fmtTime(session.tick);
+
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center px-6 overflow-y-auto py-4"
+    <div className="absolute inset-0 flex flex-col items-center gap-4 text-center px-6 overflow-y-auto py-6"
       style={{ background: C.bg, color: C.text }}>
-      <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
-      <div className="text-3xl font-black" style={{ color: isVictory ? '#5ae55a' : C.red }}>
-        {isVictory ? 'СНЯТО!' : 'ПРОВАЛ'}
+
+      {/* Hero badge */}
+      <div className="flex flex-col items-center gap-1">
+        <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
+        <div className="text-4xl font-black tracking-widest"
+          style={{ color: isVictory ? '#5ae55a' : C.red, textShadow: `0 0 30px ${isVictory ? '#5ae55a' : C.red}66` }}>
+          {isVictory ? 'С Н Я Т О !' : 'П Р О В А Л'}
+        </div>
+        {isVictory && (
+          <div className="text-xs tracking-widest" style={{ color: '#5ae55a99' }}>
+            Отличная работа, стантмен!
+          </div>
+        )}
       </div>
 
       {levelUp?.leveledUp && (
@@ -733,21 +960,44 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
         </div>
       )}
 
-      <div className="text-sm font-mono" style={{ color: C.muted }}>
-        Убито: {session.totalKilled}  ·  Тиков: {session.tick}  ·  Макс Momentum: ×{session.momentum}
+      {/* Stats grid */}
+      <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
+        {[
+          { label: 'Убито', value: String(session.totalKilled), color: C.pink },
+          { label: 'Время', value: timeFmt, color: C.muted },
+          { label: 'Макс ×', value: String(session.maxMomentum), color: C.yellow },
+          { label: 'Showtime', value: String(showtimeCount), color: C.cyan },
+          { label: 'Слабых точек', value: String(weakSpotCount), color: C.yellow },
+          { label: 'HP осталось', value: `${Math.round((session.playerHp / session.playerHpMax) * 100)}%`, color: session.playerHp / session.playerHpMax <= 0.15 ? C.red : '#5ae55a' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="flex flex-col items-center rounded-lg py-2 px-1"
+            style={{ background: C.dim, gridColumn: label === 'Слабых точек' ? 'span 2' : undefined }}>
+            <div className="text-lg font-black leading-none" style={{ color }}>{value}</div>
+            <div className="text-[8px] mt-0.5" style={{ color: C.muted }}>{label}</div>
+          </div>
+        ))}
       </div>
 
+      {/* Rewards */}
       {isVictory && (
-        <div className="rounded-xl p-5 flex flex-col gap-2 w-full max-w-xs"
+        <div className="rounded-xl p-4 flex flex-col gap-2 w-full max-w-xs"
           style={{ background: C.dim, border: `1px solid ${C.pink}44` }}>
-          <div className="text-xs font-semibold mb-1" style={{ color: C.muted }}>НАГРАДА</div>
-          {[['💰 Монеты', session.rewards.coins], ['⭐ Опыт', session.rewards.xp], ['🎞 Сталлонки', session.rewards.stallonkas]].map(([l, v]) => (
-            <div key={String(l)} className="flex justify-between text-sm">
-              <span>{l}</span><span className="font-mono">+{v}</span>
-            </div>
-          ))}
+          <div className="text-[10px] font-semibold mb-1 tracking-widest" style={{ color: C.muted }}>НАГРАДА</div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { icon: '💰', label: 'Монеты', value: session.rewards.coins },
+              { icon: '⭐', label: 'Опыт', value: session.rewards.xp },
+              { icon: '🎞', label: 'Сталлонки', value: session.rewards.stallonkas },
+            ].map(({ icon, label, value }) => (
+              <div key={label} className="flex flex-col items-center gap-0.5">
+                <span className="text-base">{icon}</span>
+                <span className="text-sm font-black" style={{ color: C.text }}>+{value}</span>
+                <span className="text-[8px]" style={{ color: C.muted }}>{label}</span>
+              </div>
+            ))}
+          </div>
           {session.rewards.vhsDropped && (
-            <div className="text-xs font-semibold mt-1" style={{ color: C.yellow }}>📼 VHS-кассета!</div>
+            <div className="text-xs font-semibold text-center mt-1" style={{ color: C.yellow }}>📼 VHS-кассета!</div>
           )}
         </div>
       )}
@@ -755,16 +1005,23 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
       {/* Сценарии */}
       {session.scenarioProgress.length > 0 && (
         <div className="w-full max-w-xs">
-          <div className="text-xs font-semibold mb-2" style={{ color: C.muted }}>СЦЕНАРИИ</div>
-          <div className="flex flex-col gap-1 text-left">
+          <div className="text-[10px] font-semibold mb-2 tracking-widest" style={{ color: C.muted }}>СЦЕНАРИИ</div>
+          <div className="flex flex-col gap-1.5 text-left">
             {session.scenarioProgress.map(sp => {
               const def = DEFAULT_SCENARIOS.find(s => s.id === sp.scenarioId);
               const color = sp.completed ? '#5ae55a' : sp.failed ? C.red : C.muted;
               return (
-                <div key={sp.scenarioId} className="flex items-center gap-2">
-                  <span style={{ color, fontFamily: 'monospace' }}>{sp.completed ? '✓' : sp.failed ? '✗' : '—'}</span>
-                  <span className="text-xs" style={{ color }}>{def?.name.ru ?? sp.scenarioId}</span>
-                  {sp.completed && def && <span className="text-[9px] ml-auto" style={{ color: '#7a9a7a' }}>{def.reward.ru}</span>}
+                <div key={sp.scenarioId} className="rounded-lg px-3 py-2 flex items-center gap-2"
+                  style={{ background: color + '11', border: `1px solid ${color}44` }}>
+                  <span className="text-sm font-black" style={{ color }}>
+                    {sp.completed ? '✓' : sp.failed ? '✗' : '—'}
+                  </span>
+                  <div className="flex flex-col gap-0.5 flex-1">
+                    <span className="text-[10px] font-semibold" style={{ color }}>{def?.name.ru ?? sp.scenarioId}</span>
+                    {sp.completed && def && (
+                      <span className="text-[8px]" style={{ color: '#7a9a7a' }}>→ {def.reward.ru}</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -772,7 +1029,8 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
         </div>
       )}
 
-      <div className="flex gap-3">
+      {/* Buttons */}
+      <div className="flex gap-3 pb-4">
         {isVictory && !collected && (
           <button onClick={() => { const r = applyRewards(); setLevelUp(r); setCollected(true); }}
             className="rounded-xl px-7 py-3 font-black transition-all"
