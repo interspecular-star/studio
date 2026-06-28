@@ -678,6 +678,8 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
   const canShowtime = session.showtime >= 100 && !session.showtimeActive;
   const frozen      = session.playerFreezeTicks > 0;
   const hasEnemy    = session.enemies.length > 0;
+  const atkOnCd     = session.playerAttackCooldownTicks > 0;
+  const atkCdSec    = (session.playerAttackCooldownTicks * 0.2).toFixed(1);
 
   return (
     <div className="flex flex-col gap-2 items-end">
@@ -727,10 +729,10 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
         </button>
 
         {/* Main ATTACK */}
-        <button onClick={onAttack} disabled={!hasEnemy || hasPending || isAuto || frozen}
-          className="rounded-xl px-5 py-2 font-black text-sm transition-all disabled:opacity-30"
-          style={{ background: C.pink, color: C.text, border: `2px solid ${C.pink}`, minWidth: 90 }}>
-          ⚔ АТАКА
+        <button onClick={onAttack} disabled={!hasEnemy || hasPending || isAuto || frozen || atkOnCd}
+          className="relative rounded-xl px-5 py-2 font-black text-sm transition-all disabled:opacity-50 overflow-hidden"
+          style={{ background: atkOnCd ? C.pink + '55' : C.pink, color: C.text, border: `2px solid ${C.pink}`, minWidth: 90 }}>
+          {atkOnCd ? <span className="font-mono text-xs">{atkCdSec}с</span> : '⚔ АТАКА'}
         </button>
 
         {/* Parry */}
@@ -838,7 +840,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         case 'Space': {
           e.preventDefault();
           const t = s.enemies[0];
-          if (t && !s.pendingSignal) a.combatPlayerAttack(t.instanceId, false);
+          if (t && !s.pendingSignal && s.playerAttackCooldownTicks === 0) a.combatPlayerAttack(t.instanceId, false);
           break;
         }
         case 'ControlLeft': e.preventDefault(); a.combatPlayerDodge(); break;
@@ -863,7 +865,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         return;
       }
       if (s.showtime >= 100 && !s.showtimeActive) { a.combatActivateShowtime(); return; }
-      if (s.enemies.length > 0) { a.combatPlayerAttack(s.enemies[0].instanceId, false); return; }
+      if (s.enemies.length > 0 && s.playerAttackCooldownTicks === 0) { a.combatPlayerAttack(s.enemies[0].instanceId, false); return; }
     }, 80);
     return () => clearInterval(id);
   }, [isAuto]);

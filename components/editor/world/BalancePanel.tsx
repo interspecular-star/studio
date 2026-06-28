@@ -2,28 +2,17 @@
 
 import { useState, useMemo } from 'react';
 import { useStudioStore } from '@/lib/store';
+import { derivePlayerStats } from '@/lib/combat/engine';
 
 type BalanceTab = 'stats' | 'damage' | 'wave' | 'progression';
 
-// ── Formulas ──────────────────────────────────────────────────────────────────
-
-function derivedStats(str: number, agi: number, end_: number, mag: number, lck: number, lvl: number) {
-  const hpMax   = 100 + end_ * 10 + (lvl - 1) * 5;
-  const mpMax   = 50  + mag  * 5  + (lvl - 1) * 3;
-  const atk     = 10  + str  * 2  + (lvl - 1) * 2;
-  const defFlat = end_ + Math.floor(agi * 0.5);
-  const defPct  = +(defFlat / (defFlat + 100) * 100).toFixed(1);
-  const critCh  = +Math.min(80, 5 + lck * 0.5 + agi * 0.3).toFixed(1);
-  const critDmg = 150 + str;
-  return { hpMax, mpMax, atk, defFlat, defPct, critCh, critDmg };
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function xpForLevel(lvl: number) {
   return Math.round(100 * Math.pow(lvl, 1.5));
 }
 
 function spAtLevel(lvl: number) {
-  // 2 points per level, +1 bonus every 5 levels
   return 2 + (lvl % 5 === 0 ? 1 : 0);
 }
 
@@ -42,7 +31,6 @@ function runSimulation(
     let hp = hpMax, dmgIn = 0, dead = false;
 
     for (let k = 0; k < count && !dead; k++) {
-      // weighted random enemy pick
       let r = Math.random() * totalW;
       let enemy = pool[pool.length - 1];
       for (const e of pool) { r -= e.weight; if (r <= 0) { enemy = e; break; } }
@@ -50,7 +38,7 @@ function runSimulation(
       let eHp = enemy.hp;
       while (eHp > 0 && hp > 0) {
         const isCrit = Math.random() < critCh / 100;
-        const isWeak = Math.random() < 0.3; // 30% weak-point hit rate assumed
+        const isWeak = Math.random() < 0.3;
         let d = atk;
         if (isCrit) d *= critDmg / 100;
         if (isWeak) d *= hunter ? 2.2 : 1.8;
@@ -111,17 +99,26 @@ function SectionBox({ title, children }: { title: string; children: React.ReactN
   );
 }
 
+// ── Base stat presets ─────────────────────────────────────────────────────────
+
+const BASE_LVL1 = { str: 5, agi: 5, end: 10, mag: 5, lck: 5, lvl: 1 };
+
 // ── Tab: СТАТЫ ────────────────────────────────────────────────────────────────
 
 function StatsTab() {
-  const [str, setStr] = useState(5);
-  const [agi, setAgi] = useState(5);
-  const [end_, setEnd] = useState(5);
-  const [mag, setMag] = useState(5);
-  const [lck, setLck] = useState(5);
-  const [lvl, setLvl] = useState(1);
+  const [str, setStr] = useState(BASE_LVL1.str);
+  const [agi, setAgi] = useState(BASE_LVL1.agi);
+  const [end_, setEnd] = useState(BASE_LVL1.end);
+  const [mag, setMag] = useState(BASE_LVL1.mag);
+  const [lck, setLck] = useState(BASE_LVL1.lck);
+  const [lvl, setLvl] = useState(BASE_LVL1.lvl);
 
-  const s = useMemo(() => derivedStats(str, agi, end_, mag, lck, lvl), [str, agi, end_, mag, lck, lvl]);
+  const s = useMemo(() => derivePlayerStats({ str, agi, end: end_, mag, lck, lvl }), [str, agi, end_, mag, lck, lvl]);
+
+  const resetToLvl = (targetLvl: number) => {
+    setStr(BASE_LVL1.str); setAgi(BASE_LVL1.agi); setEnd(BASE_LVL1.end);
+    setMag(BASE_LVL1.mag); setLck(BASE_LVL1.lck); setLvl(targetLvl);
+  };
 
   return (
     <div className="space-y-3">
@@ -134,21 +131,44 @@ function StatsTab() {
           <NumSlider label="MAG" value={mag} onChange={setMag} />
           <NumSlider label="LCK" value={lck} onChange={setLck} />
         </div>
+        <div className="flex gap-1.5 mt-2.5">
+          <button
+            onClick={() => resetToLvl(1)}
+            className="flex-1 py-1 text-[10px] font-medium rounded border border-[var(--studio-border)] bg-[var(--studio-bg)] hover:bg-[var(--studio-accent)]/10 text-[var(--studio-text-muted)] transition-colors"
+          >
+            1 ЛВЛ
+          </button>
+          <button
+            onClick={() => resetToLvl(10)}
+            className="flex-1 py-1 text-[10px] font-medium rounded border border-[var(--studio-border)] bg-[var(--studio-bg)] hover:bg-[var(--studio-accent)]/10 text-[var(--studio-text-muted)] transition-colors"
+          >
+            10 ЛВЛ
+          </button>
+          <button
+            onClick={() => setLvl(l => Math.min(50, l + 1))}
+            className="flex-1 py-1 text-[10px] font-medium rounded bg-[var(--studio-accent)] text-white hover:opacity-90 transition-opacity"
+          >
+            + Уровень
+          </button>
+        </div>
       </SectionBox>
       <SectionBox title="ПРОИЗВОДНЫЕ">
         <StatRow label="HP Макс" value={s.hpMax} />
         <StatRow label="MP Макс" value={s.mpMax} />
         <StatRow label="ATK" value={s.atk} />
-        <StatRow label="DEF (flat)" value={s.defFlat} />
-        <StatRow label="DEF (снижение урона)" value={s.defPct} unit="%" />
+        <StatRow label="Защита (flat)" value={s.defFlat} />
+        <StatRow label="Снижение урона" value={s.defPct} unit="%" />
+        <StatRow label="Уворот" value={s.dodge} unit="%" />
         <StatRow label="Крит шанс" value={s.critCh} unit="%" />
         <StatRow label="Крит урон" value={s.critDmg} unit="%" />
       </SectionBox>
       <p className="text-[10px] text-[var(--studio-text-muted)] px-0.5 leading-relaxed">
-        HP = 100 + END×10 + (ур−1)×5<br />
-        MP = 50 + MAG×5 + (ур−1)×3<br />
-        ATK = 10 + STR×2 + (ур−1)×2<br />
-        DEF% = flat / (flat + 100) × 100
+        HP = END×10 + ур×5<br />
+        MP = MAG×5<br />
+        ATK = (STR×1.5) × (1+ур×0.03)<br />
+        DEF% = ур×0.5 (+ экипировка)<br />
+        Уворот = min(40, AGI×0.3)%<br />
+        Крит = min(60, LCK×0.4)%
       </p>
     </div>
   );
@@ -158,15 +178,15 @@ function StatsTab() {
 
 function DamageTab() {
   const { enemies } = useStudioStore();
-  const [str, setStr] = useState(5);
-  const [agi, setAgi] = useState(5);
-  const [end_, setEnd] = useState(5);
-  const [lck, setLck] = useState(5);
-  const [lvl, setLvl] = useState(1);
+  const [str, setStr] = useState(BASE_LVL1.str);
+  const [agi, setAgi] = useState(BASE_LVL1.agi);
+  const [end_, setEnd] = useState(BASE_LVL1.end);
+  const [lck, setLck] = useState(BASE_LVL1.lck);
+  const [lvl, setLvl] = useState(BASE_LVL1.lvl);
   const [selectedEnemyId, setSelectedEnemyId] = useState('');
   const [hunter, setHunter] = useState(false);
 
-  const s = useMemo(() => derivedStats(str, agi, end_, 5, lck, lvl), [str, agi, end_, lck, lvl]);
+  const s = useMemo(() => derivePlayerStats({ str, agi, end: end_, mag: 5, lck, lvl }), [str, agi, end_, lck, lvl]);
   const enemy = enemies.find(e => e.id === selectedEnemyId);
   const weakMult = hunter ? 2.2 : 1.8;
 
@@ -175,9 +195,9 @@ function DamageTab() {
     const crit       = +(base * s.critDmg / 100).toFixed(1);
     const weak       = +(base * weakMult).toFixed(1);
     const weakCrit   = +(crit * weakMult).toFixed(1);
-    const st         = +(base * 1.5).toFixed(1);
-    const stCrit     = +(crit * 1.5).toFixed(1);
-    const stWeak     = +(base * 1.5 * weakMult).toFixed(1);
+    const st         = +(base * 3.5).toFixed(1); // CDD: Showtime ×3.5
+    const stCrit     = +(crit * 3.5).toFixed(1);
+    const stWeak     = +(base * 3.5 * weakMult).toFixed(1);
 
     const hitsToKill = enemy ? {
       normal:   Math.ceil(enemy.hp / base),
@@ -245,18 +265,18 @@ function DamageTab() {
 
 function WaveTab() {
   const { enemies, waves } = useStudioStore();
-  const [str, setStr] = useState(5);
-  const [agi, setAgi] = useState(5);
-  const [end_, setEnd] = useState(5);
-  const [mag, setMag] = useState(5);
-  const [lck, setLck] = useState(5);
-  const [lvl, setLvl] = useState(1);
+  const [str, setStr] = useState(BASE_LVL1.str);
+  const [agi, setAgi] = useState(BASE_LVL1.agi);
+  const [end_, setEnd] = useState(BASE_LVL1.end);
+  const [mag, setMag] = useState(BASE_LVL1.mag);
+  const [lck, setLck] = useState(BASE_LVL1.lck);
+  const [lvl, setLvl] = useState(BASE_LVL1.lvl);
   const [selectedWaveId, setSelectedWaveId] = useState('');
-  const [enemyCount, setEnemyCount] = useState(5);
+  const [enemyCount, setEnemyCount] = useState(3);
   const [hunter, setHunter] = useState(false);
   const [result, setResult] = useState<{ rate: number; avgHp: number; avgDmg: number } | null>(null);
 
-  const s    = useMemo(() => derivedStats(str, agi, end_, mag, lck, lvl), [str, agi, end_, mag, lck, lvl]);
+  const s    = useMemo(() => derivePlayerStats({ str, agi, end: end_, mag, lck, lvl }), [str, agi, end_, mag, lck, lvl]);
   const wave = waves.find(w => w.id === selectedWaveId);
 
   const pool = useMemo(() => {
@@ -291,6 +311,8 @@ function WaveTab() {
           <StatRow label="HP" value={s.hpMax} />
           <StatRow label="ATK" value={s.atk} />
           <StatRow label="DEF%" value={s.defPct} unit="%" />
+          <StatRow label="Уворот" value={s.dodge} unit="%" />
+          <StatRow label="Крит" value={s.critCh} unit="%" />
         </div>
         <label className="flex items-center gap-1.5 text-xs cursor-pointer mt-2">
           <input type="checkbox" checked={hunter} onChange={e => setHunter(e.target.checked)} className="accent-[var(--studio-accent)]" />
@@ -357,11 +379,11 @@ function WaveTab() {
 // ── Tab: ПРОГРЕССИЯ ───────────────────────────────────────────────────────────
 
 function ProgressionTab() {
-  const [startStr, setStartStr] = useState(2);
-  const [startAgi, setStartAgi] = useState(2);
-  const [startEnd, setStartEnd] = useState(2);
-  const [startMag, setStartMag] = useState(2);
-  const [startLck, setStartLck] = useState(2);
+  const [startStr, setStartStr] = useState(BASE_LVL1.str);
+  const [startAgi, setStartAgi] = useState(BASE_LVL1.agi);
+  const [startEnd, setStartEnd] = useState(BASE_LVL1.end);
+  const [startMag, setStartMag] = useState(BASE_LVL1.mag);
+  const [startLck, setStartLck] = useState(BASE_LVL1.lck);
 
   const rows = useMemo(() => {
     const data: {
@@ -376,10 +398,10 @@ function ProgressionTab() {
       totalXp += lvl > 1 ? xpForLevel(lvl - 1) : 0;
       const sp = spAtLevel(lvl);
       totalSp += sp;
-      // Assume all extra SP go into END for HP scaling display
-      const bonusSp = totalSp - (startStr + startAgi + startEnd + startMag + startLck);
+      const baseSum = startStr + startAgi + startEnd + startMag + startLck;
+      const bonusSp = totalSp - baseSum;
       const extraEnd = Math.floor(Math.max(0, bonusSp) / 5);
-      const s = derivedStats(startStr, startAgi, startEnd + extraEnd, startMag, startLck, lvl);
+      const s = derivePlayerStats({ str: startStr, agi: startAgi, end: startEnd + extraEnd, mag: startMag, lck: startLck, lvl });
       data.push({
         lvl,
         xpNext: lvl < 50 ? xpForLevel(lvl) : null,

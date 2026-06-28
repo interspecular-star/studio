@@ -12,17 +12,32 @@ import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS, DEFAULT_SKILLS, DEFAULT_SKILL
 
 export function derivePlayerStats(s: PlayerCombatStats) {
   const { str, agi, end: end_, mag, lck, lvl } = s;
-  const defFlat = Math.round(end_ * 0.2);
+  // Formulas from CDD §2-3:
+  // ATK  = (STR×1.5 + weapon) × (1 + lvl×0.03)   — weapon=0 until equip system
+  // HP   = END×10 + lvl×5
+  // MP   = MAG×5
+  // DEF% = lvl×0.5  (equipment adds on top)
+  // Dodge = AGI×0.3%
+  // Crit  = LCK×0.4%
+  const levelMult = 1 + lvl * 0.03;
   return {
-    hpMax:   end_ * 10 + (lvl - 1) * 5,
-    mpMax:   mag * 10 + (lvl - 1) * 5,
-    atk:     Math.round(str * 4 + agi * 1.5 + lvl * 2),
-    defFlat,
-    defPct:  Math.min(75, Math.round(end_ * 0.8 + agi * 0.3)),
+    hpMax:   end_ * 10 + lvl * 5,
+    mpMax:   mag * 5,
+    atk:     Math.max(1, Math.round(str * 1.5 * levelMult)),
+    defFlat: 0,
+    defPct:  +(lvl * 0.5).toFixed(1),
     dodge:   Math.min(40, +(agi * 0.3).toFixed(1)),
-    critCh:  Math.min(60, +(lck * 0.5 + agi * 0.5).toFixed(1)),
+    critCh:  Math.min(60, +(lck * 0.4).toFixed(1)),
     critDmg: 150,
   };
+}
+
+// CDD §6.2: Momentum damage bonus is a step function, not linear
+function momentumDmgMult(m: number): number {
+  if (m >= 15) return 1.3;
+  if (m >= 10) return 1.2;
+  if (m >= 5)  return 1.1;
+  return 1.0;
 }
 
 export const DEFAULT_PLAYER_STATS: PlayerCombatStats = {
@@ -74,6 +89,7 @@ export function initCombatSession(
 
     pendingSignal: null,
     playerFreezeTicks: 0,
+    playerAttackCooldownTicks: 0,
     skillSlots,
     skillCooldowns: [0, 0, 0],
     pendingDodgeRoll: false,
@@ -209,7 +225,8 @@ export function playerAttack(
   dmgOverrideMult = 1,
 ): CombatSession {
   if (session.status !== 'active') return session;
-  if (session.playerFreezeTicks > 0) return session; // Stop-frame: hero frozen
+  if (session.playerFreezeTicks > 0) return session;
+  if (session.playerAttackCooldownTicks > 0) return session;
 
   const target = session.enemies.find(e => e.instanceId === targetInstanceId);
   if (!target) return session;
@@ -220,13 +237,14 @@ export function playerAttack(
   const derived = derivePlayerStats(session.playerStats);
   const isCrit = Math.random() * 100 < derived.critCh;
   const luckyMod = session.activeInstinctId === 'lucky' ? 0.9 : 1;
-  const momentumMult = 1 + (session.momentum - 1) * 0.05;
-  const weakMult = actualIsWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
-  const showtimeMult = session.showtimeActive ? 1.5 : 1;
-  const critMult = isCrit ? derived.critDmg / 100 : 1;
-  const stunMult = target.breakBarStunTicks > 0 ? 2 : 1; // ×2 during break stun
+  // CDD §6.2: Showtime ×3.5 replaces Momentum bonus (doesn't stack)
+  const showtimeMult  = session.showtimeActive ? 3.5 : 1;
+  const mMult         = session.showtimeActive ? 1.0 : momentumDmgMult(session.momentum);
+  const weakMult      = actualIsWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
+  const critMult      = isCrit ? derived.critDmg / 100 : 1;
+  const stunMult      = target.breakBarStunTicks > 0 ? 2 : 1;
 
-  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * momentumMult * weakMult * showtimeMult * critMult * stunMult * dmgOverrideMult));
+  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * mMult * weakMult * showtimeMult * critMult * stunMult * dmgOverrideMult));
 
   // Boss phase 1 shield: -50% incoming damage (removed by provoke skill in Block 3)
   const shieldMult = target.isBoss && target.currentPhase === 1 ? 0.5 : 1;
@@ -313,6 +331,7 @@ export function playerAttack(
     totalKilled,
     noHitStreak,
     weakSpotHits,
+    playerAttackCooldownTicks: 5, // 1 second cooldown between attacks
     log: [...session.log, ...logEntries],
   };
 
@@ -512,6 +531,11 @@ export function tick(session: CombatSession): CombatSession {
       ...next,
       skillCooldowns: [Math.max(0, cd0 - 1), Math.max(0, cd1 - 1), Math.max(0, cd2 - 1)],
     };
+  }
+
+  // Player attack cooldown (1 sec = 5 ticks)
+  if (next.playerAttackCooldownTicks > 0) {
+    next = { ...next, playerAttackCooldownTicks: next.playerAttackCooldownTicks - 1 };
   }
 
   // 2% chance per tick for a random event (not during active signal)

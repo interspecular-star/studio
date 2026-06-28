@@ -110,6 +110,7 @@ export type CombatSession = {
   pendingSignal: AttackSignal | null;
 
   playerFreezeTicks: number;    // hero can't act while > 0 (boss Stop-frame)
+  playerAttackCooldownTicks: number; // 1-sec cooldown between manual attacks (5 ticks)
 
   skillSlots: [SkillId | null, SkillId | null, SkillId | null];
   skillCooldowns: [number, number, number]; // ticks until ready
