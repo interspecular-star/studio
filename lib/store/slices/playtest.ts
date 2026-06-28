@@ -3,9 +3,21 @@ import type { Item, EquipmentSlot, ButtonAction } from '../../types';
 export const createPlaytestSlice = (set: any, get: any) => ({
   // === Playtest State ===
   resetPlaytestState: () => {
+    const progressionDefaults: Record<string, number> = { level: 1, exp: 0, souls: 0 };
+
+    // Step 1: Repair any corrupted defaultValues for progression stats (e.g. level stuck at 5)
+    get().variables.forEach((v: any) => {
+      if (v.name in progressionDefaults && v.defaultValue !== progressionDefaults[v.name]) {
+        get().updateVariable(v.id, { defaultValue: progressionDefaults[v.name] });
+      }
+    });
+
+    // Step 2: Build runtime values using the now-repaired store
     const state = get();
     const newVariableValues: Record<string, number | boolean | string> = {};
-    state.variables.forEach((v: any) => { newVariableValues[v.id] = v.defaultValue; });
+    state.variables.forEach((v: any) => {
+      newVariableValues[v.id] = v.name in progressionDefaults ? progressionDefaults[v.name] : v.defaultValue;
+    });
     Object.entries(state.startingInventory).forEach(([itemId, qty]) => {
       const item = state.items.find((i: Item) => i.id === itemId);
       if (item?.quantityVariableId) newVariableValues[item.quantityVariableId] = qty as number;

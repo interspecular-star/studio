@@ -61,4 +61,5 @@ export type StudioPage = {
   dialogueLines?: DialogueLine[];
   onEnter?: ButtonAction[];
   onDialogueEnd?: ButtonAction[];
+  protected?: boolean; // нельзя удалить из сайдбара
 };

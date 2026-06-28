@@ -4,6 +4,36 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UIWidget } from './store';
 
+// ─── Built-in presets ─────────────────────────────────────────────────────────
+// Всегда присутствуют, нельзя удалить или изменить (isLocked: true).
+
+const LOC_WIDGETS: UIWidget[] = [
+  { id: 'bi_village',  type: 'quickAction', layout: { x: 15, y: 5,  width: 70, height: 9, z: 10 }, text: { ru: '🏘️  Деревня',       en: '🏘️  Village'       }, action: { type: 'goToPage', pageId: 'village'           } },
+  { id: 'bi_combat',  type: 'quickAction', layout: { x: 15, y: 15, width: 70, height: 9, z: 10 }, text: { ru: '🎬  Выбор волны',    en: '🎬  Wave Select'    }, action: { type: 'goToPage', pageId: 'combat_wave_select' } },
+  { id: 'bi_forge',   type: 'quickAction', layout: { x: 15, y: 25, width: 70, height: 9, z: 10 }, text: { ru: '⚒️  Кузница',        en: '⚒️  Forge'          }, action: { type: 'goToPage', pageId: 'forge_01'           } },
+  { id: 'bi_tavern',  type: 'quickAction', layout: { x: 15, y: 35, width: 70, height: 9, z: 10 }, text: { ru: '🍺  Таверна',        en: '🍺  Tavern'         }, action: { type: 'goToPage', pageId: 'tavern_01'          } },
+  { id: 'bi_shop',    type: 'quickAction', layout: { x: 15, y: 45, width: 70, height: 9, z: 10 }, text: { ru: '🛒  Лавка',          en: '🛒  Shop'           }, action: { type: 'goToPage', pageId: 'shop_01'            } },
+  { id: 'bi_shaman',  type: 'quickAction', layout: { x: 15, y: 55, width: 70, height: 9, z: 10 }, text: { ru: '🔮  Шаманка',        en: '🔮  Shaman\'s'      }, action: { type: 'goToPage', pageId: 'shaman_01'          } },
+  { id: 'bi_mine',    type: 'quickAction', layout: { x: 15, y: 65, width: 70, height: 9, z: 10 }, text: { ru: '⛏️  Шахта',          en: '⛏️  Mine'           }, action: { type: 'goToPage', pageId: 'mine_01'            } },
+];
+
+export const BUILT_IN_PRESETS: WidgetPreset[] = [
+  {
+    id: '__builtin__default_locations',
+    name: 'Дефолтные локации',
+    description: 'Кнопки быстрого доступа ко всем базовым локациям игры',
+    category: 'scene',
+    tags: ['default', 'locations', 'navigation'],
+    thumbnail: null,
+    widgets: LOC_WIDGETS,
+    isLocked: true,
+    isDefault: false,
+    isFavorite: false,
+    createdAt: 0,
+    updatedAt: 0,
+  },
+];
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PresetCategory =
@@ -73,6 +103,7 @@ export const usePresetsStore = create<PresetsState>()(
       },
 
       updatePreset: (id, updates) => {
+        if (id.startsWith('__builtin__')) return; // built-in нельзя менять
         if (get().presets.find(p => p.id === id)?.isLocked && !('isLocked' in updates)) return;
         set(s => ({
           presets: s.presets.map(p =>
@@ -82,6 +113,7 @@ export const usePresetsStore = create<PresetsState>()(
       },
 
       deletePreset: (id) => {
+        if (id.startsWith('__builtin__')) return; // built-in нельзя удалить
         const preset = get().presets.find(p => p.id === id);
         if (!preset || preset.isLocked) return;
         set(s => ({ presets: s.presets.filter(p => p.id !== id) }));

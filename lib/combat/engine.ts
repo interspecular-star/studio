@@ -6,42 +6,34 @@ import type {
 import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS, DEFAULT_SKILLS, DEFAULT_SKILL_SLOTS } from '../types/combat';
 
 // ── Stat derivation ───────────────────────────────────────────────────────────
-// Canonical formulas — used by both engine and BalancePanel (imported there).
-// At base naked hero (str=5 agi=5 end=10 mag=5 lck=5 lvl=1):
-//   HP=100 MP=50 ATK=30 DEF=2 dodge=1.5% crit=5% critDmg=150%
+// Designer-set variables (health_max, mana_max, defense, crit_chance, crit_damage)
+// take priority over formula fallbacks.
+// At base naked hero (lvl=1 with default WorldPanel values):
+//   HP=100 MP=50 ATK=5 DEF=2(flat) dodge=1.5% crit=5% critDmg=×1.5
 
 export function derivePlayerStats(s: PlayerCombatStats) {
   const { str, agi, end: end_, mag, lck, lvl } = s;
-  // Formulas from CDD §2-3:
-  // ATK  = (STR×1.5 + weapon) × (1 + lvl×0.03)   — weapon=0 until equip system
-  // HP   = END×10 + lvl×5
-  // MP   = MAG×5
-  // DEF% = lvl×0.5  (equipment adds on top)
-  // Dodge = AGI×0.3%
-  // Crit  = LCK×0.4%
-  const levelMult = 1 + lvl * 0.03;
+  const levelMult = 1 + (lvl - 1) * 0.03;
   return {
-    hpMax:   end_ * 10 + lvl * 5,
-    mpMax:   mag * 5,
-    atk:     Math.max(1, Math.round(str * 1.5 * levelMult)),
-    defFlat: 0,
-    defPct:  +(lvl * 0.5).toFixed(1),
+    hpMax:   s.hpMax   !== undefined ? s.hpMax   : (end_ * 10 + lvl * 5),
+    mpMax:   s.mpMax   !== undefined ? s.mpMax   : (mag * 5),
+    atk:     Math.max(1, Math.round(str * levelMult)),
+    defFlat: s.defFlat !== undefined ? s.defFlat : 0,
+    defPct:  +((lvl - 1) * 0.5).toFixed(1),
     dodge:   Math.min(40, +(agi * 0.3).toFixed(1)),
-    critCh:  Math.min(60, +(lck * 0.4).toFixed(1)),
-    critDmg: 150,
+    critCh:  s.critCh  !== undefined ? s.critCh  : Math.min(60, +(lck * 0.4).toFixed(1)),
+    critDmg: s.critDmg !== undefined ? s.critDmg : 150,
   };
 }
 
-// CDD §6.2: Momentum damage bonus is a step function, not linear
+// Momentum = +1% ATK per point (linear). At cap 15 → +15%
 function momentumDmgMult(m: number): number {
-  if (m >= 15) return 1.3;
-  if (m >= 10) return 1.2;
-  if (m >= 5)  return 1.1;
-  return 1.0;
+  return 1 + m / 100;
 }
 
 export const DEFAULT_PLAYER_STATS: PlayerCombatStats = {
   str: 5, agi: 5, end: 10, mag: 5, lck: 5, lvl: 1,
+  hpMax: 100, mpMax: 50, defFlat: 2, critCh: 5, critDmg: 150,
 };
 
 // ── Session initialisation ────────────────────────────────────────────────────
@@ -107,7 +99,10 @@ export function initCombatSession(
     activeEventFlash: null,
     enragedTicks: 0,
 
-    rewards: { coins: 0, stallonkas: 0, xp: 0, items: [], vhsDropped: false },
+    silentKillerShield: false,
+    takeSpeedActive: false,
+
+    rewards: { coins: 0, stallonkas: 0, xp: 0, souls: 0, items: [], vhsDropped: false },
     log: [{ tick: 0, type: 'info', text: `Волна: ${wave.id} / сложность: ${difficulty}` }],
   };
 }
@@ -200,7 +195,8 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
     freezeCooldownTicks: 0,
     isBoss,
     tickSinceSpawn: 0,
-    attackCooldownTicks: baseCooldown(tier, false),
+    // take scenario: first spawned enemy has -15% attack cooldown (fires faster)
+    attackCooldownTicks: session.takeSpeedActive ? Math.round(baseCooldown(tier, false) * 0.85) : baseCooldown(tier, false),
     weakPointActive: false,
     weakPointTimer: wpPause,
   };
@@ -210,6 +206,7 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
     enemies: [...session.enemies, spawned],
     spawnQueue: rest,
     bossSpawned: isBoss || session.bossSpawned,
+    takeSpeedActive: false, // consumed after first spawn
     log: [...session.log, { tick: session.tick, type: 'enemySpawn', actorId: enemy.id, text: enemy.name.ru }],
   };
 }
@@ -235,16 +232,16 @@ export function playerAttack(
   const actualIsWeakSpot = target.weakPointActive;
 
   const derived = derivePlayerStats(session.playerStats);
-  const isCrit = Math.random() * 100 < derived.critCh;
-  const luckyMod = session.activeInstinctId === 'lucky' ? 0.9 : 1;
-  // CDD §6.2: Showtime ×3.5 replaces Momentum bonus (doesn't stack)
-  const showtimeMult  = session.showtimeActive ? 3.5 : 1;
-  const mMult         = session.showtimeActive ? 1.0 : momentumDmgMult(session.momentum);
-  const weakMult      = actualIsWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
-  const critMult      = isCrit ? derived.critDmg / 100 : 1;
-  const stunMult      = target.breakBarStunTicks > 0 ? 2 : 1;
+  const critCh  = derived.critCh + (session.activeInstinctId === 'lucky' ? 5 : 0); // lucky +5% crit
+  const isCrit  = Math.random() * 100 < critCh;
+  const mMult   = momentumDmgMult(session.momentum); // +1% per momentum point
+  const weakMult = actualIsWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
+  const critMult = isCrit ? derived.critDmg / 100 : 1;
+  const stunMult = target.breakBarStunTicks > 0 ? 2 : 1;
+  // old_school: +30% ATK at 0 mana
+  const oldSchoolMult = session.activeInstinctId === 'old_school' && session.playerMp === 0 ? 1.3 : 1;
 
-  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * mMult * weakMult * showtimeMult * critMult * stunMult * dmgOverrideMult));
+  const rawDmg = Math.max(1, Math.round(derived.atk * oldSchoolMult * mMult * weakMult * critMult * stunMult * dmgOverrideMult));
 
   // Boss phase 1 shield: -50% incoming damage (removed by provoke skill in Block 3)
   const shieldMult = target.isBoss && target.currentPhase === 1 ? 0.5 : 1;
@@ -269,7 +266,7 @@ export function playerAttack(
   let newBreakBar = target.breakBar;
   let newBreakBarStunTicks = target.breakBarStunTicks;
   if (target.isBoss && target.breakBarStunTicks === 0) {
-    const bbDmg = actualIsWeakSpot ? 15 : session.showtimeActive ? 40 : 8;
+    const bbDmg = actualIsWeakSpot ? 15 : 8;
     newBreakBar = Math.max(0, target.breakBar - bbDmg);
     if (newBreakBar === 0 && target.breakBar > 0) {
       newBreakBarStunTicks = 20; // 4 sec stun
@@ -340,18 +337,62 @@ export function playerAttack(
 }
 
 // ── Activate Showtime ─────────────────────────────────────────────────────────
+// Instant cinematic super-attack: deals ×3–5 ATK damage to the first enemy.
 
 export function activateShowtime(session: CombatSession): CombatSession {
-  if (session.showtime < 100 || session.showtimeActive) return session;
+  if (session.showtime < 100) return session;
+
+  const target = session.enemies[0];
+  const derived = derivePlayerStats(session.playerStats);
+
+  // No enemy present — consume bar, mark activated, no damage
+  if (!target) {
+    return checkScenarios({
+      ...session,
+      showtime: 0,
+      showtimeActivated: true,
+      log: [...session.log, { tick: session.tick, type: 'showtime', text: 'SHOWTIME! (нет цели)' }],
+    }, 'showtime');
+  }
+
+  const mult = 3 + Math.random() * 2;                          // 3.0–5.0×
+  const dmg  = Math.max(1, Math.round(derived.atk * mult));
+  const newHp = Math.max(0, target.hp - dmg);
+  const enemyDied = newHp <= 0;
+
+  // Showtime hits boss break bar hard (40 pts)
+  let updatedTarget = { ...target, hp: newHp };
+  if (target.isBoss && target.breakBarStunTicks === 0 && !enemyDied) {
+    const newBreakBar = Math.max(0, target.breakBar - 40);
+    const bbBroke = newBreakBar === 0 && target.breakBar > 0;
+    updatedTarget = {
+      ...updatedTarget,
+      breakBar: bbBroke ? target.breakBarMax : newBreakBar,
+      breakBarStunTicks: bbBroke ? 20 : target.breakBarStunTicks,
+    };
+  }
+
+  const newEnemies = enemyDied
+    ? session.enemies.filter(e => e.instanceId !== target.instanceId)
+    : session.enemies.map(e => e.instanceId === target.instanceId ? updatedTarget : e);
+
+  const totalKilled = session.totalKilled + (enemyDied ? 1 : 0);
+  const logEntries: CombatLogEntry[] = [
+    { tick: session.tick, type: 'showtime', value: dmg, text: `SHOWTIME! ×${mult.toFixed(1)} → ${dmg} урона` },
+  ];
+  if (enemyDied) logEntries.push({ tick: session.tick, type: 'enemyDeath', actorId: target.enemyId, value: totalKilled });
+
   const next: CombatSession = {
     ...session,
     showtime: 0,
-    showtimeActive: true,
-    showtimeTicks: 20,
     showtimeActivated: true,
-    log: [...session.log, { tick: session.tick, type: 'showtime', text: 'SHOWTIME!' }],
+    enemies: newEnemies,
+    totalKilled,
+    noHitStreak: enemyDied ? session.noHitStreak + 1 : session.noHitStreak,
+    log: [...session.log, ...logEntries],
   };
-  return checkScenarios(next, 'showtime');
+
+  return checkWaveCompletion(checkScenarios(next, 'showtime'));
 }
 
 // ── Enemy signal generation ───────────────────────────────────────────────────
@@ -388,7 +429,9 @@ export function playerReact(session: CombatSession, reaction: 'dodge' | 'parry')
 
   const signal = session.pendingSignal;
   const canParry = signal.type === 'yellow';
+  const canDodge = signal.type !== 'yellow'; // blue/red = dodge; yellow = parry only
   if (reaction === 'parry' && !canParry) return applyEnemyDamage(session);
+  if (reaction === 'dodge' && !canDodge) return applyEnemyDamage(session);
 
   const stuntmanBonus = session.activeInstinctId === 'stuntman' ? 1 : 0;
   const newMomentum = Math.min(15, session.momentum + 1 + stuntmanBonus);
@@ -476,15 +519,26 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
       : e
   );
 
+  // silent_killer: one-time shield — next hit doesn't reset momentum
+  const keepMomentum = session.silentKillerShield;
+
+  const hitLog: CombatLogEntry[] = [
+    { tick: session.tick, type: 'enemyAttack', actorId: signal.enemyInstanceId, value: finalDmg },
+  ];
+  if (keepMomentum) {
+    hitLog.push({ tick: session.tick, type: 'info', text: '🛡 Тихий убийца — Momentum сохранён!' });
+  }
+
   let next: CombatSession = {
     ...session,
     pendingSignal: null,
     enemies: enemiesAfterHit,
     playerHp: newHp,
-    momentum: 1,          // momentum resets on taking damage
+    momentum: keepMomentum ? session.momentum : 1,
     noDamageTicks: 0,
     noHitStreak: 0,
-    log: [...session.log, { tick: session.tick, type: 'enemyAttack', actorId: signal.enemyInstanceId, value: finalDmg }],
+    silentKillerShield: false, // consumed
+    log: [...session.log, ...hitLog],
   };
 
   if (died) {
@@ -710,8 +764,11 @@ export function useSkill(session: CombatSession, slotIndex: 0 | 1 | 2): CombatSe
       }
       break;
     }
-    case 'quick_potion':
-      next = { ...next, playerHp: Math.min(next.playerHpMax, next.playerHp + 50), potionUsed: true };
+    case 'quick_potion': {
+      const healAmt = Math.max(10, Math.round(next.playerHpMax * 0.5)); // 50% of max HP
+      next = { ...next, playerHp: Math.min(next.playerHpMax, next.playerHp + healAmt), potionUsed: true };
+      break;
+    }
       break;
   }
 
@@ -825,10 +882,20 @@ function checkScenarios(
     return { ...sp, completed: sp.completed || completed, failed: sp.failed || failed };
   });
 
+  // Apply scenario reward flags when newly completed
+  const wasCompleted = (id: string) => session.scenarioProgress.find(s => s.scenarioId === id)?.completed ?? false;
+  const nowCompleted = (id: string) => updatedProgress.find(s => s.scenarioId === id)?.completed ?? false;
+  const silentKillerShield = session.silentKillerShield ||
+    (!wasCompleted('silent_killer') && nowCompleted('silent_killer'));
+  const takeSpeedActive = session.takeSpeedActive ||
+    (!wasCompleted('take') && nowCompleted('take'));
+
   return {
     ...session,
     scenarioProgress: updatedProgress,
     showtime: Math.min(100, session.showtime + showtimeBonus),
+    silentKillerShield,
+    takeSpeedActive,
   };
 }
 
@@ -856,19 +923,29 @@ function calcRewards(session: CombatSession): CombatRewards {
   const killed = session.totalKilled;
 
   let coinMult = 1, xpMult = 1, stallMult = 1;
+  let soulsBonus = 0;
+  let legendaryLoot = false;
   for (const sp of session.scenarioProgress) {
     if (!sp.completed) continue;
-    if (sp.scenarioId === 'no_takes')     xpMult   += 0.3;
-    if (sp.scenarioId === 'bare_minimum') coinMult  += 0.2;
-    if (sp.scenarioId === 'no_cheating')  stallMult += 0.5;
+    if (sp.scenarioId === 'no_takes')     xpMult    += 0.3;
+    if (sp.scenarioId === 'bare_minimum') coinMult   += 0.2;
+    if (sp.scenarioId === 'no_cheating')  stallMult  += 0.5;
+    if (sp.scenarioId === 'full_chaos')   { coinMult *= 2; xpMult *= 2; }
+    if (sp.scenarioId === 'on_the_edge')  legendaryLoot = true; // ×3 всё + VHS гарантировано
+    if (sp.scenarioId === 'combo_master') soulsBonus += Math.max(1, Math.round(2 * mult)); // souls capture
+    if (sp.scenarioId === 'weak_spot')    stallMult  += 0.5; // редкий лут → Сталлонки
   }
 
-  const vhsDropped = session.scenarioProgress.some(s => s.scenarioId === 'method_actor' && s.completed);
+  if (legendaryLoot) { coinMult *= 3; xpMult *= 3; stallMult *= 3; }
+
+  const vhsDropped = legendaryLoot ||
+    session.scenarioProgress.some(s => s.scenarioId === 'method_actor' && s.completed);
 
   return {
     coins:      Math.round(80  * mult * killed * coinMult),
     xp:         Math.round(40  * mult          * xpMult),
     stallonkas: Math.round(8   * mult          * stallMult),
+    souls:      soulsBonus,
     items:      [],
     vhsDropped,
   };

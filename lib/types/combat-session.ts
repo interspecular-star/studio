@@ -71,6 +71,7 @@ export type CombatRewards = {
   coins: number;
   stallonkas: number;
   xp: number;
+  souls: number;
   items: string[];
   vhsDropped: boolean;
 };
@@ -82,6 +83,12 @@ export type PlayerCombatStats = {
   mag: number;
   lck: number;
   lvl: number;
+  // Designer-set variable overrides — when present, these replace formula-derived values
+  hpMax?: number;    // health_max variable (100 by default)
+  mpMax?: number;    // mana_max variable (50 by default)
+  defFlat?: number;  // defense variable — flat damage reduction
+  critCh?: number;   // crit_chance variable (%)
+  critDmg?: number;  // crit_damage variable × 100 (1.5 → 150)
 };
 
 export type CombatSession = {
@@ -130,6 +137,10 @@ export type CombatSession = {
   randomEventsTriggered: number;
   activeEventFlash: EventFlash | null;
   enragedTicks: number; // camera_malfunction: enemies deal +30% dmg
+
+  // Scenario reward flags (consumed once applied)
+  silentKillerShield: boolean; // silent_killer: next damage hit won't reset momentum
+  takeSpeedActive: boolean;    // take: next spawned enemy has -15% attack cooldown
 
   rewards: CombatRewards;
   log: CombatLogEntry[];

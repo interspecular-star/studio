@@ -165,8 +165,8 @@ function StatsTab() {
       <p className="text-[10px] text-[var(--studio-text-muted)] px-0.5 leading-relaxed">
         HP = END×10 + ур×5<br />
         MP = MAG×5<br />
-        ATK = (STR×1.5) × (1+ур×0.03)<br />
-        DEF% = ур×0.5 (+ экипировка)<br />
+        ATK = STR × (1+(ур-1)×0.03) — при ур=1 равно STR<br />
+        DEF% = (ур-1)×0.5 — при ур=1 равно 0<br />
         Уворот = min(40, AGI×0.3)%<br />
         Крит = min(60, LCK×0.4)%
       </p>

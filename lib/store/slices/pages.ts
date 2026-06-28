@@ -43,6 +43,8 @@ export const createPagesSlice = (set: any, get: any) => ({
   },
 
   deletePage: (id: string) => {
+    const page = get().pages.find((p: StudioPage) => p.id === id);
+    if (page?.protected) return; // защищённые страницы нельзя удалить
     set((s: any) => {
       const filtered = s.pages.filter((p: StudioPage) => p.id !== id);
       return {

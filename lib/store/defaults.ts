@@ -179,6 +179,7 @@ const BUILDING_CARDS = [
 
 const villagePage = (): StudioPage => ({
   id: 'village',
+  protected: true,
   title: { ru: 'Деревня — Табуреткино', en: 'Village — Taburetkino' },
   background: '',
   speaker: 'none',
@@ -211,6 +212,7 @@ const villagePage = (): StudioPage => ({
 
 const buildingStub = (id: string, icon: string, nameRu: string, nameEn: string, npcRu: string): StudioPage => ({
   id,
+  protected: true,
   title: { ru: nameRu, en: nameEn },
   background: '',
   speaker: 'none',
@@ -233,6 +235,7 @@ const buildingStub = (id: string, icon: string, nameRu: string, nameEn: string, 
 
 const combatWaveSelectPage = (): StudioPage => ({
   id: 'combat_wave_select',
+  protected: true,
   title: { ru: 'Выбор волны', en: 'Wave Select' },
   background: '',
   speaker: 'none',

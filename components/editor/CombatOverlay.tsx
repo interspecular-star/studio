@@ -49,12 +49,27 @@ function SimulationPanel({ waveId, difficulty }: { waveId: string; difficulty: D
     const val = playtestState.variableValues[v.id];
     return typeof val === 'number' ? val : (typeof v.defaultValue === 'number' ? v.defaultValue : fallback);
   };
+  const optVar = (name: string): number | undefined => {
+    const v = variables.find((v: any) => v.name === name);
+    if (!v) return undefined;
+    const val = playtestState.variableValues[v.id];
+    return typeof val === 'number' ? val : (typeof v.defaultValue === 'number' ? v.defaultValue : undefined);
+  };
 
   const runSim = () => {
     if (!wave) return;
     setRunning(true); setResult(null);
     setTimeout(() => {
-      const ps = { str: numVar('strength', 5), agi: numVar('agility', 5), end: numVar('endurance', 10), mag: numVar('magic', 5), lck: numVar('luck', 5), lvl: numVar('level', 1) };
+      const critDmgRaw = optVar('crit_damage');
+      const ps = {
+        str: numVar('strength', 5), agi: numVar('agility', 5), end: numVar('endurance', 10),
+        mag: numVar('magic', 5), lck: numVar('luck', 5), lvl: numVar('level', 1),
+        hpMax:   optVar('health_max'),
+        mpMax:   optVar('mana_max'),
+        defFlat: optVar('defense'),
+        critCh:  optVar('crit_chance'),
+        critDmg: critDmgRaw !== undefined ? Math.round(critDmgRaw * 100) : undefined,
+      };
       setResult(simulateCombat(wave, difficulty, enemies, bosses, ps, null, iters));
       setRunning(false);
     }, 0);
@@ -468,15 +483,18 @@ function PlayerBars({ session }: { session: CombatSession }) {
   );
 }
 
-function MomentumBlock({ momentum, showtimeActive, enragedTicks }: { momentum: number; showtimeActive: boolean; enragedTicks: number }) {
-  const color = showtimeActive ? C.yellow : momentum >= 10 ? C.pink : C.yellow;
+function MomentumBlock({ momentum, enragedTicks }: { momentum: number; enragedTicks: number }) {
+  const color = momentum >= 10 ? C.pink : C.yellow;
   return (
     <div className="flex flex-col items-center">
       <div className="font-black leading-none transition-all" style={{ fontSize: '3rem', color, fontFamily: 'monospace', textShadow: `0 0 20px ${color}88` }}>
         ×{momentum}
       </div>
-      <div className="text-[9px] font-semibold tracking-widest mt-0.5" style={{ color: C.muted }}>
-        {showtimeActive ? 'SHOWTIME!' : enragedTicks > 0 ? '📷 ЯРОСТЬ' : 'MOMENTUM'}
+      <div className="text-[9px] font-bold mt-0.5 font-mono" style={{ color }}>
+        +{momentum}% УРОН
+      </div>
+      <div className="text-[9px] font-semibold tracking-widest" style={{ color: C.muted }}>
+        {enragedTicks > 0 ? '📷 ЯРОСТЬ' : 'MOMENTUM'}
       </div>
     </div>
   );
@@ -647,17 +665,20 @@ function EnemyZone({ session, onAttack }: { session: CombatSession; onAttack: (i
   );
 }
 
-function ShowtimeBar({ showtime, active }: { showtime: number; active: boolean }) {
-  const color = active ? C.yellow : C.cyan;
+function ShowtimeBar({ showtime }: { showtime: number }) {
+  const full  = showtime >= 100;
+  const color = full ? C.yellow : C.cyan;
   return (
     <div className="flex flex-col gap-1 w-full max-w-md mx-auto">
       <div className="flex justify-between text-[10px] font-bold" style={{ color }}>
-        <span style={{ letterSpacing: '0.15em' }}>SHOWTIME</span>
-        <span className="font-mono">{showtime}%</span>
+        <span style={{ letterSpacing: '0.15em' }}>
+          SHOWTIME {full ? <span className="animate-pulse">⚡ ГОТОВ! · Alt</span> : ''}
+        </span>
+        <span className="font-mono">{Math.min(100, showtime)}%</span>
       </div>
       <div className="h-2 rounded-full overflow-hidden" style={{ background: C.dim }}>
         <div className="h-full rounded-full transition-all duration-150"
-          style={{ width: `${showtime}%`, background: `linear-gradient(90deg, ${C.cyan}, ${color})`, boxShadow: active ? `0 0 12px ${C.yellow}` : 'none' }} />
+          style={{ width: `${Math.min(100, showtime)}%`, background: `linear-gradient(90deg, ${C.cyan}, ${color})`, boxShadow: full ? `0 0 16px ${C.yellow}` : 'none' }} />
       </div>
     </div>
   );
@@ -675,7 +696,7 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
 }) {
   const hasPending  = !!session.pendingSignal;
   const canParry    = session.pendingSignal?.type === 'yellow';
-  const canShowtime = session.showtime >= 100 && !session.showtimeActive;
+  const canShowtime = session.showtime >= 100;
   const frozen      = session.playerFreezeTicks > 0;
   const hasEnemy    = session.enemies.length > 0;
   const atkOnCd     = session.playerAttackCooldownTicks > 0;
@@ -747,8 +768,13 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
       <div className="flex gap-2">
         <button onClick={onShowtime} disabled={!canShowtime || isAuto}
           className="rounded-xl px-4 py-2 text-xs font-black transition-all disabled:opacity-30"
-          style={{ background: canShowtime ? C.yellow : C.dim, color: canShowtime ? '#0a0910' : C.muted, border: `1px solid ${canShowtime ? C.yellow : 'transparent'}` }}>
-          ✨ SHOWTIME
+          style={{
+            background: canShowtime ? C.yellow : C.dim,
+            color: canShowtime ? '#0a0910' : C.muted,
+            border: `2px solid ${canShowtime ? C.yellow : 'transparent'}`,
+            boxShadow: canShowtime ? `0 0 20px ${C.yellow}88` : 'none',
+          }}>
+          ✨ SHOWTIME {canShowtime ? '(Alt)' : ''}
         </button>
         <button onClick={() => setIsAuto(!isAuto)}
           className="rounded-xl px-4 py-2 text-xs font-semibold transition-all"
@@ -781,28 +807,34 @@ function ScenarioChips({ session }: { session: CombatSession }) {
 }
 
 function LogTicker({ log }: { log: CombatLogEntry[] }) {
-  const recent = log.slice(-4).reverse();
-  const fmt = (e: CombatLogEntry): string => {
+  const recent = log.slice(-5).reverse();
+  const fmt = (e: CombatLogEntry): { text: string; color: string } => {
     switch (e.type) {
-      case 'playerAttack': return `⚔ ${e.value}${e.isCrit ? ' КРИТ' : ''}${e.isWeakSpot ? ' 🎯' : ''}`;
-      case 'enemyAttack':  return `💥 −${e.value}`;
-      case 'playerDodge':  return e.text === 'passive' ? '💨 уклон (пасс.)' : '💨 уклон';
-      case 'playerParry':  return '🛡 парирование';
-      case 'enemyDeath':   return `☠ враг #${e.value}`;
-      case 'showtime':     return '✨ SHOWTIME!';
-      case 'stagger':      return '⚡ Stagger!';
-      case 'phaseChange':  return `🔥 Фаза ${e.value}`;
-      case 'randomEvent':  return `🎲 ${e.text ?? ''}`;
-      default:             return e.text ?? e.type;
+      case 'playerAttack': return {
+        text: `⚔ ${e.value}${e.isCrit ? ' ★КРИТ!' : ''}${e.isWeakSpot ? ' 🎯' : ''}`,
+        color: e.isCrit ? C.yellow : C.text,
+      };
+      case 'enemyAttack':  return { text: `💥 −${e.value}`, color: C.red };
+      case 'playerDodge':  return { text: e.text === 'passive' ? '💨 уклон (пасс.)' : '💨 уклон', color: C.cyan };
+      case 'playerParry':  return { text: '🛡 парирование', color: C.yellow };
+      case 'enemyDeath':   return { text: `☠ враг убит`, color: C.pink };
+      case 'showtime':     return { text: e.value ? `✨ SHOWTIME ${e.value} урона!` : '✨ SHOWTIME!', color: C.yellow };
+      case 'stagger':      return { text: '⚡ Stagger!', color: '#aa55ff' };
+      case 'phaseChange':  return { text: `🔥 Фаза ${e.value}`, color: C.pink };
+      case 'randomEvent':  return { text: `🎲 ${e.text ?? ''}`, color: C.cyan };
+      default:             return { text: e.text ?? e.type, color: C.muted };
     }
   };
   return (
     <div className="flex flex-col gap-0.5 min-w-[160px]">
-      {recent.map((e, i) => (
-        <div key={i} className="text-[9px] font-mono truncate" style={{ color: i === 0 ? C.text : C.muted + '77', opacity: 1 - i * 0.2 }}>
-          {fmt(e)}
-        </div>
-      ))}
+      {recent.map((e, i) => {
+        const { text, color } = fmt(e);
+        return (
+          <div key={i} className="text-[9px] font-mono truncate font-semibold" style={{ color, opacity: 1 - i * 0.18 }}>
+            {text}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -821,6 +853,52 @@ function CombatHUD({ session }: { session: CombatSession }) {
   })));
 
   const [isAuto, setIsAuto] = useState(false);
+
+  // ── Showtime badge + border glow ─────────────────────────────────────────
+  const [flashVisible,  setFlashVisible]  = useState(false);
+  const [flashOpacity,  setFlashOpacity]  = useState(0);
+  const [badgeVisible,  setBadgeVisible]  = useState(false);
+  const [badgeOpacity,  setBadgeOpacity]  = useState(0);
+  const [flashDmg,      setFlashDmg]      = useState(0);
+  const [flashMult,     setFlashMult]     = useState(0);
+  const lastShowtimeCountRef = useRef(0);
+  const logRef               = useRef(session.log);
+  logRef.current = session.log;
+
+  const showtimeCount = session.log.filter(e => e.type === 'showtime').length;
+
+  useEffect(() => {
+    if (showtimeCount <= lastShowtimeCountRef.current) return;
+    lastShowtimeCountRef.current = showtimeCount;
+
+    const log = logRef.current;
+    let dmg = 0; let mult = 0;
+    for (let i = log.length - 1; i >= 0; i--) {
+      if (log[i].type === 'showtime') {
+        dmg = log[i].value ?? 0;
+        // parse "SHOWTIME! ×3.7 → 42 урона" format
+        const m = log[i].text?.match(/×([\d.]+)/);
+        mult = m ? parseFloat(m[1]) : 0;
+        break;
+      }
+    }
+    setFlashDmg(dmg); setFlashMult(mult);
+
+    // border glow
+    setFlashVisible(true); setFlashOpacity(1);
+    const r1 = requestAnimationFrame(() => requestAnimationFrame(() => setFlashOpacity(0)));
+    const t1 = setTimeout(() => setFlashVisible(false), 1900);
+
+    // damage badge
+    setBadgeVisible(true); setBadgeOpacity(1);
+    const r2 = requestAnimationFrame(() => requestAnimationFrame(() => {
+      setTimeout(() => setBadgeOpacity(0), 800);
+    }));
+    const t2 = setTimeout(() => setBadgeVisible(false), 1900);
+
+    return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); clearTimeout(t1); clearTimeout(t2); };
+  }, [showtimeCount]);
+
   const target = session.enemies[0] ?? null;
   const frozen = session.playerFreezeTicks > 0;
   const activeInstinct = DEFAULT_INSTINCTS.find(i => i.id === session.activeInstinctId);
@@ -845,6 +923,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         }
         case 'ControlLeft': e.preventDefault(); a.combatPlayerDodge(); break;
         case 'ShiftLeft':   e.preventDefault(); a.combatPlayerParry(); break;
+        case 'AltLeft':     e.preventDefault(); if (s.showtime >= 100) a.combatActivateShowtime(); break;
         case 'Digit1':      a.combatUseSkill(0); break;
         case 'Digit2':      a.combatUseSkill(1); break;
         case 'Digit3':      a.combatUseSkill(2); break;
@@ -864,7 +943,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         s.pendingSignal.type === 'yellow' ? a.combatPlayerParry() : a.combatPlayerDodge();
         return;
       }
-      if (s.showtime >= 100 && !s.showtimeActive) { a.combatActivateShowtime(); return; }
+      if (s.showtime >= 100) { a.combatActivateShowtime(); return; }
       if (s.enemies.length > 0 && s.playerAttackCooldownTicks === 0) { a.combatPlayerAttack(s.enemies[0].instanceId, false); return; }
     }, 80);
     return () => clearInterval(id);
@@ -873,10 +952,19 @@ function CombatHUD({ session }: { session: CombatSession }) {
   return (
     <div className="absolute inset-0 flex flex-col" style={{ background: C.bg, fontFamily: 'monospace' }}>
 
+      {/* ── SHOWTIME BORDER GLOW ─────────────────────────────── */}
+      {flashVisible && (
+        <div className="absolute inset-0 z-50 pointer-events-none"
+          style={{ opacity: flashOpacity, transition: 'opacity 1.8s ease-out' }}>
+          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at center, ${C.yellow}22 0%, transparent 65%)` }} />
+          <div style={{ border: `3px solid ${C.yellow}99`, position: 'absolute', inset: 6, borderRadius: 16, boxShadow: `0 0 40px ${C.yellow}55, inset 0 0 30px ${C.yellow}0a` }} />
+        </div>
+      )}
+
       {/* ── TOP BAR ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between px-4 pt-3 pb-2 gap-4 shrink-0">
         <PlayerBars session={session} />
-        <MomentumBlock momentum={session.momentum} showtimeActive={session.showtimeActive} enragedTicks={session.enragedTicks} />
+        <MomentumBlock momentum={session.momentum} enragedTicks={session.enragedTicks} />
         <WaveProgress session={session} />
       </div>
 
@@ -902,6 +990,25 @@ function CombatHUD({ session }: { session: CombatSession }) {
         )}
       </div>
 
+      {/* ── SHOWTIME DAMAGE BADGE ───────────────────────────── */}
+      {badgeVisible && flashDmg > 0 && (
+        <div className="flex items-center justify-center shrink-0 pointer-events-none"
+          style={{ opacity: badgeOpacity, transition: 'opacity 1.0s ease-out', minHeight: 40 }}>
+          <div className="flex items-baseline gap-2 rounded-xl px-5 py-2"
+            style={{ background: `${C.yellow}18`, border: `1px solid ${C.yellow}66`, boxShadow: `0 0 24px ${C.yellow}44` }}>
+            {flashMult > 0 && (
+              <span className="font-black font-mono" style={{ fontSize: '1rem', color: C.yellow }}>
+                ×{flashMult.toFixed(1)}
+              </span>
+            )}
+            <span className="font-black font-mono" style={{ fontSize: '1.5rem', color: C.text, textShadow: `0 0 16px ${C.yellow}` }}>
+              {flashDmg}
+            </span>
+            <span className="font-bold" style={{ fontSize: '0.75rem', color: C.yellow + 'cc' }}>урона</span>
+          </div>
+        </div>
+      )}
+
       {/* ── ENEMY ZONE (center) ─────────────────────────────── */}
       <div className="flex-1 flex items-center justify-center px-4 py-2">
         <EnemyZone session={session} onAttack={(id) => !isAuto && combatPlayerAttack(id, false)} />
@@ -909,7 +1016,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
 
       {/* ── HERO SECTION ────────────────────────────────────── */}
       <div className="flex flex-col items-center gap-2 px-4 pb-2 shrink-0">
-        <ShowtimeBar showtime={session.showtime} active={session.showtimeActive} />
+        <ShowtimeBar showtime={session.showtime} />
         <div className="text-xl font-black tracking-[0.4em]" style={{ color: C.cyan, textShadow: `0 0 16px ${C.cyan}66` }}>
           S L A Y
         </div>
@@ -1014,6 +1121,7 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
               { icon: '💰', label: 'Монеты', value: session.rewards.coins },
               { icon: '⭐', label: 'Опыт', value: session.rewards.xp },
               { icon: '🎞', label: 'Сталлонки', value: session.rewards.stallonkas },
+              ...(session.rewards.souls > 0 ? [{ icon: '💀', label: 'Души', value: session.rewards.souls }] : []),
             ].map(({ icon, label, value }) => (
               <div key={label} className="flex flex-col items-center gap-0.5">
                 <span className="text-base">{icon}</span>

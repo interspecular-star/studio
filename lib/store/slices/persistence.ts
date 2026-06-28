@@ -150,7 +150,21 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         snappingGuide: null,
         snapEnabled: parsed.snapEnabled ?? true,
         items: parsed.items || [],
-        variables: parsed.variables || [],
+        variables: (() => {
+          const loaded: any[] = parsed.variables || [];
+          // Ensure luck and magic exist as player stats (may be missing from older saves)
+          const ensure = [
+            { name: 'luck',  displayName: { ru: 'Удача',  en: 'Luck'  }, type: 'number', defaultValue: 5, category: 'player' },
+            { name: 'magic', displayName: { ru: 'Магия',  en: 'Magic' }, type: 'number', defaultValue: 5, category: 'player' },
+          ];
+          const result = [...loaded];
+          for (const stat of ensure) {
+            if (!loaded.some((v: any) => v.name === stat.name)) {
+              result.push({ id: `player_${stat.name}_auto`, ...stat });
+            }
+          }
+          return result;
+        })(),
         backgrounds: loadedBackgrounds,
         uiAssets: parsed.uiAssets || [],
         speakers: parsed.speakers || createDefaultSpeakers(),

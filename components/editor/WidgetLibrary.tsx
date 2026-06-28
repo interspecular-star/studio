@@ -9,7 +9,7 @@ import {
 import { toast } from 'sonner';
 
 import { useStudioStore } from '@/lib/store';
-import { usePresetsStore, type WidgetPreset, type PresetCategory, PRESET_CATEGORY_LABELS } from '@/lib/presetsStore';
+import { usePresetsStore, BUILT_IN_PRESETS, type WidgetPreset, type PresetCategory, PRESET_CATEGORY_LABELS } from '@/lib/presetsStore';
 import {
   WIDGET_CATALOG, WIDGET_CATEGORY_LABELS, catalogByCategory,
   makeWidgetFromDefinition, type WidgetCatalogCategory,
@@ -223,10 +223,11 @@ type NavCategory = string; // WidgetCatalogCategory | PresetCategory | 'all' | '
 export default function WidgetLibrary() {
   const { isWidgetLibraryOpen, closeWidgetLibrary, selectedPageId, addUIWidget, pages } = useStudioStore();
   const {
-    presets, addPreset, updatePreset, deletePreset, duplicatePreset,
+    presets: userPresets, addPreset, updatePreset, deletePreset, duplicatePreset,
     setDefaultPreset, toggleFavorite, toggleLock,
     importPresetsFromJSON, exportPresetToJSON, exportAllToJSON,
   } = usePresetsStore();
+  const presets = [...BUILT_IN_PRESETS, ...userPresets];
 
   const [section, setSection] = useState<NavSection>('presets');
   const [category, setCategory] = useState<NavCategory>('all');

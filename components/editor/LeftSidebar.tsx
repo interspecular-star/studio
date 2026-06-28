@@ -209,10 +209,17 @@ const PageRow = React.memo(function PageRow({ pageId, actId, ownIndex }: PageRow
           className={`p-1 rounded hover:bg-black/10 ${isActive ? 'text-[#1C1814]' : 'text-[var(--studio-text-muted)]'}`}>
           <Copy className="h-3 w-3" />
         </button>
-        <button title="Удалить" onClick={e => { e.stopPropagation(); deletePage(pageId); toast.info('Страница удалена'); }}
-          className={`p-1 rounded hover:bg-black/10 ${isActive ? 'text-[#1C1814] hover:text-red-900' : 'text-[var(--danger)]'}`}>
-          <Trash2 className="h-3 w-3" />
-        </button>
+        {page.protected ? (
+          <span title="Системная страница — удаление заблокировано"
+            className={`p-1 rounded ${isActive ? 'text-[#1C1814]/40' : 'text-[var(--studio-text-muted)]/40'}`}>
+            <Lock className="h-3 w-3" />
+          </span>
+        ) : (
+          <button title="Удалить" onClick={e => { e.stopPropagation(); deletePage(pageId); toast.info('Страница удалена'); }}
+            className={`p-1 rounded hover:bg-black/10 ${isActive ? 'text-[#1C1814] hover:text-red-900' : 'text-[var(--danger)]'}`}>
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   );

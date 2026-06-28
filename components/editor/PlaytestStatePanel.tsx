@@ -5,15 +5,11 @@ import { useStudioStore, type Variable, type Item, EquipmentSlotLabels } from '@
 import { getCurrentPlayerAvatar } from '@/components/editor/TopResourceBar';
 import {
   getEffectivePlayerStat,
-  getTotalDamage,
-  getEffectiveCritChance,
-  getEffectiveCritDamage,
-  getEquippedWeaponName,
-  getEquippedWeaponDamage,
-  getEquippedDefense,
   getEquippedItems,
   getAllEquippedItemIds,
+  getEquippedWeaponName,
 } from '@/lib/store';
+import { derivePlayerStats } from '@/lib/combat/engine';
 import { RefreshCw, Sword, Shield } from 'lucide-react';
 
 export default function PlaytestStatePanel() {
@@ -21,6 +17,7 @@ export default function PlaytestStatePanel() {
     variables,
     items,
     playtestState,
+    combatSession,
     resetPlaytestState,
     loadPlaytestProgress,
     clearPlaytestSave,
@@ -59,29 +56,36 @@ export default function PlaytestStatePanel() {
     item.quantityVariableId || startingInventory[item.id] !== undefined
   );
 
-  // === Combat preview calculations (the main visual feedback) ===
-  const effectiveStrength = getEffectivePlayerStat('strength', variables, items, playtestState);
-  const strengthVar = variables.find(v => v.name === 'strength');
-  const baseStrength = strengthVar ? Number(getCurrentValue(strengthVar) ?? 0) : 0;
+  // === Combat stats — designer-set variables take priority over formula fallbacks ===
+  const numVar = (name: string, fallback: number) => {
+    const v = variables.find((v: Variable) => v.name === name);
+    if (!v) return fallback;
+    const val = playtestState.variableValues[v.id];
+    return typeof val === 'number' ? val : (typeof v.defaultValue === 'number' ? v.defaultValue : fallback);
+  };
+  const optVar = (name: string): number | undefined => {
+    const v = variables.find((v: Variable) => v.name === name);
+    if (!v) return undefined;
+    const val = playtestState.variableValues[v.id];
+    return typeof val === 'number' ? val : typeof v.defaultValue === 'number' ? v.defaultValue : undefined;
+  };
 
-  const totalDamage = getTotalDamage(variables, items, playtestState);
-  const weaponDamage = getEquippedWeaponDamage(items, playtestState);
+  const combatStats = {
+    str: numVar('strength', 5),
+    agi: numVar('agility', 5),
+    end: numVar('endurance', 10),
+    mag: numVar('magic', 5),
+    lck: numVar('luck', 5),
+    lvl: numVar('level', 1),
+    hpMax:   optVar('health_max'),
+    mpMax:   optVar('mana_max'),
+    defFlat: optVar('defense'),
+    critCh:  optVar('crit_chance'),
+    critDmg: (() => { const v = optVar('crit_damage'); return v !== undefined ? Math.round(v * 100) : undefined; })(),
+  };
+  const derived = derivePlayerStats(combatStats);
+
   const equippedWeaponName = getEquippedWeaponName(items, playtestState);
-
-  const effectiveCritChance = getEffectiveCritChance(variables, items, playtestState);
-  const baseCritChanceVar = variables.find(v => v.name === 'crit_chance');
-  const baseCritChance = baseCritChanceVar ? Number(getCurrentValue(baseCritChanceVar) ?? 5) : 5;
-
-  const effectiveCritDamage = getEffectiveCritDamage(variables, items, playtestState);
-  const baseCritDamageVar = variables.find(v => v.name === 'crit_damage');
-  const baseCritDamage = baseCritDamageVar ? Number(getCurrentValue(baseCritDamageVar) ?? 1.5) : 1.5;
-
-  // Defense calculations (аналогично урону)
-  const defenseVar = variables.find(v => v.name === 'defense');
-  const baseDefense = defenseVar ? Number(getCurrentValue(defenseVar) ?? 0) : 0;
-  const equippedDefense = getEquippedDefense(items, playtestState);
-  const totalDefense = baseDefense + equippedDefense;
-
   const equippedItems = getEquippedItems(items, getAllEquippedItemIds(playtestState));
   const equippableItems = items.filter(i => i.isEquippable);
 
@@ -143,103 +147,117 @@ export default function PlaytestStatePanel() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {/* =========================================================
-           ВИЗУАЛЬНЫЙ ФИДБЭК — САМОЕ ВАЖНОЕ ДЛЯ PLAYTEST
+           В БОЮ — реалтайм если идёт бой, иначе базовые значения
            ========================================================= */}
         <div className="rounded-lg border border-[var(--studio-accent)]/40 bg-[#1C1814] p-3">
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--studio-accent)]">
               <Sword className="h-4 w-4" />
-              В БОЮ — ИТОГОВЫЕ ХАРАКТЕРИСТИКИ
+              {combatSession?.status === 'active' ? 'В БОЮ — РЕАЛТАЙМ' : 'В БОЮ — СТАРТ'}
             </div>
-            <button
-              onClick={handleResetEquipment}
-              className="text-[10px] px-2 py-0.5 rounded border border-[var(--studio-border)] hover:bg-[var(--studio-bg-panel)] text-[var(--studio-text-muted)]"
-              title="Снять всю экипировку"
-            >
-              Сбросить экипировку
-            </button>
+            {equippedWeaponName && (
+              <span className="text-[10px] text-[var(--studio-text-muted)]">{equippedWeaponName}</span>
+            )}
           </div>
 
-          {/* Main combat numbers — big visual feedback */}
-          <div className="space-y-2">
-            {/* Strength + bonuses */}
-            <div className="flex items-baseline justify-between rounded bg-[#161310] px-3 py-2">
-              <div>
-                <div className="text-xs text-[var(--studio-text-muted)]">СИЛА ГГ</div>
-                <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
-                  База {baseStrength} {effectiveStrength !== baseStrength && `+ ${Number(effectiveStrength - baseStrength)} от предметов`}
+          {combatSession?.status === 'active' ? (
+            /* ── АКТИВНЫЙ БОЙ ── */
+            <>
+              {/* HP / MP bars */}
+              <div className="grid grid-cols-2 gap-1.5 mb-2">
+                <div className="rounded bg-[#161310] px-2.5 py-1.5">
+                  <div className="text-[10px] text-[var(--studio-text-muted)]">HP</div>
+                  <div className="font-mono text-base font-bold tabular-nums" style={{ color: combatSession.playerHp / combatSession.playerHpMax < 0.25 ? '#ff4444' : 'var(--studio-accent)' }}>
+                    {combatSession.playerHp} <span className="text-xs font-normal text-[var(--studio-text-muted)]">/ {combatSession.playerHpMax}</span>
+                  </div>
+                  <div className="mt-1 h-1 rounded-full overflow-hidden bg-[var(--studio-border)]">
+                    <div className="h-full rounded-full" style={{ width: `${(combatSession.playerHp / combatSession.playerHpMax) * 100}%`, background: combatSession.playerHp / combatSession.playerHpMax < 0.25 ? '#ff4444' : '#e55a5a' }} />
+                  </div>
+                </div>
+                <div className="rounded bg-[#161310] px-2.5 py-1.5">
+                  <div className="text-[10px] text-[var(--studio-text-muted)]">MP</div>
+                  <div className="font-mono text-base font-bold text-[var(--studio-accent)] tabular-nums">
+                    {combatSession.playerMp} <span className="text-xs font-normal text-[var(--studio-text-muted)]">/ {combatSession.playerMpMax}</span>
+                  </div>
+                  <div className="mt-1 h-1 rounded-full overflow-hidden bg-[var(--studio-border)]">
+                    <div className="h-full rounded-full bg-cyan-400" style={{ width: `${(combatSession.playerMp / combatSession.playerMpMax) * 100}%` }} />
+                  </div>
                 </div>
               </div>
-              <div className="font-mono text-2xl font-semibold text-[var(--studio-accent)] tabular-nums">
-                {effectiveStrength}
-              </div>
-            </div>
 
-            {/* Weapon + total damage — the key number user asked for */}
-            <div className="flex items-baseline justify-between rounded bg-[#161310] px-3 py-2 border border-[var(--studio-accent)]/30">
-              <div>
-                <div className="text-xs text-[var(--studio-text-muted)] flex items-center gap-1.5">
-                  <span>ОРУЖИЕ</span>
-                  {equippedWeaponName && <span className="text-[var(--studio-accent)]">• {equippedWeaponName}</span>}
+              {/* ATK with momentum */}
+              <div className="flex items-center justify-between rounded bg-[#161310] px-3 py-2 border border-[var(--studio-accent)]/30 mb-2">
+                <div>
+                  <div className="text-xs text-[var(--studio-text-muted)]">УРОН (ATK)</div>
+                  <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
+                    {derived.atk} × (1+{combatSession.momentum}%) моментум
+                  </div>
                 </div>
-                <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
-                  {weaponDamage > 0 ? `+${weaponDamage} урона оружия` : 'Нет экипированного оружия'}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] text-[var(--studio-text-muted)]">ИТОГОВЫЙ УРОН</div>
-                <div className="font-mono text-3xl font-bold text-[#E8D4A0] tabular-nums leading-none mt-0.5">
-                  {totalDamage}
-                </div>
-              </div>
-            </div>
-
-            {/* Defense block */}
-            <div className="flex items-baseline justify-between rounded bg-[#161310] px-3 py-2">
-              <div>
-                <div className="text-xs text-[var(--studio-text-muted)]">ЗАЩИТА</div>
-                <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
-                  База {baseDefense}
-                  {equippedDefense > 0 && ` + ${equippedDefense} от предметов`}
-                </div>
-              </div>
-              <div className="font-mono text-2xl font-semibold text-[var(--studio-accent)] tabular-nums">
-                {totalDefense}
-              </div>
-            </div>
-
-            {/* Crit stats */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded bg-[#161310] px-3 py-2">
-                <div className="text-xs text-[var(--studio-text-muted)]">ШАНС КРИТА</div>
-                <div className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className="font-mono text-xl font-semibold text-[var(--studio-accent)] tabular-nums">
-                    {effectiveCritChance}
-                  </span>
-                  <span className="text-xs text-[var(--studio-text-muted)]">%</span>
-                  {effectiveCritChance !== baseCritChance && (
-                    <span className="text-[10px] text-emerald-400">(+{Number(effectiveCritChance - baseCritChance)})</span>
+                <div className="text-right">
+                  <div className="font-mono text-2xl font-bold text-[#E8D4A0] tabular-nums leading-none">
+                    {Math.round(derived.atk * (1 + combatSession.momentum / 100))}
+                  </div>
+                  {combatSession.momentum > 0 && (
+                    <div className="text-[10px] text-yellow-400 font-mono">+{combatSession.momentum}%</div>
                   )}
                 </div>
               </div>
 
-              <div className="rounded bg-[#161310] px-3 py-2">
-                <div className="text-xs text-[var(--studio-text-muted)]">СИЛА КРИТА</div>
-                <div className="mt-0.5 flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-semibold text-[var(--studio-accent)] tabular-nums">
-                    x{effectiveCritDamage.toFixed(1)}
-                  </span>
-                  {effectiveCritDamage !== baseCritDamage && (
-                    <span className="text-[10px] text-emerald-400">(+{(effectiveCritDamage - baseCritDamage).toFixed(1)})</span>
-                  )}
+              {/* Stat grid */}
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  ['DEF', String(derived.defFlat)],
+                  ['Крит', `${derived.critCh}%`],
+                  ['КритУрон', `×${(derived.critDmg / 100).toFixed(1)}`],
+                  ['Уворот', `${derived.dodge}%`],
+                  ['Моментум', `×${combatSession.momentum}`],
+                  ['Showtime', `${Math.min(100, combatSession.showtime)}%`],
+                ].map(([label, val]) => (
+                  <div key={label} className="rounded bg-[#161310] px-2 py-1">
+                    <div className="text-[9px] text-[var(--studio-text-muted)]">{label}</div>
+                    <div className="font-mono text-sm font-semibold text-[var(--studio-accent)] tabular-nums">{val}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            /* ── ВНЕ БОЯ — базовые стартовые значения ── */
+            <>
+              {/* ATK — главная цифра */}
+              <div className="flex items-center justify-between rounded bg-[#161310] px-3 py-2 border border-[var(--studio-accent)]/30 mb-2">
+                <div>
+                  <div className="text-xs text-[var(--studio-text-muted)]">УРОН (ATK)</div>
+                  <div className="text-[10px] text-[var(--studio-text-muted)] mt-0.5">
+                    STR {combatStats.str}, ур.{combatStats.lvl}
+                  </div>
+                </div>
+                <div className="font-mono text-3xl font-bold text-[#E8D4A0] tabular-nums leading-none">
+                  {derived.atk}
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="mt-2 text-[10px] text-[var(--studio-text-muted)]">
-            Сила — всегда база. Урон оружия суммируется. Защита с предметов добавляется к базовой. Бонусы от экипированных предметов применяются автоматически.
-          </div>
+              {/* Stat grid */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  ['HP макс', String(derived.hpMax)],
+                  ['MP макс', String(derived.mpMax)],
+                  ['Защита (DEF)', String(derived.defFlat)],
+                  ['Уворот', `${derived.dodge}%`],
+                  ['Крит шанс', `${derived.critCh}%`],
+                  ['Крит урон', `×${(derived.critDmg / 100).toFixed(1)}`],
+                ].map(([label, val]) => (
+                  <div key={label} className="rounded bg-[#161310] px-2.5 py-1.5">
+                    <div className="text-[10px] text-[var(--studio-text-muted)]">{label}</div>
+                    <div className="font-mono text-lg font-semibold text-[var(--studio-accent)] tabular-nums leading-tight">{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-2 text-[10px] text-[var(--studio-text-muted)]">
+                Данные из переменных мира. Запусти бой — здесь появятся реалтайм значения.
+              </div>
+            </>
+          )}
         </div>
 
         {/* === ИНВЕНТАРЬ (перемещён между В БОЮ и Экипировкой) === */}
@@ -349,7 +367,7 @@ export default function PlaytestStatePanel() {
               {variables
                 .filter(v => v.category === 'player')
                 .sort((a, b) => {
-                  const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
+                  const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'magic', 'luck', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
                   const ia = order.indexOf(a.name);
                   const ib = order.indexOf(b.name);
                   return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);

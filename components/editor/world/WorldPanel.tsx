@@ -7,11 +7,12 @@ import ItemCreationModal from '@/components/editor/ItemCreationModal';
 import CombatPanel from './CombatPanel';
 import BalancePanel from './BalancePanel';
 import EconomyPanel from './EconomyPanel';
+import { derivePlayerStats } from '@/lib/combat/engine';
 
 const protectedPlayerStats = [
   'health', 'health_max',
   'mana', 'mana_max',
-  'strength', 'agility', 'endurance', 'defense',
+  'strength', 'agility', 'endurance', 'magic', 'luck', 'defense',
   'souls', 'level', 'exp',
   'crit_chance', 'crit_damage',
 ];
@@ -66,11 +67,9 @@ export default function WorldPanel() {
     addToStartingInventory,
     removeFromStartingInventory,
     setStartingInventoryQuantity,
-    setPlaytestVariableValue,
     resetPlaytestState,
     dialogueTheme,
     updateDialogueTheme,
-    mode,
   } = useStudioStore();
 
   const [worldTab, setWorldTab] = useState<'world' | 'combat' | 'balance' | 'economy'>('world');
@@ -85,10 +84,9 @@ export default function WorldPanel() {
   const numberVariables = variables.filter(v => v.type === 'number');
 
   const updatePlayerStatValue = (varId: string, val: number) => {
+    // Always write to defaultValue — this is the design starting value, not the runtime value.
+    // Runtime (playtest) values live in PlaytestStatePanel; WorldPanel is a design tool.
     updateVariable(varId, { defaultValue: val });
-    if (mode === 'playtest') {
-      setPlaytestVariableValue(varId, val);
-    }
   };
 
   return (
@@ -151,17 +149,17 @@ export default function WorldPanel() {
               variables
                 .filter(v => v.category === 'player')
                 .sort((a, b) => {
-                  const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
+                  const order = ['health', 'health_max', 'mana', 'mana_max', 'strength', 'agility', 'endurance', 'magic', 'luck', 'defense', 'souls', 'crit_chance', 'crit_damage', 'level', 'exp'];
                   const ia = order.indexOf(a.name);
                   const ib = order.indexOf(b.name);
                   return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
                 })
                 .map((variable) => {
-                  const currentValue = playtestState.variableValues[variable.id] ?? variable.defaultValue;
+                  const currentValue = variable.defaultValue;
 
                   if (variable.name === 'health' || variable.name === 'mana') {
                     const maxVar = variables.find(v => v.name === `${variable.name}_max`);
-                    const maxValue = maxVar ? (playtestState.variableValues[maxVar.id] ?? maxVar.defaultValue) : currentValue;
+                    const maxValue = maxVar ? maxVar.defaultValue : currentValue;
                     const isProtected = protectedPlayerStats.includes(variable.name) || protectedPlayerStats.includes(variable.name.replace('_max', ''));
 
                     return (
@@ -268,6 +266,41 @@ export default function WorldPanel() {
                   );
                 })
             )}
+
+            {/* Derived combat stats — shows actual starting values for combat */}
+            {variables.filter(v => v.category === 'player').length > 0 && (() => {
+              const nd = (name: string, fb: number) => {
+                const v = variables.find((v: Variable) => v.name === name);
+                return typeof v?.defaultValue === 'number' ? v.defaultValue : fb;
+              };
+              const ndOpt = (name: string): number | undefined => {
+                const v = variables.find((v: Variable) => v.name === name);
+                return typeof v?.defaultValue === 'number' ? v.defaultValue : undefined;
+              };
+              const d = derivePlayerStats({
+                str: nd('strength', 5), agi: nd('agility', 5),
+                end: nd('endurance', 10), mag: nd('magic', 5),
+                lck: nd('luck', 5), lvl: nd('level', 1),
+                hpMax:   ndOpt('health_max'),
+                mpMax:   ndOpt('mana_max'),
+                defFlat: ndOpt('defense'),
+                critCh:  ndOpt('crit_chance'),
+                critDmg: (() => { const v = ndOpt('crit_damage'); return v !== undefined ? Math.round(v * 100) : undefined; })(),
+              });
+              return (
+                <div className="mt-2 pt-2 border-t border-[var(--studio-border)]">
+                  <div className="text-[10px] text-[var(--studio-text-muted)] mb-1">РАСЧЁТ В БОЮ (стартовые значения)</div>
+                  <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 text-[11px] font-mono">
+                    {[['HP', d.hpMax], ['MP', d.mpMax], ['ATK', d.atk], ['DEF', d.defFlat], ['Увор', `${d.dodge}%`], ['Крит', `${d.critCh}%`]].map(([label, val]) => (
+                      <span key={label as string} className="flex justify-between rounded bg-[#161310] px-1.5 py-0.5">
+                        <span className="text-[var(--studio-text-muted)]">{label}</span>
+                        <span className="text-[var(--studio-accent)]">{val}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

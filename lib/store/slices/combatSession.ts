@@ -43,6 +43,13 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
       if (typeof val === 'number') return val;
       return typeof v.defaultValue === 'number' ? v.defaultValue : fallback;
     };
+    // Returns the variable's current value, or undefined if the variable doesn't exist
+    const optVar = (name: string): number | undefined => {
+      const v = variables.find((v: any) => v.name === name);
+      if (!v) return undefined;
+      const val = playtestState.variableValues[v.id];
+      return typeof val === 'number' ? val : typeof v.defaultValue === 'number' ? v.defaultValue : undefined;
+    };
 
     const playerStats = {
       str: numVar('strength', 5),
@@ -51,6 +58,12 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
       mag: numVar('magic', 5),
       lck: numVar('luck', 5),
       lvl: numVar('level', 1),
+      // Designer-set direct values — override formula-derived stats
+      hpMax:   optVar('health_max'),
+      mpMax:   optVar('mana_max'),
+      defFlat: optVar('defense'),
+      critCh:  optVar('crit_chance'),
+      critDmg: (() => { const v = optVar('crit_damage'); return v !== undefined ? Math.round(v * 100) : undefined; })(),
     };
 
     const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null, skillSlots, scenarioIds);
@@ -148,9 +161,11 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     const levelId    = varId('level');
     const hpId       = varId('health');
     const hpMaxId    = varId('health_max');
+    const soulsId    = varId('souls');
 
     if (coinsId) vals[coinsId] = numVal(coinsId) + rewards.coins;
     if (gemsId)  vals[gemsId]  = numVal(gemsId)  + rewards.stallonkas;
+    if (soulsId && rewards.souls > 0) vals[soulsId] = numVal(soulsId) + rewards.souls;
 
     // XP + level-up
     let leveledUp = false;
@@ -172,6 +187,24 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
       // Restore HP to max on level up
       if (leveledUp && hpId && hpMaxId) {
         vals[hpId] = numVal(hpMaxId, 100);
+      }
+    }
+
+    // Enemy drops: roll per killed enemy using log actorIds
+    const killedIds = combatSession.log
+      .filter((e: any) => e.type === 'enemyDeath' && e.actorId)
+      .map((e: any) => e.actorId as string);
+    const allEnemyDefs = [...(state.enemies ?? []), ...(state.bosses ?? [])];
+    for (const enemyId of killedIds) {
+      const def = allEnemyDefs.find((e: any) => e.id === enemyId);
+      if (!def?.drops) continue;
+      for (const drop of def.drops as { itemId: string; chance: number; amount: number }[]) {
+        if (Math.random() * 100 >= drop.chance) continue;
+        const item = (state.items ?? []).find((i: any) => i.id === drop.itemId);
+        if (item?.quantityVariableId) {
+          const cur = typeof vals[item.quantityVariableId] === 'number' ? (vals[item.quantityVariableId] as number) : 0;
+          vals[item.quantityVariableId] = cur + drop.amount;
+        }
       }
     }
 
