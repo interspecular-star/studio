@@ -17,16 +17,21 @@ export type SpawnedEnemy = {
   hp: number;
   hpMax: number;
   atk: number;
-  tier: number;             // 1–5, drives AI aggression
-  stagger: number;          // 0–100
+  tier: number;               // 1–5, drives AI aggression
+  stagger: number;            // 0–100
   isStaggered: boolean;
   staggerTicksLeft: number;
   isFuryMode: boolean;
-  currentPhase: number;     // 0 = normal; 1, 2 = boss phases
-  breakBar: number;         // 0–100 boss break bar
+  currentPhase: number;       // 0 = normal; 1 = shield; 2 = fury (boss)
+  breakBar: number;           // 0–breakBarMax, boss only
+  breakBarMax: number;        // max break bar (boss only, 0 for regulars)
+  breakBarStunTicks: number;  // ticks remaining in break-stun (player deals ×2)
+  freezeCooldownTicks: number;// boss phase 2: ticks until next hero-freeze
   isBoss: boolean;
   tickSinceSpawn: number;
-  attackCooldownTicks: number; // ticks until next attack signal
+  attackCooldownTicks: number;
+  weakPointActive: boolean;   // auto-cycled by tick()
+  weakPointTimer: number;     // ticks until weak point state flips
 };
 
 export type CombatLogEntry = {
@@ -103,6 +108,8 @@ export type CombatSession = {
   bossSpawned: boolean;
 
   pendingSignal: AttackSignal | null;
+
+  playerFreezeTicks: number;    // hero can't act while > 0 (boss Stop-frame)
 
   // Scenario tracking
   scenarioProgress: ScenarioProgress[];

@@ -5,23 +5,28 @@ import type {
 } from '../types/combat-session';
 import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS } from '../types/combat';
 
-// ── Stat derivation (mirrors BalancePanel formulas) ──────────────────────────
+// ── Stat derivation ───────────────────────────────────────────────────────────
+// Canonical formulas — used by both engine and BalancePanel (imported there).
+// At base naked hero (str=5 agi=5 end=10 mag=5 lck=5 lvl=1):
+//   HP=100 MP=50 ATK=30 DEF=2 dodge=1.5% crit=5% critDmg=150%
 
 export function derivePlayerStats(s: PlayerCombatStats) {
   const { str, agi, end: end_, mag, lck, lvl } = s;
+  const defFlat = Math.round(end_ * 0.2);
   return {
-    hpMax:   Math.round((80 + end_ * 12 + lvl * 8) * (1 + lck * 0.02)),
-    mpMax:   Math.round(40 + mag * 10 + lvl * 5),
+    hpMax:   end_ * 10 + (lvl - 1) * 5,
+    mpMax:   mag * 10 + (lvl - 1) * 5,
     atk:     Math.round(str * 4 + agi * 1.5 + lvl * 2),
-    defFlat: Math.round(end_ * 2 + str * 0.5),
+    defFlat,
     defPct:  Math.min(75, Math.round(end_ * 0.8 + agi * 0.3)),
-    critCh:  Math.min(95, Math.round(lck * 3 + agi * 1.5)),
-    critDmg: Math.round(150 + lck * 5),
+    dodge:   Math.min(40, +(agi * 0.3).toFixed(1)),
+    critCh:  Math.min(60, +(lck * 0.5 + agi * 0.5).toFixed(1)),
+    critDmg: 150,
   };
 }
 
 export const DEFAULT_PLAYER_STATS: PlayerCombatStats = {
-  str: 6, agi: 5, end: 5, mag: 3, lck: 4, lvl: 1,
+  str: 5, agi: 5, end: 10, mag: 5, lck: 5, lvl: 1,
 };
 
 // ── Session initialisation ────────────────────────────────────────────────────
@@ -63,6 +68,7 @@ export function initCombatSession(
     bossSpawned: false,
 
     pendingSignal: null,
+    playerFreezeTicks: 0,
 
     scenarioProgress,
     noDamageTicks: 0,
@@ -148,6 +154,8 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
   const isBoss = 'isBoss' in enemy && enemy.isBoss;
 
   const tier = (enemy as any).tier ?? 1;
+  const bbMax = isBoss ? ((enemy as Boss).breakBarMax ?? 100) : 0;
+  const wpPause = 20 + Math.floor(Math.random() * 10); // initial weak-point pause: 4–6 sec
   const spawned: SpawnedEnemy = {
     instanceId: `e_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`,
     enemyId: enemy.id,
@@ -160,10 +168,15 @@ export function spawnNextEnemy(session: CombatSession, enemy: Enemy | Boss): Com
     staggerTicksLeft: 0,
     isFuryMode: false,
     currentPhase: 0,
-    breakBar: 0,
+    breakBar: bbMax,
+    breakBarMax: bbMax,
+    breakBarStunTicks: 0,
+    freezeCooldownTicks: 0,
     isBoss,
     tickSinceSpawn: 0,
     attackCooldownTicks: baseCooldown(tier, false),
+    weakPointActive: false,
+    weakPointTimer: wpPause,
   };
 
   return {
@@ -185,19 +198,28 @@ export function playerAttack(
   isWeakSpot = false,
 ): CombatSession {
   if (session.status !== 'active') return session;
+  if (session.playerFreezeTicks > 0) return session; // Stop-frame: hero frozen
 
   const target = session.enemies.find(e => e.instanceId === targetInstanceId);
   if (!target) return session;
 
+  // Weak point is engine-driven (auto-timer), UI hint parameter is ignored
+  const actualIsWeakSpot = target.weakPointActive;
+
   const derived = derivePlayerStats(session.playerStats);
   const isCrit = Math.random() * 100 < derived.critCh;
-  const luckyMod = session.activeInstinctId === 'lucky' ? 0.9 : 1; // -10% base dmg
+  const luckyMod = session.activeInstinctId === 'lucky' ? 0.9 : 1;
   const momentumMult = 1 + (session.momentum - 1) * 0.05;
-  const weakMult = isWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
+  const weakMult = actualIsWeakSpot ? (session.activeInstinctId === 'hunter' ? 2.2 : 1.8) : 1;
   const showtimeMult = session.showtimeActive ? 1.5 : 1;
   const critMult = isCrit ? derived.critDmg / 100 : 1;
+  const stunMult = target.breakBarStunTicks > 0 ? 2 : 1; // ×2 during break stun
 
-  const dmg = Math.max(1, Math.round(derived.atk * luckyMod * momentumMult * weakMult * showtimeMult * critMult));
+  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * momentumMult * weakMult * showtimeMult * critMult * stunMult));
+
+  // Boss phase 1 shield: -50% incoming damage (removed by provoke skill in Block 3)
+  const shieldMult = target.isBoss && target.currentPhase === 1 ? 0.5 : 1;
+  const dmg = Math.max(1, Math.round(rawDmg * shieldMult));
 
   // Momentum
   const momentumGain = 1 + (isCrit && session.activeInstinctId === 'lucky' ? 1 : 0);
@@ -207,10 +229,24 @@ export function playerAttack(
   const showtimeGain = session.showtimeActive ? 0 : Math.round(6 + newMomentum * 0.8);
   const newShowtime = Math.min(100, session.showtime + showtimeGain);
 
-  // Stagger
-  const staggerAdd = session.activeInstinctId === 'old_school' ? STAGGER_PER_HIT * 1.5 : STAGGER_PER_HIT;
+  // Stagger (regular enemies only — boss uses break bar)
+  const staggerAdd = !target.isBoss
+    ? (session.activeInstinctId === 'old_school' ? STAGGER_PER_HIT * 1.5 : STAGGER_PER_HIT)
+    : 0;
   const newStaggerVal = Math.min(100, target.stagger + staggerAdd);
-  const triggersStagger = newStaggerVal >= 100 && !target.isStaggered;
+  const triggersStagger = !target.isBoss && newStaggerVal >= 100 && !target.isStaggered;
+
+  // Break bar (boss only)
+  let newBreakBar = target.breakBar;
+  let newBreakBarStunTicks = target.breakBarStunTicks;
+  if (target.isBoss && target.breakBarStunTicks === 0) {
+    const bbDmg = actualIsWeakSpot ? 15 : session.showtimeActive ? 40 : 8;
+    newBreakBar = Math.max(0, target.breakBar - bbDmg);
+    if (newBreakBar === 0 && target.breakBar > 0) {
+      newBreakBarStunTicks = 20; // 4 sec stun
+      newBreakBar = target.breakBarMax; // reset after breaking
+    }
+  }
 
   // HP
   const newHp = Math.max(0, target.hp - dmg);
@@ -219,10 +255,14 @@ export function playerAttack(
   // Boss phase transitions
   let newPhase = target.currentPhase;
   let newFury = target.isFuryMode;
+  let newFreezeCD = target.freezeCooldownTicks;
   if (target.isBoss && !enemyDied) {
     const hpPct = (newHp / target.hpMax) * 100;
-    if (hpPct <= 30 && target.currentPhase < 2) { newPhase = 2; newFury = true; }
-    else if (hpPct <= 60 && target.currentPhase < 1) { newPhase = 1; newFury = true; }
+    if (hpPct <= 30 && target.currentPhase < 2) {
+      newPhase = 2; newFury = true; newFreezeCD = 100; // first freeze in 20 sec
+    } else if (hpPct <= 60 && target.currentPhase < 1) {
+      newPhase = 1; newFury = false; // shield mode, not fury
+    }
   }
 
   const updatedEnemy: SpawnedEnemy = {
@@ -233,6 +273,9 @@ export function playerAttack(
     staggerTicksLeft: triggersStagger ? 3 : target.staggerTicksLeft,
     isFuryMode: newFury,
     currentPhase: newPhase,
+    breakBar: newBreakBar,
+    breakBarStunTicks: newBreakBarStunTicks,
+    freezeCooldownTicks: newFreezeCD,
   };
 
   const newEnemies = enemyDied
@@ -244,7 +287,7 @@ export function playerAttack(
   const weakSpotHits = session.weakSpotHits + (isWeakSpot ? 1 : 0);
 
   const logEntries: CombatLogEntry[] = [
-    { tick: session.tick, type: 'playerAttack', actorId: targetInstanceId, value: dmg, isCrit, isWeakSpot },
+    { tick: session.tick, type: 'playerAttack', actorId: targetInstanceId, value: dmg, isCrit, isWeakSpot: actualIsWeakSpot },
   ];
   if (triggersStagger) logEntries.push({ tick: session.tick, type: 'stagger', actorId: targetInstanceId });
   if (enemyDied) logEntries.push({ tick: session.tick, type: 'enemyDeath', actorId: target.enemyId, value: totalKilled });
@@ -291,11 +334,14 @@ export function generateEnemySignal(session: CombatSession, enemy: SpawnedEnemy)
   const tierBonus = enemy.isBoss && enemy.currentPhase >= 2 ? -1 : 0;
   const window = Math.max(2, baseWindow + tierBonus);
 
+  const furyMult = enemy.isFuryMode
+    ? (enemy.isBoss && enemy.currentPhase >= 2 ? 1.5 : 1.4)
+    : 1;
   const signal: AttackSignal = {
     instanceId: `sig_${Date.now().toString(36)}`,
     type,
     enemyInstanceId: enemy.instanceId,
-    damage: enemy.isFuryMode ? Math.round(enemy.atk * 1.4) : enemy.atk,
+    damage: Math.round(enemy.atk * furyMult),
     windowTicks: window,
     ticksLeft: window,
   };
@@ -307,6 +353,7 @@ export function generateEnemySignal(session: CombatSession, enemy: SpawnedEnemy)
 
 export function playerReact(session: CombatSession, reaction: 'dodge' | 'parry'): CombatSession {
   if (!session.pendingSignal || session.status !== 'active') return session;
+  if (session.playerFreezeTicks > 0) return applyEnemyDamage(session); // frozen = can't react
 
   const signal = session.pendingSignal;
   const canParry = signal.type === 'yellow';
@@ -343,6 +390,19 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
 
   const signal = session.pendingSignal;
   const derived = derivePlayerStats(session.playerStats);
+
+  // Passive dodge from AGI (doesn't reset Momentum — it's a passive slip)
+  if (Math.random() * 100 < derived.dodge) {
+    const mpGain = session.activeInstinctId === 'stuntman' ? Math.round(session.playerMpMax * 0.03) : 0;
+    const stuntmanBonus = session.activeInstinctId === 'stuntman' ? 1 : 0;
+    return {
+      ...session,
+      pendingSignal: null,
+      playerMp: Math.min(session.playerMpMax, session.playerMp + mpGain),
+      momentum: Math.min(15, session.momentum + stuntmanBonus),
+      log: [...session.log, { tick: session.tick, type: 'playerDodge', actorId: signal.enemyInstanceId, text: 'passive' }],
+    };
+  }
 
   const rawDmg = signal.damage;
   const reduced = Math.round(rawDmg * (1 - derived.defPct / 100) - derived.defFlat);
@@ -390,17 +450,28 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
 export function tick(session: CombatSession): CombatSession {
   if (session.status !== 'active') return session;
 
+  const nextTick = session.tick + 1;
   let next: CombatSession = {
     ...session,
-    tick: session.tick + 1,
+    tick: nextTick,
     noDamageTicks: session.noDamageTicks + 1,
     enragedTicks: Math.max(0, session.enragedTicks - 1),
+    playerFreezeTicks: Math.max(0, session.playerFreezeTicks - 1),
     activeEventFlash: session.activeEventFlash
       ? (session.activeEventFlash.ticksLeft > 1
           ? { ...session.activeEventFlash, ticksLeft: session.activeEventFlash.ticksLeft - 1 }
           : null)
       : null,
   };
+
+  // HP regen: +1 HP every 5 ticks (1 HP/sec)
+  if (nextTick % 5 === 0 && next.playerHp < next.playerHpMax) {
+    next = { ...next, playerHp: Math.min(next.playerHpMax, next.playerHp + 1) };
+  }
+  // MP regen: +1 MP every 10 ticks (0.5 MP/sec)
+  if (nextTick % 10 === 0 && next.playerMp < next.playerMpMax) {
+    next = { ...next, playerMp: Math.min(next.playerMpMax, next.playerMp + 1) };
+  }
 
   // 2% chance per tick for a random event (not during active signal)
   if (!next.pendingSignal && !next.activeEventFlash && Math.random() < 0.02) {
@@ -423,42 +494,77 @@ export function tick(session: CombatSession): CombatSession {
       : { ...next, pendingSignal: { ...next.pendingSignal, ticksLeft: tl } };
   }
 
-  // Enemy tick: stagger countdown + attack cooldown + spawn timer
+  // Enemy tick
+  let freezeTriggered = false;
   next = {
     ...next,
     enemies: next.enemies.map(e => {
-      let updated = { ...e, tickSinceSpawn: e.tickSinceSpawn + 1 };
+      let u = { ...e, tickSinceSpawn: e.tickSinceSpawn + 1 };
 
-      // Stagger countdown — when stagger ends, enemy enters Fury Mode
-      if (updated.isStaggered) {
-        if (updated.staggerTicksLeft > 1) {
-          updated = { ...updated, staggerTicksLeft: updated.staggerTicksLeft - 1 };
-        } else {
-          // Stagger recovered → Fury and immediate attack
-          updated = {
-            ...updated,
-            isStaggered: false,
-            staggerTicksLeft: 0,
-            stagger: 0,
-            isFuryMode: true,
-            attackCooldownTicks: 0, // attack immediately on recovery
-          };
-        }
+      // Weak point cycle: active window 10–15 ticks (2–3 sec), pause 20–30 ticks (4–6 sec)
+      const wpTimer = u.weakPointTimer - 1;
+      if (wpTimer <= 0) {
+        u = {
+          ...u,
+          weakPointActive: !u.weakPointActive,
+          weakPointTimer: u.weakPointActive
+            ? 20 + Math.floor(Math.random() * 10) // active → pause: 4–6 sec
+            : 10 + Math.floor(Math.random() * 5),  // pause → active: 2–3 sec
+        };
       } else {
-        // Decrement attack cooldown
-        updated = { ...updated, attackCooldownTicks: Math.max(0, updated.attackCooldownTicks - 1) };
+        u = { ...u, weakPointTimer: wpTimer };
       }
 
-      return updated;
+      if (u.isBoss) {
+        // Break stun countdown
+        if (u.breakBarStunTicks > 0) {
+          u = { ...u, breakBarStunTicks: u.breakBarStunTicks - 1 };
+        }
+        // Break bar slow regen in phase 2 (+5 every 30 ticks)
+        if (u.currentPhase >= 2 && u.breakBarStunTicks === 0 && nextTick % 30 === 0) {
+          u = { ...u, breakBar: Math.min(u.breakBarMax, u.breakBar + 5) };
+        }
+        // Phase 2 freeze ability: trigger every 20 sec (100 ticks)
+        if (u.currentPhase >= 2) {
+          const fcd = u.freezeCooldownTicks - 1;
+          if (fcd <= 0 && !freezeTriggered) {
+            freezeTriggered = true;
+            u = { ...u, freezeCooldownTicks: 100 };
+          } else {
+            u = { ...u, freezeCooldownTicks: Math.max(0, fcd) };
+          }
+        }
+      }
+
+      // Stagger countdown (regular enemies only)
+      if (u.isStaggered && !u.isBoss) {
+        if (u.staggerTicksLeft > 1) {
+          u = { ...u, staggerTicksLeft: u.staggerTicksLeft - 1 };
+        } else {
+          u = { ...u, isStaggered: false, staggerTicksLeft: 0, stagger: 0, isFuryMode: true, attackCooldownTicks: 0 };
+        }
+      } else if (!u.isStaggered && u.breakBarStunTicks === 0) {
+        u = { ...u, attackCooldownTicks: Math.max(0, u.attackCooldownTicks - 1) };
+      }
+
+      return u;
     }),
   };
 
-  // Auto-generate signal: find the first ready enemy (cooldown = 0, not staggered)
+  // Boss Stop-frame: freeze hero for 2 sec (10 ticks), log event
+  if (freezeTriggered && next.playerFreezeTicks === 0) {
+    next = {
+      ...next,
+      playerFreezeTicks: 10,
+      log: [...next.log, { tick: nextTick, type: 'info', text: '🎬 СТОП-КАДР! Герой заморожен!' }],
+    };
+  }
+
+  // Auto-generate signal: find first ready enemy (cooldown = 0, not staggered/stunned)
   if (!next.pendingSignal && next.status === 'active') {
-    const ready = next.enemies.find(e => e.attackCooldownTicks === 0 && !e.isStaggered);
+    const ready = next.enemies.find(e => e.attackCooldownTicks === 0 && !e.isStaggered && e.breakBarStunTicks === 0);
     if (ready) {
       next = generateEnemySignal(next, ready);
-      // Pre-set cooldown so it won't immediately trigger again (signal resolving will also reset it)
       if (next.pendingSignal) {
         next = {
           ...next,
