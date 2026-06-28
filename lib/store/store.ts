@@ -316,6 +316,7 @@ type StudioState = {
   combatActivateShowtime: () => void;
   combatSpawnNext: () => void;
   combatTick: () => void;
+  combatUseSkill: (slotIndex: 0 | 1 | 2) => void;
   applyRewards: () => { leveledUp: boolean; newLevel: number };
   endCombat: () => void;
 

@@ -7,17 +7,20 @@ import {
   playerReact as engineReact,
   activateShowtime as engineShowtime,
   tick as engineTick,
+  useSkill as engineUseSkill,
 } from '../../combat/engine';
+import type { SkillId } from '../../types/combat';
 
 export interface CombatSessionSlice {
   combatSession: CombatSession | null;
-  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string) => void;
+  startCombat: (waveId: string, difficulty: Difficulty, instinctId?: string, skillSlots?: [SkillId | null, SkillId | null, SkillId | null]) => void;
   combatPlayerAttack: (targetInstanceId: string, isWeakSpot?: boolean) => void;
   combatPlayerDodge: () => void;
   combatPlayerParry: () => void;
   combatActivateShowtime: () => void;
   combatSpawnNext: () => void;
   combatTick: () => void;
+  combatUseSkill: (slotIndex: 0 | 1 | 2) => void;
   /** Apply combat rewards to playtest variable values (coins/gems/exp/level). */
   applyRewards: () => { leveledUp: boolean; newLevel: number };
   endCombat: () => void;
@@ -26,7 +29,7 @@ export interface CombatSessionSlice {
 export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice => ({
   combatSession: null,
 
-  startCombat: (waveId, difficulty, instinctId) => {
+  startCombat: (waveId, difficulty, instinctId, skillSlots) => {
     const state = get();
     const wave = state.waves.find((w: any) => w.id === waveId);
     if (!wave) { console.warn(`[combat] wave "${waveId}" not found`); return; }
@@ -42,15 +45,15 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     };
 
     const playerStats = {
-      str: numVar('strength', 6),
+      str: numVar('strength', 5),
       agi: numVar('agility', 5),
-      end: numVar('endurance', 5),
-      mag: numVar('magic', 3),
-      lck: numVar('luck', 4),
+      end: numVar('endurance', 10),
+      mag: numVar('magic', 5),
+      lck: numVar('luck', 5),
       lvl: numVar('level', 1),
     };
 
-    const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null);
+    const session = initCombatSession(wave, difficulty, playerStats, instinctId ?? null, skillSlots);
     set(() => ({ combatSession: session }));
   },
 
@@ -115,6 +118,12 @@ export const createCombatSessionSlice = (set: any, get: any): CombatSessionSlice
     }
 
     set(() => ({ combatSession: next }));
+  },
+
+  combatUseSkill: (slotIndex) => {
+    const { combatSession } = get();
+    if (!combatSession) return;
+    set(() => ({ combatSession: engineUseSkill(combatSession, slotIndex) }));
   },
 
   applyRewards: () => {

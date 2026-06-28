@@ -1,9 +1,9 @@
-import type { Enemy, Boss, Wave, Difficulty } from '../types/combat';
+import type { Enemy, Boss, Wave, Difficulty, SkillId } from '../types/combat';
 import type {
   CombatSession, SpawnedEnemy, AttackSignal,
   CombatLogEntry, PlayerCombatStats, CombatRewards, ScenarioProgress,
 } from '../types/combat-session';
-import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS } from '../types/combat';
+import { DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS, DEFAULT_SKILLS, DEFAULT_SKILL_SLOTS } from '../types/combat';
 
 // ── Stat derivation ───────────────────────────────────────────────────────────
 // Canonical formulas — used by both engine and BalancePanel (imported there).
@@ -36,6 +36,7 @@ export function initCombatSession(
   difficulty: Difficulty,
   playerStats: PlayerCombatStats = DEFAULT_PLAYER_STATS,
   instinctId: string | null = null,
+  skillSlots: [SkillId | null, SkillId | null, SkillId | null] = DEFAULT_SKILL_SLOTS,
 ): CombatSession {
   const derived = derivePlayerStats(playerStats);
   const spawnQueue = buildSpawnQueue(wave, difficulty);
@@ -69,6 +70,10 @@ export function initCombatSession(
 
     pendingSignal: null,
     playerFreezeTicks: 0,
+    skillSlots,
+    skillCooldowns: [0, 0, 0],
+    pendingDodgeRoll: false,
+    pendingCounter: false,
 
     scenarioProgress,
     noDamageTicks: 0,
@@ -196,6 +201,7 @@ export function playerAttack(
   session: CombatSession,
   targetInstanceId: string,
   isWeakSpot = false,
+  dmgOverrideMult = 1,
 ): CombatSession {
   if (session.status !== 'active') return session;
   if (session.playerFreezeTicks > 0) return session; // Stop-frame: hero frozen
@@ -215,7 +221,7 @@ export function playerAttack(
   const critMult = isCrit ? derived.critDmg / 100 : 1;
   const stunMult = target.breakBarStunTicks > 0 ? 2 : 1; // ×2 during break stun
 
-  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * momentumMult * weakMult * showtimeMult * critMult * stunMult));
+  const rawDmg = Math.max(1, Math.round(derived.atk * luckyMod * momentumMult * weakMult * showtimeMult * critMult * stunMult * dmgOverrideMult));
 
   // Boss phase 1 shield: -50% incoming damage (removed by provoke skill in Block 3)
   const shieldMult = target.isBoss && target.currentPhase === 1 ? 0.5 : 1;
@@ -391,6 +397,26 @@ export function applyEnemyDamage(session: CombatSession): CombatSession {
   const signal = session.pendingSignal;
   const derived = derivePlayerStats(session.playerStats);
 
+  // Dodge Roll skill: guaranteed dodge of next hit
+  if (session.pendingDodgeRoll) {
+    const mpGain = session.activeInstinctId === 'stuntman' ? Math.round(session.playerMpMax * 0.03) : 0;
+    const mBonus = session.activeInstinctId === 'stuntman' ? 1 : 0;
+    return {
+      ...session,
+      pendingSignal: null,
+      pendingDodgeRoll: false,
+      playerMp: Math.min(session.playerMpMax, session.playerMp + mpGain),
+      momentum: Math.min(15, session.momentum + 1 + mBonus),
+      log: [...session.log, { tick: session.tick, type: 'playerDodge', actorId: signal.enemyInstanceId, text: 'roll' }],
+    };
+  }
+
+  // Counter skill: auto-react correctly to any signal type
+  if (session.pendingCounter) {
+    const reaction = signal.type === 'yellow' ? 'parry' : 'dodge';
+    return playerReact({ ...session, pendingCounter: false }, reaction);
+  }
+
   // Passive dodge from AGI (doesn't reset Momentum — it's a passive slip)
   if (Math.random() * 100 < derived.dodge) {
     const mpGain = session.activeInstinctId === 'stuntman' ? Math.round(session.playerMpMax * 0.03) : 0;
@@ -471,6 +497,15 @@ export function tick(session: CombatSession): CombatSession {
   // MP regen: +1 MP every 10 ticks (0.5 MP/sec)
   if (nextTick % 10 === 0 && next.playerMp < next.playerMpMax) {
     next = { ...next, playerMp: Math.min(next.playerMpMax, next.playerMp + 1) };
+  }
+
+  // Skill cooldown countdown
+  const [cd0, cd1, cd2] = next.skillCooldowns;
+  if (cd0 > 0 || cd1 > 0 || cd2 > 0) {
+    next = {
+      ...next,
+      skillCooldowns: [Math.max(0, cd0 - 1), Math.max(0, cd1 - 1), Math.max(0, cd2 - 1)],
+    };
   }
 
   // 2% chance per tick for a random event (not during active signal)
@@ -576,6 +611,78 @@ export function tick(session: CombatSession): CombatSession {
         };
       }
     }
+  }
+
+  return next;
+}
+
+// ── Active skills ─────────────────────────────────────────────────────────────
+
+export function useSkill(session: CombatSession, slotIndex: 0 | 1 | 2): CombatSession {
+  if (session.status !== 'active') return session;
+  if (session.playerFreezeTicks > 0) return session;
+
+  const skillId = session.skillSlots[slotIndex];
+  if (!skillId) return session;
+  if (session.skillCooldowns[slotIndex] > 0) return session;
+
+  const skill = DEFAULT_SKILLS[skillId];
+  if (session.playerMp < skill.mpCost) return session;
+
+  const newCDs = [...session.skillCooldowns] as [number, number, number];
+  newCDs[slotIndex] = skill.cooldownTicks;
+
+  let next: CombatSession = {
+    ...session,
+    playerMp: session.playerMp - skill.mpCost,
+    skillCooldowns: newCDs,
+    log: [...session.log, { tick: session.tick, type: 'info', text: `[${skill.name.ru}]` }],
+  };
+
+  switch (skillId) {
+    case 'strong_hit': {
+      const target = next.enemies[0];
+      if (target) next = playerAttack(next, target.instanceId, false, 2.5);
+      break;
+    }
+    case 'dodge_roll':
+      next = { ...next, pendingDodgeRoll: true };
+      break;
+    case 'provoke': {
+      next = {
+        ...next,
+        enemies: next.enemies.map(e => ({
+          ...e,
+          // Skip next attack: push cooldown forward
+          attackCooldownTicks: Math.max(e.attackCooldownTicks, baseCooldown(e.tier, e.isFuryMode) + 8),
+          // Remove boss phase 1 shield
+          currentPhase: (e.isBoss && e.currentPhase === 1) ? 0 : e.currentPhase,
+          isFuryMode: (e.isBoss && e.currentPhase === 1) ? false : e.isFuryMode,
+        })),
+      };
+      break;
+    }
+    case 'counter':
+      next = { ...next, pendingCounter: true };
+      break;
+    case 'dash': {
+      const target = next.enemies[0];
+      if (target) {
+        next = playerAttack(next, target.instanceId, false, 0.8);
+        // Reset one random cooldown by 50%
+        const cds = [...next.skillCooldowns] as [number, number, number];
+        const candidates = ([0, 1, 2] as const).filter(i => i !== slotIndex && cds[i] > 0);
+        if (candidates.length > 0) {
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          cds[pick] = Math.max(0, Math.floor(cds[pick] * 0.5));
+          next = { ...next, skillCooldowns: cds };
+        }
+      }
+      break;
+    }
+    case 'quick_potion':
+      next = { ...next, playerHp: Math.min(next.playerHpMax, next.playerHp + 50), potionUsed: true };
+      break;
   }
 
   return next;

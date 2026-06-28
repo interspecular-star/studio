@@ -1,5 +1,72 @@
 import type { LocalizedString } from './core';
 
+// ── Active Skills ─────────────────────────────────────────────────────────────
+
+export type SkillId =
+  | 'strong_hit'
+  | 'dodge_roll'
+  | 'provoke'
+  | 'counter'
+  | 'dash'
+  | 'quick_potion';
+
+export type SkillDef = {
+  id: SkillId;
+  name: LocalizedString;
+  description: LocalizedString;
+  cooldownTicks: number; // 200ms/tick: 30t=6s 40t=8s 45t=9s 50t=10s 60t=12s 100t=20s
+  mpCost: number;
+};
+
+export const DEFAULT_SKILLS: Record<SkillId, SkillDef> = {
+  strong_hit: {
+    id: 'strong_hit',
+    name: { ru: 'Сильный удар', en: 'Strong Hit' },
+    description: { ru: '×2.5 урон, без уворота. Кд: 8 сек', en: '×2.5 damage. CD: 8s' },
+    cooldownTicks: 40,
+    mpCost: 10,
+  },
+  dodge_roll: {
+    id: 'dodge_roll',
+    name: { ru: 'Кувырок', en: 'Dodge Roll' },
+    description: { ru: '100% уворот следующего удара. Кд: 6 сек', en: '100% dodge next hit. CD: 6s' },
+    cooldownTicks: 30,
+    mpCost: 5,
+  },
+  provoke: {
+    id: 'provoke',
+    name: { ru: 'Провокация', en: 'Provoke' },
+    description: { ru: 'Враг пропускает атаку. Снимает щит босса. Кд: 12 сек', en: 'Enemy skips attack. Removes boss shield. CD: 12s' },
+    cooldownTicks: 60,
+    mpCost: 8,
+  },
+  counter: {
+    id: 'counter',
+    name: { ru: 'Контратака', en: 'Counter' },
+    description: { ru: 'Авто-реакция на следующий сигнал. Кд: 10 сек', en: 'Auto-react to next signal. CD: 10s' },
+    cooldownTicks: 50,
+    mpCost: 12,
+  },
+  dash: {
+    id: 'dash',
+    name: { ru: 'Рывок', en: 'Dash' },
+    description: { ru: '×0.8 урон + сбрасывает рандомный кд. Кд: 9 сек', en: '×0.8 dmg + reset random cd. CD: 9s' },
+    cooldownTicks: 45,
+    mpCost: 6,
+  },
+  quick_potion: {
+    id: 'quick_potion',
+    name: { ru: 'Зелье', en: 'Quick Potion' },
+    description: { ru: '+50 HP немедленно. Кд: 20 сек', en: '+50 HP instantly. CD: 20s' },
+    cooldownTicks: 100,
+    mpCost: 0,
+  },
+};
+
+export const DEFAULT_SKILL_SLOTS: [SkillId | null, SkillId | null, SkillId | null] = [
+  'strong_hit', 'dodge_roll', 'provoke',
+];
+
 export type EnemyTier = 1 | 2 | 3 | 4 | 5;
 
 export type Difficulty =

@@ -1,4 +1,4 @@
-import type { Difficulty } from './combat';
+import type { Difficulty, SkillId } from './combat';
 
 export type SignalType = 'red' | 'yellow' | 'blue';
 
@@ -110,6 +110,11 @@ export type CombatSession = {
   pendingSignal: AttackSignal | null;
 
   playerFreezeTicks: number;    // hero can't act while > 0 (boss Stop-frame)
+
+  skillSlots: [SkillId | null, SkillId | null, SkillId | null];
+  skillCooldowns: [number, number, number]; // ticks until ready
+  pendingDodgeRoll: boolean;  // dodge_roll: auto-dodge next incoming signal
+  pendingCounter: boolean;    // counter: auto-react correctly to next signal
 
   // Scenario tracking
   scenarioProgress: ScenarioProgress[];
