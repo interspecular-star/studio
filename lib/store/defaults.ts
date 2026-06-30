@@ -258,17 +258,84 @@ const tavernPage = (): StudioPage => ({
   showTopResourceBar: false,
   uiLayoutPreset: 'freeform',
   uiWidgets: [], buttons: [],
-  // Rendered as a managed React overlay (TavernPage.tsx) in playtest mode
+});
+
+const forgePage = (): StudioPage => ({
+  id: 'forge_01',
+  protected: true,
+  title: { ru: 'Кузница Агафьи', en: "Agafya's Forge" },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+});
+
+const shopPage = (): StudioPage => ({
+  id: 'shop_01',
+  protected: true,
+  title: { ru: 'Лавка Сэма', en: "Sam's Shop" },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+});
+
+const shamanPage = (): StudioPage => ({
+  id: 'shaman_01',
+  protected: true,
+  title: { ru: 'Логово Зоси', en: "Zosya's Lair" },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+});
+
+const cavePage = (): StudioPage => ({
+  id: 'mine_01',
+  protected: true,
+  title: { ru: 'Пещера', en: 'The Cave' },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+});
+
+const officePage = (): StudioPage => ({
+  id: 'office_01',
+  protected: true,
+  title: { ru: 'Контора Бурмила', en: "Burmil's Office" },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+});
+
+const bureauPage = (): StudioPage => ({
+  id: 'bureau_01',
+  protected: true,
+  title: { ru: 'Бюро Ксении', en: "Ksenia's Bureau" },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
 });
 
 export const createDefaultPages = (): StudioPage[] => [
   villagePage(),
   warPathPage(),
   tavernPage(),
-  buildingStub('forge_01',  '⚒️',  'Кузница',  'Forge',    'Агафья'),
-  buildingStub('shop_01',   '🛒',  'Лавка',    'Shop',     'Сэм'),
-  buildingStub('shaman_01', '🔮',  'Шаманка',  "Shaman's", 'Зося'),
-  buildingStub('mine_01',   '⛏️', 'Шахта',    'Mine',     '—'),
+  forgePage(),
+  shopPage(),
+  shamanPage(),
+  cavePage(),
+  officePage(),
+  bureauPage(),
   combatWaveSelectPage(),
   {
     id: 'intro_01',
@@ -290,7 +357,7 @@ export const createDefaultPages = (): StudioPage[] => [
         id: 'btn_cave',
         text: { ru: 'Проверить пещеру', en: 'Check your cave' },
         layout: { x: 58, y: 68, width: 24, height: 11, style: 'default' },
-        action: { type: 'goToPage', pageId: 'cave_01' },
+        action: { type: 'goToPage', pageId: 'mine_01' },
       },
     ] as StudioButton[],
     uiWidgets: [],
