@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStudioStore } from '@/lib/store';
 import { toast } from 'sonner';
+import GameHUD from './GameHUD';
 
 const VT:   React.CSSProperties = { fontFamily: 'var(--font-vt, VT323, monospace)', lineHeight: 1 };
 const SILK: React.CSSProperties = { fontFamily: 'var(--font-silk, Silkscreen, monospace)', letterSpacing: '0.5px' };
@@ -123,42 +124,7 @@ export default function ShamanPage() {
       <style>{CSS}</style>
       <div style={{ position:'absolute', inset:0, zIndex:30, overflow:'hidden', display:'flex', flexDirection:'column', background:`${WOOD_BG}, #231522`, border:'1px solid #4a3550', color:'#ecdcc0', fontFamily:'Hanken Grotesk,system-ui,sans-serif' }}>
 
-        {/* HUD */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 18px', background:'#1a1018', borderBottom:'1px solid #4a3550', zIndex:3, flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:36, height:36, border:'2px solid #b48fc4', borderRadius:4, background:'repeating-linear-gradient(45deg,#2a1d28,#2a1d28 4px,#241820 4px,#241820 8px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <span style={{ ...SILK, fontSize:8, color:'#b48fc4' }}>СЛЭЙ</span>
-            </div>
-            <div>
-              <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-                <span style={{ ...DOT, fontSize:14, color:'#e7d8b4' }}>СЛЭЙ</span>
-                <span style={{ ...MONO, fontSize:10, color:'#a890a8' }}>наёмник · ур.24</span>
-              </div>
-              <div style={{ display:'flex', gap:10, marginTop:4, alignItems:'center' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <span style={{ ...MONO, fontSize:9, color:'#a890a8' }}>HP</span>
-                  <div style={{ width:74, height:6, background:'#2a1d28', borderRadius:3, overflow:'hidden' }}><div style={{ height:'100%', width:'84%', background:'#7faf6a' }} /></div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <span style={{ ...MONO, fontSize:9, color:'#a890a8' }}>MP</span>
-                  <div style={{ width:54, height:6, background:'#2a1d28', borderRadius:3, overflow:'hidden' }}><div style={{ height:'100%', width:'65%', background:'#6fa3a0' }} /></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#190f17', border:'1px solid #5a3f60', borderRadius:4, boxShadow:'0 0 10px rgba(180,143,196,0.18)' }}>
-              <span style={{ fontSize:13 }}>💀</span><span style={{ ...VT, fontSize:18, color:'#c9a8d4' }}>{souls}</span>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#190f17', border:'1px solid #3a2c38', borderRadius:4 }}>
-              <span style={{ fontSize:13 }}>💰</span><span style={{ ...VT, fontSize:18, color:'#e0c178' }}>{storeGold.toLocaleString('ru-RU')}</span>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#190f17', border:'1px solid #3a2c38', borderRadius:4 }}>
-              <span style={{ fontSize:13 }}>📼</span><span style={{ ...VT, fontSize:18, color:'#b8a888' }}>12</span>
-            </div>
-            <div style={{ cursor:'pointer', width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:'#2a1d28', border:'1px solid #4a3550', borderRadius:4, fontSize:13 }}>🎒</div>
-          </div>
-        </div>
+        <GameHUD />
 
         {/* TITLE BAND */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 22px', background:'linear-gradient(180deg,#2c1a2a,#231522)', borderBottom:'1px solid #4a3550', zIndex:3, flexShrink:0 }}>

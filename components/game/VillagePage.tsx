@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStudioStore } from '@/lib/store';
 
 // ── Static data ───────────────────────────────────────────────────────────────
@@ -56,6 +56,9 @@ export default function VillagePage() {
   const { variables, playtestState, executeAction, openInventory } = useStudioStore();
   const [npcIndex, setNpcIndex]       = useState(0);
   const [activeBuilding, setActiveBuilding] = useState<string | null>(null);
+  const [feedDragging, setFeedDragging] = useState(false);
+  const feedRef    = useRef<HTMLDivElement>(null);
+  const feedDragStart = useRef({ y: 0, scrollTop: 0 });
 
   useEffect(() => {
     const t = setInterval(() => setNpcIndex(i => (i + 1) % VILLAGE_NPCS.length), 6000);
@@ -123,9 +126,22 @@ export default function VillagePage() {
     fontFamily: 'var(--font-mono, Space Mono, monospace)',
   };
 
+  // ── Feed drag-scroll ────────────────────────────────────────────────────────
+  const onFeedMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    setFeedDragging(true);
+    feedDragStart.current = { y: e.clientY, scrollTop: feedRef.current?.scrollTop ?? 0 };
+  }, []);
+  const onFeedMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!feedRef.current) return;
+    feedRef.current.scrollTop = feedDragStart.current.scrollTop - (e.clientY - feedDragStart.current.y);
+  }, []);
+  const onFeedMouseUp = useCallback(() => setFeedDragging(false), []);
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
+    <>
+    <style>{`.vp-feed::-webkit-scrollbar{display:none}`}</style>
     <div
       className="sa-wood absolute inset-0 flex flex-col overflow-hidden select-none font-body"
       style={{
@@ -236,7 +252,15 @@ export default function VillagePage() {
               <span style={{ ...silkLabel, color: '#7faf6a' }}>▷ ЧТО ПРОИСХОДИТ</span>
               <span style={{ ...monoText, fontSize: '10px', color: '#6e5e44' }}>хроника площади</span>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 4px 6px 14px' }}>
+            <div
+              ref={feedRef}
+              className="vp-feed"
+              onMouseDown={onFeedMouseDown}
+              onMouseMove={feedDragging ? onFeedMouseMove : undefined}
+              onMouseUp={onFeedMouseUp}
+              onMouseLeave={onFeedMouseUp}
+              style={{ flex: 1, overflowY: 'auto', padding: '6px 4px 6px 14px', scrollbarWidth: 'none', cursor: feedDragging ? 'grabbing' : 'grab', userSelect: feedDragging ? 'none' : undefined }}
+            >
               {VILLAGE_EVENTS.map((ev, i) => (
                 <div key={i} style={{ display: 'flex', gap: 11, padding: '9px 10px 9px 0', borderBottom: '1px solid #20170d' }}>
                   <span style={{ marginTop: 4, flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: ev.dot, display: 'inline-block' }} />
@@ -379,6 +403,7 @@ export default function VillagePage() {
             { key: 'И', label: 'Инвентарь', action: () => openInventory() },
             { key: 'К', label: 'Карта',     action: () => {} },
             { key: 'С', label: 'Скиллы',    action: () => {} },
+            { key: 'У', label: 'Улучшения', action: () => navigate('office_01') },
           ].map(btn => (
             <button
               key={btn.key}
@@ -401,7 +426,7 @@ export default function VillagePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ ...monoText, fontSize: '10px', color: '#a8916a' }}>Режиссёр Вики ждёт дубль</div>
-            <div style={{ fontSize: '11px', color: '#7faf6a' }}>→ ведёт на Тропу Войны</div>
+            <div style={{ fontSize: '11px', color: '#7faf6a' }}>→ ведёт в Примерочную</div>
           </div>
           <button
             onClick={() => navigate('war_path')}
@@ -422,5 +447,6 @@ export default function VillagePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStudioStore } from '@/lib/store';
 import { toast } from 'sonner';
+import GameHUD from './GameHUD';
 
 const VT:   React.CSSProperties = { fontFamily: 'var(--font-vt, VT323, monospace)',        lineHeight: 1 };
 const SILK: React.CSSProperties = { fontFamily: 'var(--font-silk, Silkscreen, monospace)', letterSpacing: '0.5px' };
@@ -90,7 +91,7 @@ export default function TavernPage() {
 
   const hpCur  = varVal('HP', 100);  const hpMax = varVal('HP_max', 100);
   const mpCur  = varVal('MP', 50);   const mpMax = varVal('MP_max', 50);
-  const gold   = Math.max(0, varVal('Золото', 1240) - goldSpent);
+  const gold   = Math.max(0, varVal('coins', 0) - goldSpent);
   const fuel   = varVal('Бензин', 38);
   const tapes  = varVal('Кассеты', 12);
 
@@ -125,40 +126,7 @@ export default function TavernPage() {
       className="absolute inset-0 z-30 flex flex-col overflow-hidden"
       style={{ background:'#241810', backgroundImage:WOOD_BG, color:'#ecdcc0' }}
     >
-      {/* ── HUD BAR ──────────────────────────────────────────────── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 18px', background:'#1a120a', borderBottom:'1px solid #5a4226', flexShrink:0, zIndex:3 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ width:36, height:36, border:'2px solid #c39b4e', borderRadius:4, background:'repeating-linear-gradient(45deg,#2a1d10,#2a1d10 4px,#241810 4px,#241810 8px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <span style={{ ...SILK, fontSize:8, color:'#c39b4e' }}>СЛЭЙ</span>
-          </div>
-          <div>
-            <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-              <span style={{ ...DOT, fontSize:14, color:'#e7d8b4' }}>СЛЭЙ</span>
-              <span style={{ ...MONO, fontSize:10, color:'#a8916a' }}>наёмник · ур.24</span>
-            </div>
-            <div style={{ display:'flex', gap:10, marginTop:4, alignItems:'center' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                <span style={{ ...MONO, fontSize:9, color:'#a8916a' }}>HP</span>
-                <div style={{ width:74, height:6, background:'#2a1d10', borderRadius:3, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${hpPct}%`, background: hpPct < 25 ? '#b15539' : '#7faf6a', transition:'width 0.3s' }} />
-                </div>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                <span style={{ ...MONO, fontSize:9, color:'#a8916a' }}>MP</span>
-                <div style={{ width:54, height:6, background:'#2a1d10', borderRadius:3, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${mpPct}%`, background:'#c39b4e', transition:'width 0.3s' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-          <div style={LCD}><span style={{ fontSize:13 }}>💰</span><span style={{ ...VT, fontSize:18, color:'#e0c178' }}>{gold}</span></div>
-          <div style={LCD}><span style={{ fontSize:13 }}>⛽</span><span style={{ ...VT, fontSize:18, color:'#d98a6a' }}>{fuel}</span></div>
-          <div style={LCD}><span style={{ fontSize:13 }}>📼</span><span style={{ ...VT, fontSize:18, color:'#b8a888' }}>{tapes}</span></div>
-          <button onClick={() => openInventory?.()} style={{ width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:'#2a1d11', border:'1px solid #4a3722', borderRadius:4, fontSize:13, cursor:'pointer' }}>🎒</button>
-        </div>
-      </div>
+      <GameHUD coinsDisplay={gold} />
 
       {/* ── TITLE BAND ───────────────────────────────────────────── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 22px', background:'linear-gradient(180deg,#2f2114,#241810)', borderBottom:'1px solid #5a4226', flexShrink:0, zIndex:3 }}>

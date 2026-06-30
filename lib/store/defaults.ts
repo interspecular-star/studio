@@ -220,7 +220,7 @@ const buildingStub = (id: string, icon: string, nameRu: string, nameEn: string, 
 const warPathPage = (): StudioPage => ({
   id: 'war_path',
   protected: true,
-  title: { ru: 'Тропа Войны', en: 'War Path' },
+  title: { ru: 'Примерочная', en: 'Dressing Room' },
   background: '',
   speaker: 'none',
   text: { ru: '', en: '' },

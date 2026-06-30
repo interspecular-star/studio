@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStudioStore } from '@/lib/store';
 import { toast } from 'sonner';
+import GameHUD from './GameHUD';
 
 const VT:   React.CSSProperties = { fontFamily: 'var(--font-vt, VT323, monospace)', lineHeight: 1 };
 const SILK: React.CSSProperties = { fontFamily: 'var(--font-silk, Silkscreen, monospace)', letterSpacing: '0.5px' };
@@ -62,9 +63,14 @@ const SHARPENS_DEF = [
 ];
 
 export default function ForgePage() {
-  const { variables, executeAction } = useStudioStore();
-  const goldVar = variables.find(v => ['Золото','gold','Gold'].includes(v.name));
-  const storeGold = Number(goldVar?.defaultValue ?? 1240);
+  const { variables, playtestState, executeAction } = useStudioStore();
+  const getVal = (name: string): number => {
+    const v = variables.find(vv => vv.name === name);
+    if (!v) return 0;
+    const live = playtestState.variableValues[v.id];
+    return typeof live === 'number' ? live : (v.defaultValue as number) ?? 0;
+  };
+  const storeCoins = getVal('coins');
 
   const [goldSpent, setGoldSpent] = useState(0);
   const [scrap, setScrap]         = useState(86);
@@ -77,7 +83,7 @@ export default function ForgePage() {
   const [combo, setCombo]         = useState(0);
 
   const forgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const gold = Math.max(0, storeGold - goldSpent);
+  const gold = Math.max(0, storeCoins - goldSpent);
 
   function fix(id: string) {
     const dur = durab[id];
@@ -137,39 +143,7 @@ export default function ForgePage() {
       <style>{CSS}</style>
       <div style={{ position:'absolute', inset:0, zIndex:30, overflow:'hidden', display:'flex', flexDirection:'column', background:`${WOOD_BG}, #241810`, border:'1px solid #5a4226', color:'#ecdcc0', fontFamily:'Hanken Grotesk,system-ui,sans-serif' }}>
 
-        {/* HUD */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 18px', background:'#1a120a', borderBottom:'1px solid #5a4226', zIndex:3, flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:36, height:36, border:'2px solid #c39b4e', borderRadius:4, background:'repeating-linear-gradient(45deg,#2a1d10,#2a1d10 4px,#241810 4px,#241810 8px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <span style={{ ...SILK, fontSize:8, color:'#c39b4e' }}>СЛЭЙ</span>
-            </div>
-            <div>
-              <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-                <span style={{ ...DOT, fontSize:14, color:'#e7d8b4' }}>СЛЭЙ</span>
-                <span style={{ ...MONO, fontSize:10, color:'#a8916a' }}>наёмник · ур.24</span>
-              </div>
-              <div style={{ display:'flex', gap:10, marginTop:4, alignItems:'center' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <span style={{ ...MONO, fontSize:9, color:'#a8916a' }}>HP</span>
-                  <div style={{ width:74, height:6, background:'#2a1d10', borderRadius:3, overflow:'hidden' }}><div style={{ height:'100%', width:'84%', background:'#7faf6a' }} /></div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <span style={{ ...MONO, fontSize:9, color:'#a8916a' }}>MP</span>
-                  <div style={{ width:54, height:6, background:'#2a1d10', borderRadius:3, overflow:'hidden' }}><div style={{ height:'100%', width:'65%', background:'#c39b4e' }} /></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#161009', border:'1px solid #5a4226', borderRadius:4, boxShadow:'0 0 10px rgba(224,193,120,0.15)' }}>
-              <span style={{ fontSize:13 }}>💰</span><span style={{ ...VT, fontSize:18, color:'#e0c178' }}>{gold.toLocaleString('ru-RU')}</span>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#161009', border:'1px solid #3a2c18', borderRadius:4 }}>
-              <span style={{ fontSize:13 }}>🔩</span><span style={{ ...VT, fontSize:18, color:'#b8a888' }}>{scrap}</span>
-            </div>
-            <div style={{ cursor:'pointer', width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', background:'#2a1d11', border:'1px solid #4a3722', borderRadius:4, fontSize:13 }}>🎒</div>
-          </div>
-        </div>
+        <GameHUD coinsDisplay={gold} />
 
         {/* TITLE BAND */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 22px', background:'linear-gradient(180deg,#2f2114,#241810)', borderBottom:'1px solid #5a4226', zIndex:3, flexShrink:0 }}>

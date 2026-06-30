@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useStudioStore } from '@/lib/store';
+import type { Difficulty } from '@/lib/types/combat';
+import GameHUD from './GameHUD';
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -84,7 +86,7 @@ const LCD: React.CSSProperties = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WarPathPage() {
-  const { variables, playtestState, executeAction } = useStudioStore();
+  const { variables, playtestState, executeAction, waves, startCombat } = useStudioStore();
 
   const [selWave, setSelWave]       = useState('w4');
   const [selMode, setSelMode]       = useState<'normal' | 'endless' | 'super'>('normal');
@@ -155,50 +157,7 @@ export default function WarPathPage() {
       overflow: 'hidden',
     }}>
 
-      {/* ===== HUD BAR ===== */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px', background: '#1a120a', borderBottom: '1px solid #5a4226', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, border: '2px solid #c39b4e', borderRadius: 4, background: 'repeating-linear-gradient(45deg,#2a1d10,#2a1d10 4px,#241810 4px,#241810 8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ ...SILK, fontSize: '8px', color: '#c39b4e' }}>СЛЭЙ</span>
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ ...DOT, fontSize: '14px', color: '#e7d8b4' }}>СЛЭЙ</span>
-              <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>наёмник · ур.{level}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ ...MONO, fontSize: '9px', color: '#a8916a' }}>HP</span>
-                <div style={{ width: 72, height: 6, background: '#2a1d10', borderRadius: 3, overflow: 'hidden', border: '1px solid #3a2c18' }}>
-                  <div style={{ height: '100%', width: `${hpPct}%`, background: isLowHp ? '#b15539' : '#7faf6a', transition: 'width 0.3s' }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ ...MONO, fontSize: '9px', color: '#a8916a' }}>MP</span>
-                <div style={{ width: 52, height: 6, background: '#2a1d10', borderRadius: 3, overflow: 'hidden', border: '1px solid #3a2c18' }}>
-                  <div style={{ height: '100%', width: `${mpPct}%`, background: '#c39b4e', transition: 'width 0.3s' }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ ...MONO, fontSize: '9px', color: '#a8916a' }}>EXP</span>
-                <div style={{ width: 34, height: 6, background: '#2a1d10', borderRadius: 3, overflow: 'hidden', border: '1px solid #3a2c18' }}>
-                  <div style={{ height: '100%', width: `${expPct}%`, background: '#6f8fb0', transition: 'width 0.3s' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={LCD}><span style={{ fontSize: 13 }}>💰</span><span style={{ ...VT, fontSize: '17px', color: '#e0c178' }}>{fmtNum(coins)}</span></div>
-          <div style={LCD}><span style={{ fontSize: 13 }}>⛽</span><span style={{ ...VT, fontSize: '17px', color: '#d98a6a' }}>{fmtNum(fuel)}</span></div>
-          <div style={LCD}><span style={{ fontSize: 13 }}>📼</span><span style={{ ...VT, fontSize: '17px', color: '#b8a888' }}>{fmtNum(vhs)}</span></div>
-          <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#2a1d11', border: '1px solid #4a3722', borderRadius: 4 }}
-            onClick={() => useStudioStore.getState().openInventory?.()}>
-            <span style={{ fontSize: 13 }}>🎒</span>
-            <span style={{ fontSize: 12, color: '#d8c8aa' }}>Инвентарь</span>
-          </div>
-        </div>
-      </div>
+      <GameHUD />
 
       {/* ===== TITLE BAND ===== */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 22px', background: 'linear-gradient(180deg,#2f2114,#241810)', borderBottom: '1px solid #5a4226', flexShrink: 0 }}>
@@ -207,8 +166,8 @@ export default function WarPathPage() {
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#46341f', border: '1px solid #6e5430', borderRadius: 4, color: '#c39b4e', fontSize: 12, cursor: 'pointer' }}>
             ← площадь
           </button>
-          <span style={{ ...DOT, fontSize: '26px', color: '#e7d8b4', letterSpacing: '1px' }}>ТРОПА ВОЙНЫ</span>
-          <span style={{ fontSize: 12, color: '#a8916a' }}>съёмочная площадка · дубль готовят</span>
+          <span style={{ ...DOT, fontSize: '26px', color: '#e7d8b4', letterSpacing: '1px' }}>ПРИМЕРОЧНАЯ</span>
+          <span style={{ fontSize: 12, color: '#a8916a' }}>настройка перед боем · подбор снаряжения</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d98a6a', boxShadow: '0 0 8px #d98a6a', display: 'inline-block' }} />
@@ -449,10 +408,15 @@ export default function WarPathPage() {
 
           {/* START BUTTON */}
           <button
-            onClick={() => executeAction({ type: 'goToPage', pageId: 'combat_wave_select' })}
+            onClick={() => {
+              const waveId = waves[0]?.id ?? 'wave_test_01';
+              const diff: Difficulty = selWave === 'super' ? 'super_endless' : selMode === 'endless' ? 'hollywood' : 'stuntman';
+              startCombat(waveId, diff);
+              executeAction({ type: 'goToPage', pageId: 'combat_wave_select' });
+            }}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, padding: 14, background: 'linear-gradient(180deg,#e7d8b4,#cdb98a)', border: '1px solid #f0e3c0', borderRadius: 7, boxShadow: '0 3px 0 #8a6a36, 0 5px 14px rgba(0,0,0,0.4)', cursor: 'pointer' }}>
             <span style={{ fontSize: 19 }}>🎬</span>
-            <span style={{ ...DOT, fontSize: '20px', color: '#2e2012', letterSpacing: '0.5px' }}>МОТОР! НАЧАТЬ ДУБЛЬ</span>
+            <span style={{ ...DOT, fontSize: '20px', color: '#2e2012', letterSpacing: '0.5px' }}>МОТОР! ДУБЛЬ!</span>
           </button>
         </div>
 
