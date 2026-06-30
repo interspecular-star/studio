@@ -8,16 +8,16 @@ import type { Difficulty, SkillId } from '@/lib/types/combat';
 import { DIFFICULTY_LABELS, DEFAULT_INSTINCTS, DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS, DEFAULT_SKILLS, DEFAULT_SKILL_SLOTS } from '@/lib/types/combat';
 import { simulateCombat, type SimulationResult } from '@/lib/combat/engine';
 
-// ── Palette (из макета Slay Adventure Combat HUD.html) ────────────────────────
+// ── Palette — Wood & Brass ────────────────────────────────────────────────────
 const C = {
-  bg:     '#0a0910',
-  pink:   '#ff3ca0',
-  cyan:   '#36e0e0',
-  yellow: '#ffcc33',
-  red:    '#ff2e2e',
-  text:   '#ffffff',
-  muted:  'rgba(255,255,255,0.4)',
-  dim:    'rgba(255,255,255,0.07)',
+  bg:     '#1b130b',   // dark wood
+  pink:   '#b15539',   // enemy HP / damage
+  cyan:   '#6f8fb0',   // MP / dodge / parry / shield
+  yellow: '#e0c178',   // showtime / crits / brass-hero
+  red:    '#cf6a5a',   // low HP / danger bright
+  text:   '#ecdcc0',   // main text
+  muted:  '#a8916a',   // muted text
+  dim:    '#2a1d10',   // dark slot / panel bg
 };
 
 // Кол-во врагов на каждой сложности
@@ -317,11 +317,11 @@ function WaveSelect() {
 
   return (
     <div className="flex flex-col items-center h-full gap-4 px-6 overflow-y-auto py-5"
-      style={{ background: C.bg, color: C.text }}>
-      <div className="text-3xl font-black tracking-widest" style={{ color: C.cyan, letterSpacing: '0.25em' }}>
+      style={{ background: C.bg, color: C.text, fontFamily: 'var(--font-body, Hanken Grotesk, system-ui, sans-serif)', backgroundImage: 'repeating-linear-gradient(92deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 9px),repeating-linear-gradient(92deg,rgba(140,104,58,0.05) 3px,transparent 4px,transparent 16px)' }}>
+      <div style={{ fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: '28px', color: '#e7d8b4', letterSpacing: '2px', marginTop: 8 }}>
         🎬 СЪЁМКА
       </div>
-      <div className="text-xs" style={{ color: C.muted }}>Ур. {playerLevel} · выбери волну и настрой бой</div>
+      <div className="text-xs" style={{ color: C.muted, fontFamily: 'var(--font-mono, Space Mono, monospace)' }}>Ур. {playerLevel} · выбери волну и настрой бой</div>
 
       {waves.length === 0 ? (
         <div className="rounded-xl p-6 text-center max-w-xs" style={{ background: C.dim, border: `1px solid ${C.dim}` }}>
@@ -684,6 +684,11 @@ function ShowtimeBar({ showtime }: { showtime: number }) {
   );
 }
 
+const WB_VT:   React.CSSProperties = { fontFamily: 'var(--font-vt, VT323, monospace)', lineHeight: 1 };
+const WB_SILK: React.CSSProperties = { fontFamily: 'var(--font-silk, Silkscreen, monospace)', letterSpacing: '0.5px' };
+const WB_MONO: React.CSSProperties = { fontFamily: 'var(--font-mono, Space Mono, monospace)' };
+const WB_DOT:  React.CSSProperties = { fontFamily: 'var(--font-dot, DotGothic16, sans-serif)' };
+
 function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime, isAuto, setIsAuto }: {
   session: CombatSession;
   onUseSkill: (i: 0 | 1 | 2) => void;
@@ -703,84 +708,85 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
   const atkCdSec    = (session.playerAttackCooldownTicks * 0.2).toFixed(1);
 
   return (
-    <div className="flex flex-col gap-2 items-end">
-      {/* 3 skill slots */}
-      <div className="flex gap-2">
-        {([0, 1, 2] as const).map(i => {
-          const skillId = session.skillSlots[i];
-          const cd      = session.skillCooldowns[i];
-          const color   = SLOT_COLORS[i];
-          const skill   = skillId ? DEFAULT_SKILLS[skillId] : null;
-          const ready   = cd === 0 && session.playerMp >= (skill?.mpCost ?? 0);
-          const isActiveSkill = (skillId === 'dodge_roll' && session.pendingDodgeRoll) || (skillId === 'counter' && session.pendingCounter);
-          return (
-            <button key={i} onClick={() => onUseSkill(i)}
-              disabled={!skillId || cd > 0 || frozen || isAuto}
-              className="relative rounded-xl flex flex-col items-center justify-center transition-all disabled:opacity-40 overflow-hidden"
-              style={{
-                border: `2px solid ${isActiveSkill ? color : ready ? color + 'aa' : color + '44'}`,
-                width: 80, height: 64,
-                background: isActiveSkill ? color + '22' : ready ? color + '11' : 'transparent',
-                boxShadow: isActiveSkill ? `0 0 16px ${color}88` : 'none',
-              }}>
-              {/* Cooldown overlay */}
-              {cd > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-xl"
-                  style={{ background: 'rgba(10,9,16,0.75)' }}>
-                  <span className="text-sm font-black" style={{ color }}>{cdSec(cd)}</span>
-                </div>
-              )}
-              <span className="text-[9px] font-bold tracking-wider" style={{ color }}>{i + 1}</span>
-              <span className="text-[9px] font-semibold text-center leading-tight px-1" style={{ color: ready ? C.text : C.muted }}>
-                {skill?.name.ru ?? '—'}
-              </span>
-              {skill && <span className="text-[8px]" style={{ color: C.muted }}>{skill.mpCost} MP</span>}
-            </button>
-          );
-        })}
-      </div>
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 14 }}>
 
-      {/* Action buttons */}
-      <div className="flex gap-2">
-        {/* Dodge */}
+      {/* LEFT THUMB — защита + зелья */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
         <button onClick={onDodge} disabled={!hasPending || isAuto || frozen}
-          className="rounded-xl px-4 py-2 text-xs font-black transition-all disabled:opacity-30"
-          style={{ background: C.cyan + '22', color: C.cyan, border: `2px solid ${hasPending && !frozen ? C.cyan : C.cyan + '44'}` }}>
-          УКЛОН
+          style={{ width: 90, height: 90, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: 'radial-gradient(circle at 50% 38%,#2c4636,#19261c)', border: `2px solid ${hasPending && !frozen ? '#9ad27e' : '#7faf6a44'}`, boxShadow: hasPending ? '0 3px 0 #2c4a36,0 6px 14px rgba(0,0,0,0.45),inset 0 0 14px rgba(127,175,106,0.2)' : 'none', cursor: hasPending && !frozen ? 'pointer' : 'not-allowed', opacity: hasPending && !frozen ? 1 : 0.45 }}>
+          <span style={{ fontSize: 30 }}>💨</span>
+          <span style={{ ...WB_DOT, fontSize: '12px', color: '#9ad27e' }}>УКЛОН</span>
         </button>
-
-        {/* Main ATTACK */}
-        <button onClick={onAttack} disabled={!hasEnemy || hasPending || isAuto || frozen || atkOnCd}
-          className="relative rounded-xl px-5 py-2 font-black text-sm transition-all disabled:opacity-50 overflow-hidden"
-          style={{ background: atkOnCd ? C.pink + '55' : C.pink, color: C.text, border: `2px solid ${C.pink}`, minWidth: 90 }}>
-          {atkOnCd ? <span className="font-mono text-xs">{atkCdSec}с</span> : '⚔ АТАКА'}
-        </button>
-
-        {/* Parry */}
         <button onClick={onParry} disabled={!canParry || isAuto || frozen}
-          className="rounded-xl px-4 py-2 text-xs font-black transition-all disabled:opacity-30"
-          style={{ background: C.yellow + '22', color: C.yellow, border: `2px solid ${canParry && !frozen ? C.yellow : C.yellow + '44'}` }}>
-          ПАРИ
+          style={{ width: 90, height: 90, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: 'radial-gradient(circle at 50% 38%,#283a4a,#18242e)', border: `2px solid ${canParry && !frozen ? '#9ab8d4' : '#6f8fb044'}`, boxShadow: canParry ? '0 3px 0 #2c4258,0 6px 14px rgba(0,0,0,0.45),inset 0 0 14px rgba(111,143,176,0.2)' : 'none', cursor: canParry && !frozen ? 'pointer' : 'not-allowed', opacity: canParry && !frozen ? 1 : 0.45 }}>
+          <span style={{ fontSize: 30 }}>🛡️</span>
+          <span style={{ ...WB_DOT, fontSize: '12px', color: '#9ab8d4' }}>ПАРИР.</span>
         </button>
       </div>
 
-      {/* Showtime + Auto */}
-      <div className="flex gap-2">
+      {/* CENTER — SHOWTIME */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1 }}>
+        {/* Showtime bar */}
+        <ShowtimeBar showtime={session.showtime} />
         <button onClick={onShowtime} disabled={!canShowtime || isAuto}
-          className="rounded-xl px-4 py-2 text-xs font-black transition-all disabled:opacity-30"
-          style={{
-            background: canShowtime ? C.yellow : C.dim,
-            color: canShowtime ? '#0a0910' : C.muted,
-            border: `2px solid ${canShowtime ? C.yellow : 'transparent'}`,
-            boxShadow: canShowtime ? `0 0 20px ${C.yellow}88` : 'none',
-          }}>
-          ✨ SHOWTIME {canShowtime ? '(Alt)' : ''}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 15, width: '100%', maxWidth: 344, height: 68, borderRadius: 12, border: `2px solid ${canShowtime ? '#ffd66b' : '#6e5430'}`, background: canShowtime ? 'linear-gradient(180deg,#3a2a12,#2a1d0e)' : '#1c1409', boxShadow: canShowtime ? '0 0 22px rgba(255,214,107,0.45),inset 0 0 14px rgba(255,214,107,0.18)' : 'inset 0 2px 6px rgba(0,0,0,0.5)', cursor: canShowtime && !isAuto ? 'pointer' : 'not-allowed', opacity: canShowtime ? 1 : 0.78, overflow: 'hidden', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${session.showtime}%`, background: 'linear-gradient(90deg,rgba(195,155,78,0.12),rgba(224,193,120,0.32))', transition: 'width 0.3s' }} />
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ width: 30, height: 6, background: 'repeating-linear-gradient(115deg,#e7d8b4 0,#e7d8b4 5px,#2e2012 5px,#2e2012 10px)', borderRadius: 1, transformOrigin: 'left bottom', transform: canShowtime ? 'rotate(-34deg)' : 'rotate(-6deg)', transition: 'transform 0.3s' }} />
+            <div style={{ width: 30, height: 18, background: '#2e2012', border: '1px solid #e7d8b4', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ ...WB_SILK, fontSize: '7px', color: '#e7d8b4' }}>7</span>
+            </div>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <div style={{ ...WB_DOT, fontSize: '20px', color: canShowtime ? '#ffe9a8' : '#9a8a5e' }}>SHOWTIME</div>
+            <div style={{ ...WB_MONO, fontSize: '10px', color: canShowtime ? '#e0c178' : '#6e5e44' }}>{canShowtime ? 'ГОТОВ · Alt' : `заряд ${Math.min(100, session.showtime)}%`}</div>
+          </div>
         </button>
-        <button onClick={() => setIsAuto(!isAuto)}
-          className="rounded-xl px-4 py-2 text-xs font-semibold transition-all"
-          style={{ background: isAuto ? '#5ae55a22' : C.dim, color: isAuto ? '#5ae55a' : C.muted, border: `1px solid ${isAuto ? '#5ae55a' : 'transparent'}` }}>
-          {isAuto ? '⚡ АВТО' : 'АВТО'}
-        </button>
+      </div>
+
+      {/* RIGHT THUMB — навыки + СИЛА + АТАКА */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 9 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {([0, 1, 2] as const).map(i => {
+            const skillId = session.skillSlots[i];
+            const cd      = session.skillCooldowns[i];
+            const skill   = skillId ? DEFAULT_SKILLS[skillId] : null;
+            const ready   = cd === 0 && session.playerMp >= (skill?.mpCost ?? 0);
+            const isActiveSkill = (skillId === 'dodge_roll' && session.pendingDodgeRoll) || (skillId === 'counter' && session.pendingCounter);
+            return (
+              <button key={i} onClick={() => onUseSkill(i)}
+                disabled={!skillId || cd > 0 || frozen || isAuto}
+                style={{ position: 'relative', cursor: (!skillId || cd > 0 || frozen || isAuto) ? 'not-allowed' : 'pointer', width: 52, height: 52, borderRadius: 10, border: `1.5px solid ${isActiveSkill ? '#e0c178' : ready ? '#6e5430' : '#3a2c18'}`, background: isActiveSkill ? '#2a2113' : ready ? '#2a1d11' : '#15100a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 21, opacity: (!skillId || frozen || isAuto) ? 0.4 : 1 }}>
+                {skill?.name.ru ? <span style={{ ...WB_SILK, fontSize: '7px', color: ready ? '#e0c178' : '#6e5e44', textAlign: 'center', lineHeight: 1.2 }}>{skill.name.ru.slice(0,6)}</span> : <span style={{ color: '#5a4226' }}>—</span>}
+                {cd > 0 && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,7,4,0.72)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ ...WB_VT, fontSize: '19px', color: '#cf6a5a' }}>{cdSec(cd)}</span>
+                  </div>
+                )}
+                <span style={{ ...WB_SILK, fontSize: '7px', color: '#5a4226', position: 'absolute', bottom: 2, right: 4 }}>{i + 1}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+          <button onClick={onAttack} disabled={!hasEnemy || hasPending || isAuto || frozen || atkOnCd}
+            style={{ width: 72, height: 72, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 38%,#3a2a12,#241809)', border: `2px solid ${atkOnCd ? '#6e4a1c' : '#a9762a'}`, boxShadow: '0 3px 0 #6e4a1c,0 6px 12px rgba(0,0,0,0.45)', cursor: (!hasEnemy || hasPending || isAuto || frozen || atkOnCd) ? 'not-allowed' : 'pointer', opacity: (!hasEnemy || hasPending || frozen || isAuto) ? 0.4 : 1 }}>
+            <span style={{ fontSize: 24 }}>💥</span>
+            <span style={{ ...WB_DOT, fontSize: '10px', color: '#e0c178' }}>СИЛА</span>
+            <span style={{ ...WB_MONO, fontSize: '7px', color: '#8a724a' }}>−8MP</span>
+          </button>
+          <button onClick={onAttack} disabled={!hasEnemy || hasPending || isAuto || frozen || atkOnCd}
+            style={{ width: 98, height: 98, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: atkOnCd ? '#4a3a1c' : 'radial-gradient(circle at 50% 36%,#e7d8b4,#c39b4e)', border: `2px solid ${atkOnCd ? '#6e5430' : '#f0e3c0'}`, boxShadow: '0 4px 0 #8a6a36,0 7px 16px rgba(0,0,0,0.5)', cursor: (!hasEnemy || hasPending || isAuto || frozen || atkOnCd) ? 'not-allowed' : 'pointer', opacity: (!hasEnemy || hasPending || frozen || isAuto) ? 0.45 : 1 }}>
+            {atkOnCd ? (
+              <span style={{ ...WB_VT, fontSize: '28px', color: '#e0c178' }}>{atkCdSec}с</span>
+            ) : (
+              <>
+                <span style={{ fontSize: 34 }}>🗡️</span>
+                <span style={{ ...WB_DOT, fontSize: '13px', color: '#2e2012' }}>АТАКА</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -949,27 +955,95 @@ function CombatHUD({ session }: { session: CombatSession }) {
     return () => clearInterval(id);
   }, [isAuto]);
 
+  const VT   = { fontFamily: 'var(--font-vt, VT323, monospace)',       lineHeight: 1 } as React.CSSProperties;
+  const SILK = { fontFamily: 'var(--font-silk, Silkscreen, monospace)', letterSpacing: '0.5px' } as React.CSSProperties;
+  const MONO = { fontFamily: 'var(--font-mono, Space Mono, monospace)' } as React.CSSProperties;
+  const DOT  = { fontFamily: 'var(--font-dot, DotGothic16, sans-serif)' } as React.CSSProperties;
+
+  const waveName = `ВОЛНА ${session.totalKilled + session.enemies.length + session.spawnQueue.length > 0 ? (session.totalKilled + 1) : '?'}`;
+  const [blink, setBlink] = useState(true);
+  useEffect(() => { const t = setInterval(() => setBlink(b => !b), 600); return () => clearInterval(t); }, []);
+
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: C.bg, fontFamily: 'monospace' }}>
+    <div className="absolute inset-0 flex flex-col"
+      style={{ background: '#241810', color: '#ecdcc0', fontFamily: 'var(--font-body, Hanken Grotesk, system-ui, sans-serif)', backgroundImage: 'repeating-linear-gradient(92deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 9px),repeating-linear-gradient(92deg,rgba(140,104,58,0.05) 3px,transparent 4px,transparent 16px)' }}>
 
       {/* ── SHOWTIME BORDER GLOW ─────────────────────────────── */}
       {flashVisible && (
         <div className="absolute inset-0 z-50 pointer-events-none"
           style={{ opacity: flashOpacity, transition: 'opacity 1.8s ease-out' }}>
           <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at center, ${C.yellow}22 0%, transparent 65%)` }} />
-          <div style={{ border: `3px solid ${C.yellow}99`, position: 'absolute', inset: 6, borderRadius: 16, boxShadow: `0 0 40px ${C.yellow}55, inset 0 0 30px ${C.yellow}0a` }} />
+          <div style={{ border: `3px solid ${C.yellow}99`, position: 'absolute', inset: 6, borderRadius: 9, boxShadow: `0 0 40px ${C.yellow}55, inset 0 0 30px ${C.yellow}0a` }} />
         </div>
       )}
 
-      {/* ── TOP BAR ─────────────────────────────────────────── */}
-      <div className="flex items-start justify-between px-4 pt-3 pb-2 gap-4 shrink-0">
-        <PlayerBars session={session} />
-        <MomentumBlock momentum={session.momentum} enragedTicks={session.enragedTicks} />
-        <WaveProgress session={session} />
+      {/* ── HUD BAR ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 18px', background: '#1a120a', borderBottom: '1px solid #5a4226', flexShrink: 0, zIndex: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={endCombat}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', background: '#46341f', border: '1px solid #6e5430', borderRadius: 4, color: '#c39b4e', fontSize: 12, cursor: 'pointer' }}>
+            ← тропа
+          </button>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ ...DOT, fontSize: '14px', color: '#e7d8b4' }}>СЛЭЙ</span>
+            <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>наёмник</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* HP */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...MONO, fontSize: '10px', color: '#7faf6a' }}>♥</span>
+            <div style={{ width: 150, height: 9, background: '#2a1d10', border: '1px solid #3a2c18', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round((session.playerHp / Math.max(1, session.playerHpMax)) * 100)}%`, background: session.playerHp / session.playerHpMax <= 0.2 ? '#cf6a5a' : '#7faf6a', transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ ...VT, fontSize: '15px', color: '#9ad27e', minWidth: 62 }}>{session.playerHp}/{session.playerHpMax}</span>
+          </div>
+          {/* MP */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...MONO, fontSize: '10px', color: '#6f8fb0' }}>✦</span>
+            <div style={{ width: 96, height: 9, background: '#2a1d10', border: '1px solid #3a2c18', borderRadius: 5, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round((session.playerMp / Math.max(1, session.playerMpMax)) * 100)}%`, background: '#6f8fb0', transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ ...VT, fontSize: '15px', color: '#9ab8d4', minWidth: 46 }}>{session.playerMp}/{session.playerMpMax}</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#161009', border: '1px solid #3a2c18', borderRadius: 4 }}>
+            <span style={{ fontSize: 12 }}>💰</span>
+            <span style={{ ...VT, fontSize: '16px', color: '#e0c178' }}>1240</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#161009', border: '1px solid #3a2c18', borderRadius: 4 }}>
+            <span style={{ fontSize: 12 }}>📼</span>
+            <span style={{ ...VT, fontSize: '16px', color: '#b8a888' }}>12</span>
+          </div>
+          <div style={{ cursor: 'pointer', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#2a1d11', border: '1px solid #4a3722', borderRadius: 4, fontSize: 13 }}>🎒</div>
+          <button onClick={() => setIsAuto(!isAuto)}
+            style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isAuto ? 'rgba(127,175,106,0.2)' : '#2a1d11', border: `1px solid ${isAuto ? '#7faf6a' : '#4a3722'}`, borderRadius: 4, cursor: 'pointer', ...SILK, fontSize: '11px', color: isAuto ? '#7faf6a' : '#c39b4e' }}>
+            {isAuto ? 'A' : '≡'}
+          </button>
+        </div>
       </div>
 
-      {/* ── INSTINCT / EVENT FLASH ──────────────────────────── */}
-      <div className="flex items-center justify-center gap-3 px-4 shrink-0 min-h-[24px]">
+      {/* ── TITLE STRIP ─────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 20px', background: 'linear-gradient(180deg,#2f2114,#241810)', borderBottom: '1px solid #5a4226', flexShrink: 0, zIndex: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ ...DOT, fontSize: '18px', color: '#e7d8b4' }}>ГАРАЖИ</span>
+          <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>дубль 1 · обычный</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>ВОЛНА</span>
+            <span style={{ ...VT, fontSize: '18px', color: '#e0c178' }}>{session.totalKilled + 1} / {session.enemies.length + session.spawnQueue.length + session.totalKilled}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 10px', background: '#161009', border: '1px solid #6e3a2a', borderRadius: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: blink ? '#d44444' : 'transparent', display: 'inline-block', transition: 'background 0.3s' }} />
+            <span style={{ ...MONO, fontSize: '11px', color: '#d98a6a' }}>REC</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── STATUS STRIP (instinct / event / freeze) ─────── */}
+      <div className="flex items-center justify-center gap-3 px-4 shrink-0 min-h-[24px]" style={{ background: '#1c140a' }}>
         {activeInstinct && (
           <div className="rounded px-2 py-0.5 text-[9px] font-semibold"
             style={{ background: C.cyan + '22', color: C.cyan, border: `1px solid ${C.cyan}44` }}>
@@ -988,49 +1062,64 @@ function CombatHUD({ session }: { session: CombatSession }) {
             🥶 ЗАМОРОЖЕН {(session.playerFreezeTicks * 0.2).toFixed(1)}с
           </div>
         )}
+        {!activeInstinct && !session.activeEventFlash && !frozen && (
+          <span style={{ fontSize: 9, color: '#5a4226' }}>КАМЕРА ПИШЕТ</span>
+        )}
       </div>
 
-      {/* ── SHOWTIME DAMAGE BADGE ───────────────────────────── */}
-      {badgeVisible && flashDmg > 0 && (
-        <div className="flex items-center justify-center shrink-0 pointer-events-none"
-          style={{ opacity: badgeOpacity, transition: 'opacity 1.0s ease-out', minHeight: 40 }}>
-          <div className="flex items-baseline gap-2 rounded-xl px-5 py-2"
-            style={{ background: `${C.yellow}18`, border: `1px solid ${C.yellow}66`, boxShadow: `0 0 24px ${C.yellow}44` }}>
-            {flashMult > 0 && (
-              <span className="font-black font-mono" style={{ fontSize: '1rem', color: C.yellow }}>
-                ×{flashMult.toFixed(1)}
-              </span>
-            )}
-            <span className="font-black font-mono" style={{ fontSize: '1.5rem', color: C.text, textShadow: `0 0 16px ${C.yellow}` }}>
-              {flashDmg}
-            </span>
-            <span className="font-bold" style={{ fontSize: '0.75rem', color: C.yellow + 'cc' }}>урона</span>
+      {/* ── STAGE (enemy + combo + log + hero card) ──────── */}
+      <div className="flex-1 relative min-h-0" style={{ background: 'radial-gradient(ellipse at 60% 35%, #2c1f12 0%, #1b130b 70%)', backgroundImage: 'repeating-linear-gradient(180deg,rgba(255,255,255,0.025) 0px,rgba(255,255,255,0.025) 1px,transparent 1px,transparent 3px)', boxShadow: 'inset 0 0 120px 20px rgba(0,0,0,0.55)' }}>
+
+        {/* COMBO — top-left */}
+        <div style={{ position: 'absolute', top: 16, left: 22, zIndex: 2 }}>
+          <div style={{ ...MONO, fontSize: '10px', color: '#8a724a', letterSpacing: '1px' }}>КОМБО</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ ...VT, fontSize: '54px', color: session.momentum >= 10 ? '#ffd66b' : session.momentum >= 4 ? '#e0c178' : '#c39b4e', textShadow: session.momentum >= 4 ? `0 0 14px #e0c17866` : 'none' }}>×{session.momentum}</span>
+            <span style={{ ...VT, fontSize: '20px', color: '#8a724a' }}>ударов: {session.totalKilled}</span>
           </div>
         </div>
-      )}
 
-      {/* ── ENEMY ZONE (center) ─────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center px-4 py-2">
-        <EnemyZone session={session} onAttack={(id) => !isAuto && combatPlayerAttack(id, false)} />
-      </div>
+        {/* SHOWTIME BADGE */}
+        {badgeVisible && flashDmg > 0 && (
+          <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 5, opacity: badgeOpacity, transition: 'opacity 1.0s ease-out', pointerEvents: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '8px 20px', background: `${C.yellow}18`, border: `1px solid ${C.yellow}66`, boxShadow: `0 0 24px ${C.yellow}44`, borderRadius: 8 }}>
+              {flashMult > 0 && <span style={{ ...VT, fontSize: '20px', color: C.yellow }}>×{flashMult.toFixed(1)}</span>}
+              <span style={{ ...VT, fontSize: '30px', color: C.text, textShadow: `0 0 16px ${C.yellow}` }}>{flashDmg}</span>
+              <span style={{ fontSize: '12px', color: C.yellow + 'cc' }}>урона</span>
+            </div>
+          </div>
+        )}
 
-      {/* ── HERO SECTION ────────────────────────────────────── */}
-      <div className="flex flex-col items-center gap-2 px-4 pb-2 shrink-0">
-        <ShowtimeBar showtime={session.showtime} />
-        <div className="text-xl font-black tracking-[0.4em]" style={{ color: C.cyan, textShadow: `0 0 16px ${C.cyan}66` }}>
-          S L A Y
+        {/* ENEMY — center */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <EnemyZone session={session} onAttack={(id) => !isAuto && combatPlayerAttack(id, false)} />
         </div>
-      </div>
 
-      {/* ── BOTTOM BAR ──────────────────────────────────────── */}
-      <div className="flex items-end justify-between px-4 pb-4 gap-4 shrink-0">
-        {/* Left: scenarios + log */}
-        <div className="flex flex-col gap-2">
-          <ScenarioChips session={session} />
+        {/* COMBAT LOG — bottom-right */}
+        <div style={{ position: 'absolute', bottom: 14, right: 22, width: 280, zIndex: 2 }}>
           <LogTicker log={session.log} />
+          <ScenarioChips session={session} />
         </div>
 
-        {/* Right: skills + actions */}
+        {/* HERO CARD — bottom-left */}
+        <div style={{ position: 'absolute', bottom: 14, left: 22, display: 'flex', alignItems: 'center', gap: 11, padding: '9px 12px', background: 'rgba(22,16,9,0.85)', border: '1px solid #3a2c18', borderRadius: 8, zIndex: 2 }}>
+          <div style={{ width: 48, height: 48, border: '2px solid #c39b4e', borderRadius: 6, background: 'repeating-linear-gradient(45deg,#2a1d10,#2a1d10 5px,#211610 5px,#211610 10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 3 }}>
+            <span style={{ ...SILK, fontSize: '7px', color: '#c39b4e' }}>СЛЭЙ</span>
+          </div>
+          <div>
+            <div style={{ ...DOT, fontSize: '13px', color: '#e7d8b4' }}>Слэй</div>
+            <div style={{ ...MONO, fontSize: '9px', color: '#a8916a' }}>наёмник · в ударе</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── ACTION BAR ──────────────────────────────────────── */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, padding: '12px 22px 16px', background: '#1a120a', borderTop: '1px solid #5a4226', zIndex: 3, minHeight: 168, flexShrink: 0 }}>
+        {/* Thumb-reach guides */}
+        <div style={{ position: 'absolute', left: -50, bottom: -80, width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(127,175,106,0.07), transparent 66%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: -50, bottom: -80, width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(224,193,120,0.08), transparent 66%)', pointerEvents: 'none' }} />
+
+        {/* LEFT — УКЛОН + ПАРИР + зелья (SkillBar left portion) */}
         <SkillBar
           session={session}
           onUseSkill={combatUseSkill}
@@ -1042,11 +1131,6 @@ function CombatHUD({ session }: { session: CombatSession }) {
           setIsAuto={setIsAuto}
         />
       </div>
-
-      {/* Exit */}
-      <button onClick={endCombat}
-        className="absolute top-2 right-20 text-[9px] transition-opacity hover:opacity-60"
-        style={{ color: C.muted }}>✕ выйти</button>
     </div>
   );
 }
@@ -1070,17 +1154,16 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
 
   return (
     <div className="absolute inset-0 flex flex-col items-center gap-4 text-center px-6 overflow-y-auto py-6"
-      style={{ background: C.bg, color: C.text }}>
+      style={{ background: '#241810', color: '#ecdcc0', fontFamily: 'var(--font-body, Hanken Grotesk, system-ui, sans-serif)', backgroundImage: 'repeating-linear-gradient(92deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 9px),repeating-linear-gradient(92deg,rgba(140,104,58,0.05) 3px,transparent 4px,transparent 16px)' }}>
 
       {/* Hero badge */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1" style={{ marginTop: 16 }}>
         <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
-        <div className="text-4xl font-black tracking-widest"
-          style={{ color: isVictory ? '#5ae55a' : C.red, textShadow: `0 0 30px ${isVictory ? '#5ae55a' : C.red}66` }}>
-          {isVictory ? 'С Н Я Т О !' : 'П Р О В А Л'}
+        <div style={{ fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 38, letterSpacing: 6, color: isVictory ? '#9ad27e' : '#cf6a5a', textShadow: `0 0 30px ${isVictory ? '#7faf6a' : '#b15539'}66` }}>
+          {isVictory ? 'СНЯТО!' : 'ПРОВАЛ'}
         </div>
         {isVictory && (
-          <div className="text-xs tracking-widest" style={{ color: '#5ae55a99' }}>
+          <div style={{ fontFamily: 'var(--font-mono, Space Mono, monospace)', fontSize: 11, color: '#7faf6a99', letterSpacing: 2 }}>
             Отличная работа, стантмен!
           </div>
         )}
@@ -1167,14 +1250,12 @@ function ResultsView({ session, onExit }: { session: CombatSession; onExit: () =
       <div className="flex gap-3 pb-4">
         {isVictory && !collected && (
           <button onClick={() => { const r = applyRewards(); setLevelUp(r); setCollected(true); }}
-            className="rounded-xl px-7 py-3 font-black transition-all"
-            style={{ background: '#5ae55a22', color: '#5ae55a', border: `2px solid #5ae55a` }}>
+            style={{ borderRadius: 8, padding: '12px 28px', fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 16, background: 'rgba(127,175,106,0.18)', color: '#9ad27e', border: '2px solid #7faf6a', cursor: 'pointer' }}>
             ✓ Забрать
           </button>
         )}
         <button onClick={onExit}
-          className="rounded-xl px-7 py-3 font-black transition-all"
-          style={{ background: C.pink + '22', color: C.pink, border: `2px solid ${C.pink}` }}>
+          style={{ borderRadius: 8, padding: '12px 28px', fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 16, background: '#46341f', color: '#c39b4e', border: '2px solid #6e5430', cursor: 'pointer' }}>
           ← Деревня
         </button>
       </div>

@@ -215,29 +215,43 @@ const buildingStub = (id: string, icon: string, nameRu: string, nameEn: string, 
   ],
 });
 
-// ── Combat wave select stub ───────────────────────────────────────────────────
+// ── War Path (pre-combat managed page) ───────────────────────────────────────
+
+const warPathPage = (): StudioPage => ({
+  id: 'war_path',
+  protected: true,
+  title: { ru: 'Тропа Войны', en: 'War Path' },
+  background: '',
+  speaker: 'none',
+  text: { ru: '', en: '' },
+  sceneType: 'exploration',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [],
+  buttons: [],
+  // Rendered as a managed React overlay (WarPathPage.tsx) in playtest mode
+});
+
+// ── Combat wave select — trigger page for CombatOverlay ─────────────────────
 
 const combatWaveSelectPage = (): StudioPage => ({
   id: 'combat_wave_select',
   protected: true,
-  title: { ru: 'Выбор волны', en: 'Wave Select' },
+  title: { ru: 'Бой', en: 'Combat' },
   background: '',
   speaker: 'none',
   text: { ru: '', en: '' },
   sceneType: 'combat',
-  showTopResourceBar: true,
+  showTopResourceBar: false,
   uiLayoutPreset: 'freeform',
-  uiWidgets: [
-    { id: 'cws_title', type: 'textLabel', layout: { x: 15, y: 10, width: 70, height: 12, z: 10 }, text: { ru: '🎬 СЪЁМКА', en: '🎬 SHOOT' } },
-    { id: 'cws_hint',  type: 'textLabel', layout: { x: 15, y: 25, width: 70, height: 8,  z: 10 }, text: { ru: 'Выбор волны и сложности — здесь будет интерфейс боя (C2)', en: 'Wave & difficulty select — combat UI goes here (C2)' } },
-  ],
-  buttons: [
-    { id: 'cws_back', text: { ru: '← Деревня', en: '← Village' }, layout: { x: 2, y: 88, width: 22, height: 9, style: 'subtle' as const }, action: { type: 'goToPage' as const, pageId: 'village' } },
-  ],
+  uiWidgets: [],
+  buttons: [],
+  // CombatOverlay activates when this page is selected
 });
 
 export const createDefaultPages = (): StudioPage[] => [
   villagePage(),
+  warPathPage(),
   buildingStub('forge_01',  '⚒️',  'Кузница',  'Forge',    'Агафья'),
   buildingStub('tavern_01', '🍺',  'Таверна',  'Tavern',   'Мила'),
   buildingStub('shop_01',   '🛒',  'Лавка',    'Shop',     'Сэм'),
