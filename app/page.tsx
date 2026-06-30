@@ -26,6 +26,7 @@ import CavePage from '@/components/game/CavePage';
 import OfficePage from '@/components/game/OfficePage';
 import BureauPage from '@/components/game/BureauPage';
 import ManagedPagePreview from '@/components/editor/ManagedPagePreview';
+import NovelHUD from '@/components/editor/NovelHUD';
 
 export default function SlayStudio() {
   const {
@@ -176,6 +177,7 @@ export default function SlayStudio() {
                 {selectedPageId === 'mine_01'    && <CavePage />}
                 {selectedPageId === 'office_01'  && <OfficePage />}
                 {selectedPageId === 'bureau_01'  && <BureauPage />}
+                <NovelHUD />
                 {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
                 {playtestState.itemRewardModal && <ItemRewardModal />}
                 <CombatOverlay currentPageId={selectedPageId} />

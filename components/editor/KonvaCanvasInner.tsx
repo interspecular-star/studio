@@ -430,8 +430,14 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
       }
     : undefined;
 
+  // NovelHUD (React overlay) takes over dialogue rendering in playtest when speaker is set.
+  // Suppress Konva dialogueBox / choiceButton widgets to avoid doubling.
+  const novelHudActive = isPlaytest &&
+    !!currentPage?.speaker && currentPage.speaker !== 'none';
+
   // Filter widgets by visibleWhen (same logic as buttons). In editor always show for authoring.
   const visibleWidgets = effectiveWidgets.filter((widget: UIWidget) => {
+    if (novelHudActive && (widget.type === 'dialogueBox' || widget.type === 'choiceButton')) return false;
     if (!widget.visibleWhen) return true;
     if (!isPlaytest) return true; // always visible in editor
 
