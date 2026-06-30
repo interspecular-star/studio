@@ -18,6 +18,7 @@ import WidgetLibrary from '@/components/editor/WidgetLibrary';
 import CombatOverlay from '@/components/editor/CombatOverlay';
 import VillagePage from '@/components/game/VillagePage';
 import WarPathPage from '@/components/game/WarPathPage';
+import TavernPage from '@/components/game/TavernPage';
 import ManagedPagePreview from '@/components/editor/ManagedPagePreview';
 
 export default function SlayStudio() {
@@ -77,7 +78,7 @@ export default function SlayStudio() {
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
   // Pages that render their own full-screen UI (including their own HUD)
-  const MANAGED_PAGE_IDS = ['village', 'war_path', 'combat_wave_select'];
+  const MANAGED_PAGE_IDS = ['village', 'war_path', 'tavern_01', 'combat_wave_select'];
 
   const shouldShowTopResourceBar = (): boolean => {
     if (currentPage?.showTopResourceBar === false) return false;
@@ -162,6 +163,7 @@ export default function SlayStudio() {
                 {/* Managed game screens — full-screen overlays */}
                 {selectedPageId === 'village' && <VillagePage />}
                 {selectedPageId === 'war_path' && <WarPathPage />}
+                {selectedPageId === 'tavern_01' && <TavernPage />}
                 {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
                 {playtestState.itemRewardModal && <ItemRewardModal />}
                 <CombatOverlay currentPageId={selectedPageId} />
@@ -181,6 +183,9 @@ export default function SlayStudio() {
                   )}
                   {selectedPageId === 'war_path' && (
                     <ManagedPagePreview pageId="war_path" label="Тропа Войны" />
+                  )}
+                  {selectedPageId === 'tavern_01' && (
+                    <ManagedPagePreview pageId="tavern_01" label="Таверна «Пьяный Табурет»" />
                   )}
                 </>
               </CanvasWithRulers>

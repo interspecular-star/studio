@@ -249,11 +249,23 @@ const combatWaveSelectPage = (): StudioPage => ({
   // CombatOverlay activates when this page is selected
 });
 
+const tavernPage = (): StudioPage => ({
+  id: 'tavern_01',
+  protected: true,
+  title: { ru: 'Таверна «Пьяный Табурет»', en: 'Tavern «Drunk Stool»' },
+  background: '', speaker: 'none', text: { ru: '', en: '' },
+  sceneType: 'dialog',
+  showTopResourceBar: false,
+  uiLayoutPreset: 'freeform',
+  uiWidgets: [], buttons: [],
+  // Rendered as a managed React overlay (TavernPage.tsx) in playtest mode
+});
+
 export const createDefaultPages = (): StudioPage[] => [
   villagePage(),
   warPathPage(),
+  tavernPage(),
   buildingStub('forge_01',  '⚒️',  'Кузница',  'Forge',    'Агафья'),
-  buildingStub('tavern_01', '🍺',  'Таверна',  'Tavern',   'Мила'),
   buildingStub('shop_01',   '🛒',  'Лавка',    'Shop',     'Сэм'),
   buildingStub('shaman_01', '🔮',  'Шаманка',  "Shaman's", 'Зося'),
   buildingStub('mine_01',   '⛏️', 'Шахта',    'Mine',     '—'),
