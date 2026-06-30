@@ -357,7 +357,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   snapEnabled: true,
 
   canvasWidth: 1280,
-  canvasHeight: 720,
+  canvasHeight: 800,
 
   items: [],
   variables: [],

@@ -130,7 +130,7 @@
 }
 
 /* ========================================
-   SLAY STUDIO — Warm Nostalgic Dark Theme
+   SLAY STUDIO — Editor Theme (unchanged)
    ======================================== */
 
 :root {
@@ -150,6 +150,45 @@
   --studio-border-strong: #534B40;
 
   --studio-danger: #B85C4C;
+
+  /* ========================================
+     SLAY ADVENTURE — Game: Wood & Brass (Direction D)
+     ======================================== */
+
+  /* Дерево — корпус */
+  --sa-bg-page:     #0e0a07;
+  --sa-bg-panel:    #241810;
+  --sa-bg-titlebar: #2f2114;
+  --sa-bg-hud:      #1a120a;
+  --sa-bg-lcd:      #161009;
+  --sa-bg-btn:      #46341f;
+  --sa-bg-slot:     #2a1d10;
+
+  /* Рамки */
+  --sa-border:       #5a4226;
+  --sa-border-quiet: #3a2c18;
+  --sa-border-btn:   #6e5430;
+  --sa-border-hover: #c39b4e;
+
+  /* Латунь и текст */
+  --sa-brass:      #c39b4e;
+  --sa-brass-hero: #e0c178;
+  --sa-text-title: #e7d8b4;
+  --sa-text-main:  #ecdcc0;
+  --sa-text-muted: #a8916a;
+  --sa-text-meta:  #8a724a;
+  --sa-text-price: #cdb88a;
+
+  /* Семантика */
+  --sa-hp:        #7faf6a;
+  --sa-hp-bright: #9ad27e;
+  --sa-danger:    #b15539;
+  --sa-mp:        #6f8fb0;
+  --sa-mp-bright: #9ab8d4;
+  --sa-orange:    #cf8a5a;
+  --sa-pink:      #c47a93;
+  --sa-violet:    #b48fc4;
+  --sa-gold-warm: #d6a24e;
 }
 
 .dark {
@@ -206,3 +245,29 @@
   outline: 2px solid var(--studio-accent);
   outline-offset: 2px;
 }
+
+/* ── Game textures ──────────────────────────────────────────────────────── */
+
+.sa-wood {
+  background-color: var(--sa-bg-panel);
+  background-image:
+    repeating-linear-gradient(92deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(92deg, rgba(140,104,58,0.05) 3px, transparent 4px, transparent 16px);
+}
+
+.sa-scan {
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(255,255,255,0.025) 0px,
+    rgba(255,255,255,0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Шрифты игровых экранов (через CSS vars, заданные в layout.tsx) */
+.font-dot  { font-family: var(--font-dot,  'DotGothic16', monospace); }
+.font-vt   { font-family: var(--font-vt,   'VT323', monospace); }
+.font-silk { font-family: var(--font-silk, 'Silkscreen', monospace); }
+.font-mono { font-family: var(--font-mono, 'Space Mono', monospace); }
+.font-body { font-family: var(--font-body, 'Hanken Grotesk', sans-serif); }

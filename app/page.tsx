@@ -16,6 +16,8 @@ import TopResourceBar from '@/components/editor/TopResourceBar';
 import LeftSidebar from '@/components/editor/LeftSidebar';
 import WidgetLibrary from '@/components/editor/WidgetLibrary';
 import CombatOverlay from '@/components/editor/CombatOverlay';
+import VillagePage from '@/components/game/VillagePage';
+import ManagedPagePreview from '@/components/editor/ManagedPagePreview';
 
 export default function SlayStudio() {
   const {
@@ -73,8 +75,13 @@ export default function SlayStudio() {
 
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
+  // Pages that render their own full-screen UI (including their own HUD)
+  const MANAGED_PAGE_IDS = ['village', 'war_path'];
+
   const shouldShowTopResourceBar = (): boolean => {
     if (currentPage?.showTopResourceBar === false) return false;
+    // Managed pages render their own HUD
+    if (selectedPageId && MANAGED_PAGE_IDS.includes(selectedPageId)) return false;
     if (mode === 'editor') return true;
     if (mode !== 'playtest') return false;
     if (playtestState.isInventoryOpen) return false;
@@ -151,6 +158,8 @@ export default function SlayStudio() {
                   </div>
                 )}
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
+                {/* Managed game screens — full-screen overlays */}
+                {selectedPageId === 'village' && <VillagePage />}
                 {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
                 {playtestState.itemRewardModal && <ItemRewardModal />}
                 <CombatOverlay currentPageId={selectedPageId} />
@@ -163,6 +172,10 @@ export default function SlayStudio() {
                     <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none border-b border-[var(--studio-border)]/60 opacity-80">
                       <TopResourceBar currentPage={currentPage} variables={variables} playtestState={playtestState} />
                     </div>
+                  )}
+                  {/* Editor preview for managed pages */}
+                  {selectedPageId === 'village' && (
+                    <ManagedPagePreview pageId="village" label="Площадь Табуреткино" />
                   )}
                 </>
               </CanvasWithRulers>

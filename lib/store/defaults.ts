@@ -185,27 +185,11 @@ const villagePage = (): StudioPage => ({
   speaker: 'none',
   text: { ru: '', en: '' },
   sceneType: 'exploration',
-  showTopResourceBar: true,
+  showTopResourceBar: false,
   uiLayoutPreset: 'freeform',
-  uiWidgets: [
-    { id: 'vw_title', type: 'textLabel', layout: { x: 10, y: 4, width: 80, height: 10, z: 10 }, text: { ru: '🎬 ТАБУРЕТКИНО', en: '🎬 TABURETKINO' } },
-  ],
-  buttons: [
-    // Buildings — one button each, clearly labeled
-    ...BUILDING_CARDS.map(b => ({
-      id: `vbtn_${b.key}`,
-      text: { ru: `${b.icon} ${b.nameRu}`, en: `${b.icon} ${b.nameEn}` },
-      layout: { x: b.x, y: 18, width: 17, height: 44, style: 'default' as const },
-      action: { type: 'goToPage' as const, pageId: b.pageId },
-    })),
-    // СЪЁМКА — combat entry
-    {
-      id: 'vbtn_combat',
-      text: { ru: '🎬  СЪЁМКА', en: '🎬  SHOOT' },
-      layout: { x: 28, y: 68, width: 44, height: 14, style: 'important' as const },
-      action: { type: 'goToPage' as const, pageId: 'combat_wave_select' },
-    },
-  ],
+  uiWidgets: [],
+  buttons: [],
+  // Rendered as a managed React overlay (VillagePage.tsx) in playtest mode
 });
 
 // ── Building stub pages ───────────────────────────────────────────────────────

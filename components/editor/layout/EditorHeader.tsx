@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useStudioStore } from '@/lib/store';
 
 const CANVAS_PRESETS = [
+  { label: '1280 × 800', w: 1280, h: 800 },
   { label: '1280 × 720', w: 1280, h: 720 },
   { label: '1920 × 1080', w: 1920, h: 1080 },
   { label: '960 × 540', w: 960, h: 540 },
