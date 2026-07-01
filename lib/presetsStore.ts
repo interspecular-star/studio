@@ -9,7 +9,7 @@ import type { UIWidget } from './store';
 
 const LOC_WIDGETS: UIWidget[] = [
   { id: 'bi_village',  type: 'quickAction', layout: { x: 15, y: 5,  width: 70, height: 9, z: 10 }, text: { ru: '🏘️  Деревня',       en: '🏘️  Village'       }, action: { type: 'goToPage', pageId: 'village'           } },
-  { id: 'bi_combat',  type: 'quickAction', layout: { x: 15, y: 15, width: 70, height: 9, z: 10 }, text: { ru: '🎬  Выбор волны',    en: '🎬  Wave Select'    }, action: { type: 'goToPage', pageId: 'combat_wave_select' } },
+  { id: 'bi_combat',  type: 'quickAction', layout: { x: 15, y: 15, width: 70, height: 9, z: 10 }, text: { ru: '🎬  Примерочная',   en: '🎬  Dressing Room'  }, action: { type: 'goToPage', pageId: 'war_path'           } },
   { id: 'bi_forge',   type: 'quickAction', layout: { x: 15, y: 25, width: 70, height: 9, z: 10 }, text: { ru: '⚒️  Кузница',        en: '⚒️  Forge'          }, action: { type: 'goToPage', pageId: 'forge_01'           } },
   { id: 'bi_tavern',  type: 'quickAction', layout: { x: 15, y: 35, width: 70, height: 9, z: 10 }, text: { ru: '🍺  Таверна',        en: '🍺  Tavern'         }, action: { type: 'goToPage', pageId: 'tavern_01'          } },
   { id: 'bi_shop',    type: 'quickAction', layout: { x: 15, y: 45, width: 70, height: 9, z: 10 }, text: { ru: '🛒  Лавка',          en: '🛒  Shop'           }, action: { type: 'goToPage', pageId: 'shop_01'            } },

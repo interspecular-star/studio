@@ -4,10 +4,13 @@ import { createInitialMeta, createDefaultSpeakers, createDefaultPages, DEFAULT_E
 import { buildCombatPack } from '../../validation/validate';
 
 // Bump when default system pages OR system enemies/waves change structure.
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 // Pages managed by the engine — replaced on schema upgrade, not user-authored
-const SYSTEM_PAGE_IDS = ['village', 'forge_01', 'tavern_01', 'shop_01', 'shaman_01', 'mine_01', 'combat_wave_select'];
+const SYSTEM_PAGE_IDS = ['village', 'war_path', 'combat_results', 'forge_01', 'tavern_01', 'shop_01', 'shaman_01', 'mine_01', 'office_01', 'bureau_01'];
+
+// Pages that have been removed from the engine — purged from saved projects on upgrade
+const REMOVED_PAGE_IDS = new Set(['combat_wave_select']);
 
 // Default enemies/waves injected on first load or when missing
 const DEFAULT_ENEMIES = [
@@ -101,10 +104,20 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         }),
       }));
 
-      const rawActs: StudioAct[] = parsed.acts || [];
-      const rawUnassigned: string[] = parsed.unassignedPageIds || (parsed.acts ? [] : sanitizedPages.map((p: any) => p.id));
+      // Schema version check — must happen before page filtering so we know if we should migrate
+      const defaultPages = createDefaultPages();
+      const savedVersion: number = parsed.schemaVersion ?? 1;
+      const needsUpgrade = savedVersion < SCHEMA_VERSION;
 
-      const validPageIds = new Set<string>(sanitizedPages.map((p: any) => p.id));
+      // Strip pages that were removed from the engine (only on upgrade to preserve user projects)
+      const pagesAfterRemoval = needsUpgrade
+        ? sanitizedPages.filter((p: any) => !REMOVED_PAGE_IDS.has(p.id))
+        : sanitizedPages;
+
+      const rawActs: StudioAct[] = parsed.acts || [];
+      const rawUnassigned: string[] = parsed.unassignedPageIds || (parsed.acts ? [] : pagesAfterRemoval.map((p: any) => p.id));
+
+      const validPageIds = new Set<string>(pagesAfterRemoval.map((p: any) => p.id));
       const loadedActs = rawActs.map((a: StudioAct) => ({
         ...a,
         pageIds: a.pageIds.filter((pid: string) => validPageIds.has(pid)),
@@ -114,25 +127,21 @@ export const createPersistenceSlice = (set: any, get: any) => ({
         ...loadedActs.flatMap((a: StudioAct) => a.pageIds),
         ...rawUnassigned.filter((pid: string) => validPageIds.has(pid)),
       ]);
-      const orphaned = sanitizedPages.map((p: any) => p.id).filter((pid: string) => !trackedIds.has(pid));
+      const orphaned = pagesAfterRemoval.map((p: any) => p.id).filter((pid: string) => !trackedIds.has(pid));
       const loadedUnassigned = [...rawUnassigned.filter((pid: string) => validPageIds.has(pid)), ...orphaned];
 
       // Merge defaults: add missing pages + replace system pages on schema upgrade
-      const defaultPages = createDefaultPages();
-      const savedVersion: number = parsed.schemaVersion ?? 1;
-      const needsUpgrade = savedVersion < SCHEMA_VERSION;
-
-      const loadedPageIds = new Set<string>(sanitizedPages.map((p: any) => p.id));
+      const loadedPageIds = new Set<string>(pagesAfterRemoval.map((p: any) => p.id));
       const missingDefaults = defaultPages.filter(dp => !loadedPageIds.has(dp.id));
 
       let mergedPages = needsUpgrade
-        ? sanitizedPages.map((p: any) => {
+        ? pagesAfterRemoval.map((p: any) => {
             if (SYSTEM_PAGE_IDS.includes(p.id)) {
               return defaultPages.find(dp => dp.id === p.id) ?? p;
             }
             return p;
           })
-        : sanitizedPages;
+        : pagesAfterRemoval;
 
       const finalPages = [...missingDefaults, ...mergedPages];
       const finalUnassigned = [...missingDefaults.map(p => p.id), ...loadedUnassigned];

@@ -32,7 +32,7 @@ const NOVEL_CSS = `
 
 // ── Managed page IDs — NovelHUD stays silent for these ────────────────────────
 const MANAGED = new Set([
-  'village', 'war_path', 'combat_wave_select',
+  'village', 'war_path', 'combat_results',
   'tavern_01', 'forge_01', 'shop_01', 'shaman_01', 'mine_01', 'office_01', 'bureau_01',
 ]);
 
