@@ -1,5 +1,10 @@
 {
-  "$schema": "https://ui.shadcn.com/schema.json",
+ {
+  "registries": {
+    "@react-bits": "https://reactbits.dev/r/{name}.json"
+  }
+}
+ "$schema": "https://ui.shadcn.com/schema.json",
   "style": "base-nova",
   "rsc": true,
   "tsx": true,

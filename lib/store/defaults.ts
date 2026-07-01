@@ -232,21 +232,21 @@ const warPathPage = (): StudioPage => ({
   // Rendered as a managed React overlay (WarPathPage.tsx) in playtest mode
 });
 
-// ── Combat wave select — trigger page for CombatOverlay ─────────────────────
+// ── Combat results — managed page shown after victory/defeat ─────────────────
 
-const combatWaveSelectPage = (): StudioPage => ({
-  id: 'combat_wave_select',
+const combatResultsPage = (): StudioPage => ({
+  id: 'combat_results',
   protected: true,
-  title: { ru: 'Бой', en: 'Combat' },
+  title: { ru: 'Итоги дубля', en: 'Take Results' },
   background: '',
   speaker: 'none',
   text: { ru: '', en: '' },
-  sceneType: 'combat',
+  sceneType: 'exploration',
   showTopResourceBar: false,
   uiLayoutPreset: 'freeform',
   uiWidgets: [],
   buttons: [],
-  // CombatOverlay activates when this page is selected
+  // Rendered as CombatResultsPage.tsx after combat ends
 });
 
 const tavernPage = (): StudioPage => ({
@@ -329,6 +329,7 @@ const bureauPage = (): StudioPage => ({
 export const createDefaultPages = (): StudioPage[] => [
   villagePage(),
   warPathPage(),
+  combatResultsPage(),
   tavernPage(),
   forgePage(),
   shopPage(),
@@ -336,7 +337,6 @@ export const createDefaultPages = (): StudioPage[] => [
   cavePage(),
   officePage(),
   bureauPage(),
-  combatWaveSelectPage(),
   {
     id: 'intro_01',
     title: { ru: 'Введение — Окраина Табуреткино', en: 'Introduction — Edge of Taburetkiно' },

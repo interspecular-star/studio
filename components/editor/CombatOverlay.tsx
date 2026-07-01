@@ -5,453 +5,27 @@ import { useShallow } from 'zustand/react/shallow';
 import { useStudioStore } from '@/lib/store';
 import type { CombatSession, SpawnedEnemy, AttackSignal, CombatLogEntry } from '@/lib/types/combat-session';
 import type { Difficulty, SkillId } from '@/lib/types/combat';
-import { DIFFICULTY_LABELS, DEFAULT_INSTINCTS, DEFAULT_SCENARIOS, DEFAULT_RANDOM_EVENTS, DEFAULT_SKILLS, DEFAULT_SKILL_SLOTS } from '@/lib/types/combat';
-import { simulateCombat, type SimulationResult } from '@/lib/combat/engine';
+import { DEFAULT_INSTINCTS, DEFAULT_SKILLS } from '@/lib/types/combat';
 
 // ── Palette — Wood & Brass ────────────────────────────────────────────────────
 const C = {
-  bg:     '#1b130b',   // dark wood
-  pink:   '#b15539',   // enemy HP / damage
-  cyan:   '#6f8fb0',   // MP / dodge / parry / shield
-  yellow: '#e0c178',   // showtime / crits / brass-hero
-  red:    '#cf6a5a',   // low HP / danger bright
-  text:   '#ecdcc0',   // main text
-  muted:  '#a8916a',   // muted text
-  dim:    '#2a1d10',   // dark slot / panel bg
+  bg:     '#1b130b',
+  pink:   '#b15539',
+  cyan:   '#6f8fb0',
+  yellow: '#e0c178',
+  red:    '#cf6a5a',
+  text:   '#ecdcc0',
+  muted:  '#a8916a',
+  dim:    '#2a1d10',
 };
 
-// Кол-во врагов на каждой сложности
 const DIFF_COUNT: Record<Difficulty, number> = {
   novice: 3, amateur: 5, professional: 7, stuntman: 9, hollywood: 12, super_endless: 20,
 };
 const BOSS_DIFFS: Difficulty[] = ['professional', 'stuntman', 'hollywood', 'super_endless'];
-
-// Цвет слота навыка
 const SLOT_COLORS: [string, string, string] = [C.pink, C.cyan, C.yellow];
 
 function cdSec(ticks: number) { return (ticks * 0.2).toFixed(1) + 'с'; }
-
-// ── Simulation Panel ──────────────────────────────────────────────────────────
-
-function SimulationPanel({ waveId, difficulty }: { waveId: string; difficulty: Difficulty }) {
-  const { waves, enemies, bosses, variables, playtestState } = useStudioStore(useShallow(s => ({
-    waves: s.waves, enemies: s.enemies, bosses: s.bosses,
-    variables: s.variables, playtestState: s.playtestState,
-  })));
-  const [result, setResult] = useState<SimulationResult | null>(null);
-  const [running, setRunning] = useState(false);
-  const [iters, setIters] = useState(50);
-
-  const wave = waves.find((w: any) => w.id === waveId);
-  const numVar = (name: string, fallback: number): number => {
-    const v = variables.find((v: any) => v.name === name);
-    if (!v) return fallback;
-    const val = playtestState.variableValues[v.id];
-    return typeof val === 'number' ? val : (typeof v.defaultValue === 'number' ? v.defaultValue : fallback);
-  };
-  const optVar = (name: string): number | undefined => {
-    const v = variables.find((v: any) => v.name === name);
-    if (!v) return undefined;
-    const val = playtestState.variableValues[v.id];
-    return typeof val === 'number' ? val : (typeof v.defaultValue === 'number' ? v.defaultValue : undefined);
-  };
-
-  const runSim = () => {
-    if (!wave) return;
-    setRunning(true); setResult(null);
-    setTimeout(() => {
-      const critDmgRaw = optVar('crit_damage');
-      const ps = {
-        str: numVar('strength', 5), agi: numVar('agility', 5), end: numVar('endurance', 10),
-        mag: numVar('magic', 5), lck: numVar('luck', 5), lvl: numVar('level', 1),
-        hpMax:   optVar('health_max'),
-        mpMax:   optVar('mana_max'),
-        defFlat: optVar('defense'),
-        critCh:  optVar('crit_chance'),
-        critDmg: critDmgRaw !== undefined ? Math.round(critDmgRaw * 100) : undefined,
-      };
-      setResult(simulateCombat(wave, difficulty, enemies, bosses, ps, null, iters));
-      setRunning(false);
-    }, 0);
-  };
-
-  if (!wave) return null;
-  return (
-    <div className="rounded-xl p-3 flex flex-col gap-2 mt-2" style={{ background: '#0D0B0F', border: `1px solid ${C.dim}` }}>
-      <div className="text-[10px] font-semibold" style={{ color: C.muted }}>СИМУЛЯЦИЯ</div>
-      <div className="flex gap-2">
-        <select value={iters} onChange={e => setIters(Number(e.target.value))}
-          className="rounded px-2 py-1 text-xs" style={{ background: '#1a1020', color: C.text, border: `1px solid ${C.dim}` }}>
-          {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} итер.</option>)}
-        </select>
-        <button onClick={runSim} disabled={running} className="rounded px-3 py-1 text-xs font-bold transition-opacity disabled:opacity-40"
-          style={{ background: C.pink + '33', color: C.pink, border: `1px solid ${C.pink}66` }}>
-          {running ? '…' : '▶ Запуск'}
-        </button>
-      </div>
-      {result && (
-        <div className="flex gap-4 flex-wrap">
-          {[['Победы', result.winRate + '%', result.winRate >= 60], ['Убито', String(result.avgKills), false], ['Монет', String(result.avgCoins), false], ['XP', String(result.avgXp), false]].map(([l, v, hi]) => (
-            <div key={String(l)} className="flex flex-col items-center">
-              <div className="text-sm font-black" style={{ color: hi ? '#5AE55A' : C.text }}>{v}</div>
-              <div className="text-[9px]" style={{ color: C.muted }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Wave Select ───────────────────────────────────────────────────────────────
-
-function SkillPicker({
-  skillSlots, setSkillSlots,
-}: {
-  skillSlots: [SkillId | null, SkillId | null, SkillId | null];
-  setSkillSlots: (s: [SkillId | null, SkillId | null, SkillId | null]) => void;
-}) {
-  const [activeSlot, setActiveSlot] = useState<0 | 1 | 2 | null>(null);
-  const ALL_SKILLS = Object.values(DEFAULT_SKILLS) as typeof DEFAULT_SKILLS[SkillId][];
-
-  const assignSkill = (skillId: SkillId) => {
-    if (activeSlot === null) return;
-    const next = [...skillSlots] as [SkillId | null, SkillId | null, SkillId | null];
-    next[activeSlot] = skillId;
-    setSkillSlots(next);
-    setActiveSlot(null);
-  };
-
-  return (
-    <div className="w-full max-w-sm flex flex-col gap-2">
-      <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>НАВЫКИ — ВЫБЕРИ 3 СЛОТА</div>
-
-      {/* Current slots */}
-      <div className="flex gap-2">
-        {([0, 1, 2] as const).map(i => {
-          const skillId = skillSlots[i];
-          const skill   = skillId ? DEFAULT_SKILLS[skillId] : null;
-          const color   = SLOT_COLORS[i];
-          const isActive = activeSlot === i;
-          return (
-            <button key={i} onClick={() => setActiveSlot(isActive ? null : i)}
-              className="flex-1 rounded-xl py-2 px-1 flex flex-col items-center gap-0.5 transition-all"
-              style={{
-                border: `2px solid ${isActive ? color : color + '55'}`,
-                background: isActive ? color + '22' : color + '0a',
-                boxShadow: isActive ? `0 0 12px ${color}55` : 'none',
-              }}>
-              <span className="text-[8px] font-bold" style={{ color }}>{i + 1}</span>
-              <span className="text-[9px] font-semibold text-center leading-tight" style={{ color: skill ? C.text : C.muted }}>
-                {skill?.name.ru ?? '—'}
-              </span>
-              {skill && <span className="text-[8px]" style={{ color: C.muted }}>{skill.mpCost} MP</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeSlot !== null && (
-        <div className="text-[9px] text-center" style={{ color: SLOT_COLORS[activeSlot] }}>
-          ↑ Слот {activeSlot + 1} выбран — нажми навык ниже
-        </div>
-      )}
-
-      {/* Skill grid */}
-      <div className="grid grid-cols-3 gap-1.5">
-        {ALL_SKILLS.map(skill => {
-          const inSlot = skillSlots.indexOf(skill.id as SkillId);
-          return (
-            <button key={skill.id} onClick={() => assignSkill(skill.id as SkillId)}
-              disabled={activeSlot === null}
-              title={skill.description.ru}
-              className="rounded-lg px-2 py-2 flex flex-col items-center gap-0.5 transition-all disabled:opacity-40"
-              style={{
-                background: inSlot >= 0 ? SLOT_COLORS[inSlot] + '22' : C.dim,
-                border: `1px solid ${inSlot >= 0 ? SLOT_COLORS[inSlot] + '88' : 'transparent'}`,
-              }}>
-              <span className="text-[9px] font-bold text-center leading-tight" style={{ color: C.text }}>
-                {skill.name.ru}
-              </span>
-              <span className="text-[8px]" style={{ color: C.muted }}>{skill.mpCost}MP · {(skill.cooldownTicks * 0.2).toFixed(0)}с</span>
-              {inSlot >= 0 && (
-                <span className="text-[7px] font-black" style={{ color: SLOT_COLORS[inSlot] }}>▲{inSlot + 1}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ScenarioPicker({
-  difficulty, selected, setSelected,
-}: {
-  difficulty: Difficulty;
-  selected: string[];
-  setSelected: (ids: string[]) => void;
-}) {
-  const available = DEFAULT_SCENARIOS.filter(s => s.availableDifficulties.includes(difficulty));
-  const toggle = (id: string) => {
-    if (selected.includes(id)) {
-      setSelected(selected.filter(s => s !== id));
-    } else if (selected.length < 2) {
-      setSelected([...selected, id]);
-    }
-  };
-
-  return (
-    <div className="w-full max-w-sm flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>СЦЕНАРИИ (до 2)</span>
-        <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.yellow + '22', color: C.yellow }}>
-          {selected.length}/2
-        </span>
-      </div>
-      <div className="flex flex-col gap-1">
-        {available.map(s => {
-          const isOn = selected.includes(s.id);
-          const full = !isOn && selected.length >= 2;
-          return (
-            <button key={s.id} onClick={() => toggle(s.id)} disabled={full}
-              className="rounded-lg px-3 py-2 text-left transition-all disabled:opacity-30 flex items-start gap-2"
-              style={{
-                background: isOn ? C.cyan + '15' : C.dim,
-                border: `1px solid ${isOn ? C.cyan + '66' : 'transparent'}`,
-              }}>
-              <span className="text-xs font-bold mt-0.5 shrink-0" style={{ color: isOn ? C.cyan : C.muted }}>
-                {isOn ? '☑' : '☐'}
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-semibold" style={{ color: isOn ? C.text : C.muted + 'cc' }}>
-                  {s.name.ru}
-                </span>
-                <span className="text-[8px]" style={{ color: C.muted }}>
-                  {s.condition.ru}
-                </span>
-                <span className="text-[8px]" style={{ color: C.yellow + 'cc' }}>
-                  → {s.reward.ru}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function EnemyPoolPreview({ waveData, enemies, bosses }: { waveData: any; enemies: any[]; bosses: any[] }) {
-  if (!waveData) return null;
-  const allDefs = [...enemies, ...bosses];
-  const pool: Array<{ id: string; name: string; weight: number; pct: number }> = waveData.enemyPool.map((e: any) => {
-    const total = waveData.enemyPool.reduce((s: number, x: any) => s + x.weight, 0);
-    const def = allDefs.find((d: any) => d.id === e.enemyId);
-    return { id: e.enemyId, name: def?.name?.ru ?? e.enemyId, weight: e.weight, pct: Math.round((e.weight / total) * 100) };
-  }).sort((a: any, b: any) => b.weight - a.weight);
-
-  const boss = waveData.bossId ? allDefs.find((d: any) => d.id === waveData.bossId) : null;
-
-  return (
-    <div className="w-full max-w-sm flex flex-col gap-2">
-      <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ВРАГИ В ПУЛЕ</div>
-      <div className="flex flex-wrap gap-1.5">
-        {pool.map(e => (
-          <div key={e.id} className="rounded px-2 py-1 flex items-center gap-1"
-            style={{ background: C.pink + '15', border: `1px solid ${C.pink}33` }}>
-            <span className="text-[9px] font-semibold" style={{ color: C.text }}>{e.name}</span>
-            <span className="text-[8px]" style={{ color: C.muted }}>{e.pct}%</span>
-          </div>
-        ))}
-        {boss && (
-          <div className="rounded px-2 py-1 flex items-center gap-1"
-            style={{ background: C.yellow + '15', border: `1px solid ${C.yellow}55` }}>
-            <span className="text-[8px] font-bold" style={{ color: C.yellow }}>⚡</span>
-            <span className="text-[9px] font-semibold" style={{ color: C.text }}>{boss.name?.ru ?? boss.id}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function WaveSelect() {
-  const { waves, startCombat, variables, playtestState, enemies, bosses } = useStudioStore(useShallow(s => ({
-    waves: s.waves, startCombat: s.startCombat, variables: s.variables,
-    playtestState: s.playtestState, enemies: s.enemies, bosses: s.bosses,
-  })));
-
-  const [selectedWave, setSelectedWave]       = useState('');
-  const [difficulty, setDifficulty]           = useState<Difficulty>('stuntman');
-  const [instinctId, setInstinctId]           = useState<string | null>(null);
-  const [showSim, setShowSim]                 = useState(false);
-  const [skillSlots, setSkillSlots]           = useState<[SkillId | null, SkillId | null, SkillId | null]>([...DEFAULT_SKILL_SLOTS]);
-  const [selectedScenarios, setSelectedScenarios] = useState<string[]>([]);
-
-  const levelVarId = variables.find((v: any) => v.name === 'level')?.id as string | undefined;
-  const playerLevel = levelVarId ? ((playtestState.variableValues[levelVarId] as number | undefined) ?? 1) : 1;
-  const unlockedInstincts = DEFAULT_INSTINCTS.filter(i => i.unlockLevel <= playerLevel);
-
-  const waveData: any = waves.find((w: any) => w.id === selectedWave);
-  const availableDiffs: Difficulty[] = waveData?.difficulties ?? (['novice', 'amateur', 'professional', 'stuntman', 'hollywood'] as Difficulty[]);
-
-  useEffect(() => {
-    if (waveData && !availableDiffs.includes(difficulty)) {
-      setDifficulty(availableDiffs[availableDiffs.length - 1]);
-    }
-    // Reset scenarios on wave change (available set may differ)
-    setSelectedScenarios([]);
-  }, [selectedWave]);
-
-  // Also reset invalid scenarios when difficulty changes
-  useEffect(() => {
-    const stillAvail = DEFAULT_SCENARIOS
-      .filter(s => s.availableDifficulties.includes(difficulty))
-      .map(s => s.id);
-    setSelectedScenarios(prev => prev.filter(id => stillAvail.includes(id)));
-  }, [difficulty]);
-
-  const hasBoss = waveData?.bossId && BOSS_DIFFS.includes(difficulty);
-  const enemyCount = DIFF_COUNT[difficulty];
-
-  return (
-    <div className="flex flex-col items-center h-full gap-4 px-6 overflow-y-auto py-5"
-      style={{ background: C.bg, color: C.text, fontFamily: 'var(--font-body, Hanken Grotesk, system-ui, sans-serif)', backgroundImage: 'repeating-linear-gradient(92deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 9px),repeating-linear-gradient(92deg,rgba(140,104,58,0.05) 3px,transparent 4px,transparent 16px)' }}>
-      <div style={{ fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: '28px', color: '#e7d8b4', letterSpacing: '2px', marginTop: 8 }}>
-        🎬 СЪЁМКА
-      </div>
-      <div className="text-xs" style={{ color: C.muted, fontFamily: 'var(--font-mono, Space Mono, monospace)' }}>Ур. {playerLevel} · выбери волну и настрой бой</div>
-
-      {waves.length === 0 ? (
-        <div className="rounded-xl p-6 text-center max-w-xs" style={{ background: C.dim, border: `1px solid ${C.dim}` }}>
-          <div className="text-sm font-semibold mb-1">Нет волн</div>
-          <div className="text-xs leading-relaxed" style={{ color: C.muted }}>
-            Правая панель → Мир → Боёвка → Волны
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Волны */}
-          <div className="flex flex-col gap-2 w-full max-w-sm">
-            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ВОЛНА</div>
-            {waves.map((w: any) => (
-              <button key={w.id} onClick={() => setSelectedWave(w.id)}
-                className="rounded-xl px-4 py-3 text-left transition-all"
-                style={{
-                  background: selectedWave === w.id ? C.pink + '22' : C.dim,
-                  border: `1px solid ${selectedWave === w.id ? C.pink : 'transparent'}`,
-                }}>
-                <div className="font-semibold text-sm">{w.name.ru}</div>
-                <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>
-                  {w.enemyPool.length} типов враг.{w.bossId ? '  ·  ⚡ Босс' : ''}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Сложность */}
-          <div className="w-full max-w-sm flex flex-col gap-2">
-            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>СЛОЖНОСТЬ</div>
-            <div className="flex flex-wrap gap-2">
-              {availableDiffs.map(d => {
-                const count = DIFF_COUNT[d];
-                const boss  = waveData?.bossId && BOSS_DIFFS.includes(d);
-                const isOn  = difficulty === d;
-                return (
-                  <button key={d} onClick={() => setDifficulty(d)}
-                    className="rounded-lg px-3 py-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5"
-                    style={{
-                      background: isOn ? C.yellow + '22' : C.dim,
-                      color: isOn ? C.yellow : C.muted,
-                      border: `1px solid ${isOn ? C.yellow : 'transparent'}`,
-                    }}>
-                    <span>{DIFFICULTY_LABELS[d]}</span>
-                    <span className="text-[9px] font-normal" style={{ color: isOn ? C.yellow + 'bb' : C.muted + '99' }}>
-                      {count} моб.{boss ? '+босс' : ''}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {selectedWave && (
-              <div className="text-xs" style={{ color: C.yellow }}>
-                Итого: {enemyCount} {hasBoss ? `мобов + 1 босс = ${enemyCount + 1} врагов` : 'мобов'}
-              </div>
-            )}
-          </div>
-
-          {/* Enemy pool preview */}
-          {selectedWave && (
-            <EnemyPoolPreview waveData={waveData} enemies={enemies} bosses={bosses} />
-          )}
-
-          {/* Skill picker */}
-          <SkillPicker skillSlots={skillSlots} setSkillSlots={setSkillSlots} />
-
-          {/* Scenario picker */}
-          {selectedWave && (
-            <ScenarioPicker
-              difficulty={difficulty}
-              selected={selectedScenarios}
-              setSelected={setSelectedScenarios}
-            />
-          )}
-
-          {/* Инстинкт */}
-          <div className="w-full max-w-sm flex flex-col gap-2">
-            <div className="text-[10px] font-semibold tracking-widest" style={{ color: C.muted }}>ИНСТИНКТ</div>
-            <div className="flex flex-wrap gap-1.5">
-              <button onClick={() => setInstinctId(null)}
-                className="rounded-lg px-2.5 py-1 text-[10px] font-semibold"
-                style={{ background: instinctId === null ? C.dim : 'transparent', color: instinctId === null ? C.text : C.muted, border: `1px solid ${instinctId === null ? C.muted + '66' : 'transparent'}` }}>
-                Нет
-              </button>
-              {unlockedInstincts.map(inst => (
-                <button key={inst.id} onClick={() => setInstinctId(inst.id)} title={inst.passiveEffect.ru}
-                  className="rounded-lg px-2.5 py-1 text-[10px] font-semibold"
-                  style={{ background: instinctId === inst.id ? C.cyan + '22' : 'transparent', color: instinctId === inst.id ? C.cyan : C.muted, border: `1px solid ${instinctId === inst.id ? C.cyan : 'transparent'}` }}>
-                  {inst.name.ru}
-                </button>
-              ))}
-              {DEFAULT_INSTINCTS.filter(i => i.unlockLevel > playerLevel).map(inst => (
-                <button key={inst.id} disabled className="rounded-lg px-2.5 py-1 text-[10px] opacity-25 cursor-not-allowed"
-                  style={{ color: C.muted }}>🔒 {inst.name.ru}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Симуляция */}
-          {selectedWave && (
-            <div className="w-full max-w-sm">
-              <button onClick={() => setShowSim(v => !v)} className="text-[10px] font-semibold transition-colors"
-                style={{ color: showSim ? C.yellow : C.muted + '66' }}>
-                {showSim ? '▲' : '▼'} Симуляция
-              </button>
-              {showSim && <SimulationPanel waveId={selectedWave} difficulty={difficulty} />}
-            </div>
-          )}
-
-          {/* Старт */}
-          <button
-            onClick={() => {
-              if (selectedWave) startCombat(
-                selectedWave, difficulty,
-                instinctId ?? undefined,
-                skillSlots,
-                selectedScenarios,
-              );
-            }}
-            disabled={!selectedWave}
-            className="rounded-xl px-12 py-4 text-lg font-black tracking-widest transition-all disabled:opacity-30"
-            style={{ background: selectedWave ? C.pink : 'transparent', color: C.text, border: `2px solid ${selectedWave ? C.pink : C.muted}` }}>
-            ▶ НАЧАТЬ БОЙ
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ── HUD sub-components ────────────────────────────────────────────────────────
 
@@ -510,12 +84,10 @@ function WaveProgress({ session }: { session: CombatSession }) {
   }, []);
   return (
     <div className="flex flex-col items-end gap-1.5">
-      {/* REC */}
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-full" style={{ background: blink ? C.red : 'transparent', transition: 'background 0.3s' }} />
         <span className="text-[10px] font-black tracking-widest" style={{ color: C.red }}>REC</span>
       </div>
-      {/* Wave kills */}
       <div className="text-xs font-mono" style={{ color: C.muted }}>
         {killed} / {total + killed - (session.spawnQueue.length + session.enemies.length)} убито
       </div>
@@ -533,9 +105,9 @@ function WaveProgress({ session }: { session: CombatSession }) {
 
 function SignalOverlay({ signal }: { signal: AttackSignal }) {
   const cfg = {
-    red:    { color: C.pink,   text: '🔴 УКЛОНИСЬ!',   sub: 'красный удар' },
-    yellow: { color: C.yellow, text: '🟡 ПАРИРУЙ!',     sub: 'жёлтый — парировать' },
-    blue:   { color: C.cyan,   text: '🔵 УКЛОНИСЬ!',   sub: 'синий удар' },
+    red:    { color: C.pink,   text: '🔴 УКЛОНИСЬ!', sub: 'красный удар' },
+    yellow: { color: C.yellow, text: '🟡 ПАРИРУЙ!',   sub: 'жёлтый — парировать' },
+    blue:   { color: C.cyan,   text: '🔵 УКЛОНИСЬ!', sub: 'синий удар' },
   }[signal.type];
   const pct = (signal.ticksLeft / signal.windowTicks) * 100;
   return (
@@ -565,23 +137,18 @@ function EnemyZone({ session, onAttack }: { session: CombatSession; onAttack: (i
     <div className="relative flex flex-col gap-3 rounded-2xl p-5 cursor-pointer transition-all"
       style={{
         border: `2px solid ${borderColor}`,
-        minHeight: 180,
-        minWidth: 320,
-        maxWidth: 480,
-        width: '100%',
+        minHeight: 180, minWidth: 320, maxWidth: 480, width: '100%',
         boxShadow: enemy ? `0 0 30px ${borderColor}33` : 'none',
         background: 'rgba(10,9,16,0.85)',
       }}
       onClick={() => enemy && onAttack(enemy.instanceId)}>
 
-      {/* Signal overlay */}
       {session.pendingSignal && session.enemies.some(e => e.instanceId === session.pendingSignal?.enemyInstanceId) && (
         <SignalOverlay signal={session.pendingSignal} />
       )}
 
       {enemy ? (
         <>
-          {/* Name row */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-base font-black" style={{ color: C.text }}>
               {def?.name?.ru ?? enemy.enemyId}
@@ -590,28 +157,19 @@ function EnemyZone({ session, onAttack }: { session: CombatSession; onAttack: (i
               T{enemy.tier}
             </span>
             {enemy.isFuryMode && (
-              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.red + '33', color: C.red }}>
-                FURY
-              </span>
+              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.red + '33', color: C.red }}>FURY</span>
             )}
             {enemy.isStaggered && (
-              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: '#aa55ff33', color: '#aa55ff' }}>
-                STAGGER
-              </span>
+              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: '#aa55ff33', color: '#aa55ff' }}>STAGGER</span>
             )}
             {enemy.isBoss && enemy.currentPhase === 1 && (
-              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.cyan + '33', color: C.cyan }}>
-                ЩИТ
-              </span>
+              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold" style={{ background: C.cyan + '33', color: C.cyan }}>ЩИТ</span>
             )}
             {enemy.isBoss && enemy.breakBarStunTicks > 0 && (
-              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold animate-pulse" style={{ background: C.yellow + '33', color: C.yellow }}>
-                💥 БРЕЙК ×2 урон
-              </span>
+              <span className="text-[9px] rounded px-1.5 py-0.5 font-bold animate-pulse" style={{ background: C.yellow + '33', color: C.yellow }}>💥 БРЕЙК ×2 урон</span>
             )}
           </div>
 
-          {/* Enemy HP bar */}
           <div className="flex flex-col gap-0.5">
             <div className="flex justify-between text-[10px] font-mono" style={{ color: C.muted }}>
               <span>HP</span><span>{enemy.hp}/{enemy.hpMax}</span>
@@ -622,7 +180,6 @@ function EnemyZone({ session, onAttack }: { session: CombatSession; onAttack: (i
             </div>
           </div>
 
-          {/* Break bar (boss only) */}
           {enemy.isBoss && enemy.breakBarMax > 0 && (
             <div className="flex flex-col gap-0.5">
               <div className="flex justify-between text-[9px] font-mono" style={{ color: C.muted }}>
@@ -635,18 +192,15 @@ function EnemyZone({ session, onAttack }: { session: CombatSession; onAttack: (i
             </div>
           )}
 
-          {/* Weak point indicator */}
           {enemy.weakPointActive && (
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: C.yellow, boxShadow: `0 0 8px ${C.yellow}` }} />
               <span className="text-[10px] font-semibold" style={{ color: C.yellow }}>
-                слабая точка
-                {def?.weakPointTrigger?.ru ? ` · ${def.weakPointTrigger.ru}` : ''}
+                слабая точка{def?.weakPointTrigger?.ru ? ` · ${def.weakPointTrigger.ru}` : ''}
               </span>
             </div>
           )}
 
-          {/* Stagger bar */}
           {!enemy.isBoss && (
             <div className="h-1 rounded-full overflow-hidden" style={{ background: C.dim }}>
               <div className="h-full rounded-full transition-all duration-150"
@@ -710,7 +264,7 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 14 }}>
 
-      {/* LEFT THUMB — защита + зелья */}
+      {/* LEFT — УКЛОН + ПАРИР */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
         <button onClick={onDodge} disabled={!hasPending || isAuto || frozen}
           style={{ width: 90, height: 90, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: 'radial-gradient(circle at 50% 38%,#2c4636,#19261c)', border: `2px solid ${hasPending && !frozen ? '#9ad27e' : '#7faf6a44'}`, boxShadow: hasPending ? '0 3px 0 #2c4a36,0 6px 14px rgba(0,0,0,0.45),inset 0 0 14px rgba(127,175,106,0.2)' : 'none', cursor: hasPending && !frozen ? 'pointer' : 'not-allowed', opacity: hasPending && !frozen ? 1 : 0.45 }}>
@@ -726,7 +280,6 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
 
       {/* CENTER — SHOWTIME */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1 }}>
-        {/* Showtime bar */}
         <ShowtimeBar showtime={session.showtime} />
         <button onClick={onShowtime} disabled={!canShowtime || isAuto}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 15, width: '100%', maxWidth: 344, height: 68, borderRadius: 12, border: `2px solid ${canShowtime ? '#ffd66b' : '#6e5430'}`, background: canShowtime ? 'linear-gradient(180deg,#3a2a12,#2a1d0e)' : '#1c1409', boxShadow: canShowtime ? '0 0 22px rgba(255,214,107,0.45),inset 0 0 14px rgba(255,214,107,0.18)' : 'inset 0 2px 6px rgba(0,0,0,0.5)', cursor: canShowtime && !isAuto ? 'pointer' : 'not-allowed', opacity: canShowtime ? 1 : 0.78, overflow: 'hidden', position: 'relative' }}>
@@ -744,7 +297,7 @@ function SkillBar({ session, onUseSkill, onAttack, onDodge, onParry, onShowtime,
         </button>
       </div>
 
-      {/* RIGHT THUMB — навыки + СИЛА + АТАКА */}
+      {/* RIGHT — навыки + АТАКА */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 9 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           {([0, 1, 2] as const).map(i => {
@@ -797,14 +350,13 @@ function ScenarioChips({ session }: { session: CombatSession }) {
   return (
     <div className="flex flex-wrap gap-1 max-w-[220px]">
       {session.scenarioProgress.map(sp => {
-        const def = DEFAULT_SCENARIOS.find(s => s.id === sp.scenarioId);
         const color = sp.completed ? '#5ae55a' : sp.failed ? C.red : C.muted;
         const icon  = sp.completed ? '✓' : sp.failed ? '✗' : '○';
         return (
-          <div key={sp.scenarioId} title={def?.condition.ru}
+          <div key={sp.scenarioId}
             className="rounded px-1.5 py-0.5 text-[9px] font-semibold"
             style={{ background: color + '22', color, border: `1px solid ${color}44` }}>
-            {icon} {def?.name.ru ?? sp.scenarioId}
+            {icon} {sp.scenarioId}
           </div>
         );
       })}
@@ -816,10 +368,7 @@ function LogTicker({ log }: { log: CombatLogEntry[] }) {
   const recent = log.slice(-5).reverse();
   const fmt = (e: CombatLogEntry): { text: string; color: string } => {
     switch (e.type) {
-      case 'playerAttack': return {
-        text: `⚔ ${e.value}${e.isCrit ? ' ★КРИТ!' : ''}${e.isWeakSpot ? ' 🎯' : ''}`,
-        color: e.isCrit ? C.yellow : C.text,
-      };
+      case 'playerAttack': return { text: `⚔ ${e.value}${e.isCrit ? ' ★КРИТ!' : ''}${e.isWeakSpot ? ' 🎯' : ''}`, color: e.isCrit ? C.yellow : C.text };
       case 'enemyAttack':  return { text: `💥 −${e.value}`, color: C.red };
       case 'playerDodge':  return { text: e.text === 'passive' ? '💨 уклон (пасс.)' : '💨 уклон', color: C.cyan };
       case 'playerParry':  return { text: '🛡 парирование', color: C.yellow };
@@ -848,15 +397,30 @@ function LogTicker({ log }: { log: CombatLogEntry[] }) {
 // ── Combat HUD ────────────────────────────────────────────────────────────────
 
 function CombatHUD({ session }: { session: CombatSession }) {
-  const { combatPlayerAttack, combatPlayerDodge, combatPlayerParry, combatActivateShowtime, combatTick, combatUseSkill, endCombat } = useStudioStore(useShallow(s => ({
-    combatPlayerAttack:  s.combatPlayerAttack,
-    combatPlayerDodge:   s.combatPlayerDodge,
-    combatPlayerParry:   s.combatPlayerParry,
+  const {
+    combatPlayerAttack, combatPlayerDodge, combatPlayerParry,
+    combatActivateShowtime, combatTick, combatUseSkill, endCombat,
+    variables, playtestState,
+  } = useStudioStore(useShallow(s => ({
+    combatPlayerAttack:     s.combatPlayerAttack,
+    combatPlayerDodge:      s.combatPlayerDodge,
+    combatPlayerParry:      s.combatPlayerParry,
     combatActivateShowtime: s.combatActivateShowtime,
-    combatTick:          s.combatTick,
-    combatUseSkill:      s.combatUseSkill,
-    endCombat:           s.endCombat,
+    combatTick:             s.combatTick,
+    combatUseSkill:         s.combatUseSkill,
+    endCombat:              s.endCombat,
+    variables:              s.variables,
+    playtestState:          s.playtestState,
   })));
+
+  const getVar = (name: string): number => {
+    const v = variables.find((vv: any) => vv.name === name);
+    if (!v) return 0;
+    const live = playtestState.variableValues[v.id];
+    return typeof live === 'number' ? live : (v.defaultValue as number) ?? 0;
+  };
+  const coins = getVar('coins');
+  const vhs   = getVar('vhs');
 
   const [isAuto, setIsAuto] = useState(false);
 
@@ -882,7 +446,6 @@ function CombatHUD({ session }: { session: CombatSession }) {
     for (let i = log.length - 1; i >= 0; i--) {
       if (log[i].type === 'showtime') {
         dmg = log[i].value ?? 0;
-        // parse "SHOWTIME! ×3.7 → 42 урона" format
         const m = log[i].text?.match(/×([\d.]+)/);
         mult = m ? parseFloat(m[1]) : 0;
         break;
@@ -890,12 +453,10 @@ function CombatHUD({ session }: { session: CombatSession }) {
     }
     setFlashDmg(dmg); setFlashMult(mult);
 
-    // border glow
     setFlashVisible(true); setFlashOpacity(1);
     const r1 = requestAnimationFrame(() => requestAnimationFrame(() => setFlashOpacity(0)));
     const t1 = setTimeout(() => setFlashVisible(false), 1900);
 
-    // damage badge
     setBadgeVisible(true); setBadgeOpacity(1);
     const r2 = requestAnimationFrame(() => requestAnimationFrame(() => {
       setTimeout(() => setBadgeOpacity(0), 800);
@@ -905,8 +466,8 @@ function CombatHUD({ session }: { session: CombatSession }) {
     return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); clearTimeout(t1); clearTimeout(t2); };
   }, [showtimeCount]);
 
-  const target = session.enemies[0] ?? null;
-  const frozen = session.playerFreezeTicks > 0;
+  const target  = session.enemies[0] ?? null;
+  const frozen  = session.playerFreezeTicks > 0;
   const activeInstinct = DEFAULT_INSTINCTS.find(i => i.id === session.activeInstinctId);
 
   const sessionRef = useRef(session);
@@ -960,7 +521,6 @@ function CombatHUD({ session }: { session: CombatSession }) {
   const MONO = { fontFamily: 'var(--font-mono, Space Mono, monospace)' } as React.CSSProperties;
   const DOT  = { fontFamily: 'var(--font-dot, DotGothic16, sans-serif)' } as React.CSSProperties;
 
-  const waveName = `ВОЛНА ${session.totalKilled + session.enemies.length + session.spawnQueue.length > 0 ? (session.totalKilled + 1) : '?'}`;
   const [blink, setBlink] = useState(true);
   useEffect(() => { const t = setInterval(() => setBlink(b => !b), 600); return () => clearInterval(t); }, []);
 
@@ -982,7 +542,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={endCombat}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', background: '#46341f', border: '1px solid #6e5430', borderRadius: 4, color: '#c39b4e', fontSize: 12, cursor: 'pointer' }}>
-            ← тропа
+            ← примерочная
           </button>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ ...DOT, fontSize: '14px', color: '#e7d8b4' }}>СЛЭЙ</span>
@@ -1010,11 +570,11 @@ function CombatHUD({ session }: { session: CombatSession }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#161009', border: '1px solid #3a2c18', borderRadius: 4 }}>
             <span style={{ fontSize: 12 }}>💰</span>
-            <span style={{ ...VT, fontSize: '16px', color: '#e0c178' }}>1240</span>
+            <span style={{ ...VT, fontSize: '16px', color: '#e0c178' }}>{coins}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#161009', border: '1px solid #3a2c18', borderRadius: 4 }}>
             <span style={{ fontSize: 12 }}>📼</span>
-            <span style={{ ...VT, fontSize: '16px', color: '#b8a888' }}>12</span>
+            <span style={{ ...VT, fontSize: '16px', color: '#b8a888' }}>{vhs}</span>
           </div>
           <div style={{ cursor: 'pointer', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#2a1d11', border: '1px solid #4a3722', borderRadius: 4, fontSize: 13 }}>🎒</div>
           <button onClick={() => setIsAuto(!isAuto)}
@@ -1027,8 +587,8 @@ function CombatHUD({ session }: { session: CombatSession }) {
       {/* ── TITLE STRIP ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 20px', background: 'linear-gradient(180deg,#2f2114,#241810)', borderBottom: '1px solid #5a4226', flexShrink: 0, zIndex: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ ...DOT, fontSize: '18px', color: '#e7d8b4' }}>ГАРАЖИ</span>
-          <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>дубль 1 · обычный</span>
+          <span style={{ ...DOT, fontSize: '18px', color: '#e7d8b4' }}>СЪЁМКА</span>
+          <span style={{ ...MONO, fontSize: '10px', color: '#a8916a' }}>дубль идёт</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1042,7 +602,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         </div>
       </div>
 
-      {/* ── STATUS STRIP (instinct / event / freeze) ─────── */}
+      {/* ── STATUS STRIP ─────────────────────────────────────── */}
       <div className="flex items-center justify-center gap-3 px-4 shrink-0 min-h-[24px]" style={{ background: '#1c140a' }}>
         {activeInstinct && (
           <div className="rounded px-2 py-0.5 text-[9px] font-semibold"
@@ -1067,7 +627,7 @@ function CombatHUD({ session }: { session: CombatSession }) {
         )}
       </div>
 
-      {/* ── STAGE (enemy + combo + log + hero card) ──────── */}
+      {/* ── STAGE ────────────────────────────────────────────── */}
       <div className="flex-1 relative min-h-0" style={{ background: 'radial-gradient(ellipse at 60% 35%, #2c1f12 0%, #1b130b 70%)', backgroundImage: 'repeating-linear-gradient(180deg,rgba(255,255,255,0.025) 0px,rgba(255,255,255,0.025) 1px,transparent 1px,transparent 3px)', boxShadow: 'inset 0 0 120px 20px rgba(0,0,0,0.55)' }}>
 
         {/* COMBO — top-left */}
@@ -1115,11 +675,8 @@ function CombatHUD({ session }: { session: CombatSession }) {
 
       {/* ── ACTION BAR ──────────────────────────────────────── */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, padding: '12px 22px 16px', background: '#1a120a', borderTop: '1px solid #5a4226', zIndex: 3, minHeight: 168, flexShrink: 0 }}>
-        {/* Thumb-reach guides */}
         <div style={{ position: 'absolute', left: -50, bottom: -80, width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(127,175,106,0.07), transparent 66%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: -50, bottom: -80, width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(224,193,120,0.08), transparent 66%)', pointerEvents: 'none' }} />
-
-        {/* LEFT — УКЛОН + ПАРИР + зелья (SkillBar left portion) */}
         <SkillBar
           session={session}
           onUseSkill={combatUseSkill}
@@ -1135,141 +692,12 @@ function CombatHUD({ session }: { session: CombatSession }) {
   );
 }
 
-// ── Results ───────────────────────────────────────────────────────────────────
-
-function fmtTime(ticks: number) {
-  const s = Math.floor(ticks * 0.2);
-  return s >= 60 ? `${Math.floor(s / 60)}м ${s % 60}с` : `${s}с`;
-}
-
-function ResultsView({ session, onExit }: { session: CombatSession; onExit: () => void }) {
-  const { applyRewards } = useStudioStore(useShallow(s => ({ applyRewards: s.applyRewards })));
-  const [collected, setCollected] = useState(false);
-  const [levelUp, setLevelUp] = useState<{ leveledUp: boolean; newLevel: number } | null>(null);
-  const isVictory = session.status === 'victory';
-
-  const showtimeCount = session.log.filter(e => e.type === 'showtime').length;
-  const weakSpotCount = session.weakSpotHits;
-  const timeFmt = fmtTime(session.tick);
-
-  return (
-    <div className="absolute inset-0 flex flex-col items-center gap-4 text-center px-6 overflow-y-auto py-6"
-      style={{ background: '#241810', color: '#ecdcc0', fontFamily: 'var(--font-body, Hanken Grotesk, system-ui, sans-serif)', backgroundImage: 'repeating-linear-gradient(92deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 9px),repeating-linear-gradient(92deg,rgba(140,104,58,0.05) 3px,transparent 4px,transparent 16px)' }}>
-
-      {/* Hero badge */}
-      <div className="flex flex-col items-center gap-1" style={{ marginTop: 16 }}>
-        <div className="text-5xl">{isVictory ? '🏆' : '💀'}</div>
-        <div style={{ fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 38, letterSpacing: 6, color: isVictory ? '#9ad27e' : '#cf6a5a', textShadow: `0 0 30px ${isVictory ? '#7faf6a' : '#b15539'}66` }}>
-          {isVictory ? 'СНЯТО!' : 'ПРОВАЛ'}
-        </div>
-        {isVictory && (
-          <div style={{ fontFamily: 'var(--font-mono, Space Mono, monospace)', fontSize: 11, color: '#7faf6a99', letterSpacing: 2 }}>
-            Отличная работа, стантмен!
-          </div>
-        )}
-      </div>
-
-      {levelUp?.leveledUp && (
-        <div className="rounded-xl px-6 py-3 font-black text-lg animate-pulse"
-          style={{ background: C.yellow + '22', border: `2px solid ${C.yellow}`, color: C.yellow }}>
-          🎉 УРОВЕНЬ UP! → УР.{levelUp.newLevel}
-        </div>
-      )}
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
-        {[
-          { label: 'Убито', value: String(session.totalKilled), color: C.pink },
-          { label: 'Время', value: timeFmt, color: C.muted },
-          { label: 'Макс ×', value: String(session.maxMomentum), color: C.yellow },
-          { label: 'Showtime', value: String(showtimeCount), color: C.cyan },
-          { label: 'Слабых точек', value: String(weakSpotCount), color: C.yellow },
-          { label: 'HP осталось', value: `${Math.round((session.playerHp / session.playerHpMax) * 100)}%`, color: session.playerHp / session.playerHpMax <= 0.15 ? C.red : '#5ae55a' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="flex flex-col items-center rounded-lg py-2 px-1"
-            style={{ background: C.dim, gridColumn: label === 'Слабых точек' ? 'span 2' : undefined }}>
-            <div className="text-lg font-black leading-none" style={{ color }}>{value}</div>
-            <div className="text-[8px] mt-0.5" style={{ color: C.muted }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Rewards */}
-      {isVictory && (
-        <div className="rounded-xl p-4 flex flex-col gap-2 w-full max-w-xs"
-          style={{ background: C.dim, border: `1px solid ${C.pink}44` }}>
-          <div className="text-[10px] font-semibold mb-1 tracking-widest" style={{ color: C.muted }}>НАГРАДА</div>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { icon: '💰', label: 'Монеты', value: session.rewards.coins },
-              { icon: '⭐', label: 'Опыт', value: session.rewards.xp },
-              { icon: '🎞', label: 'Сталлонки', value: session.rewards.stallonkas },
-              ...(session.rewards.souls > 0 ? [{ icon: '💀', label: 'Души', value: session.rewards.souls }] : []),
-            ].map(({ icon, label, value }) => (
-              <div key={label} className="flex flex-col items-center gap-0.5">
-                <span className="text-base">{icon}</span>
-                <span className="text-sm font-black" style={{ color: C.text }}>+{value}</span>
-                <span className="text-[8px]" style={{ color: C.muted }}>{label}</span>
-              </div>
-            ))}
-          </div>
-          {session.rewards.vhsDropped && (
-            <div className="text-xs font-semibold text-center mt-1" style={{ color: C.yellow }}>📼 VHS-кассета!</div>
-          )}
-        </div>
-      )}
-
-      {/* Сценарии */}
-      {session.scenarioProgress.length > 0 && (
-        <div className="w-full max-w-xs">
-          <div className="text-[10px] font-semibold mb-2 tracking-widest" style={{ color: C.muted }}>СЦЕНАРИИ</div>
-          <div className="flex flex-col gap-1.5 text-left">
-            {session.scenarioProgress.map(sp => {
-              const def = DEFAULT_SCENARIOS.find(s => s.id === sp.scenarioId);
-              const color = sp.completed ? '#5ae55a' : sp.failed ? C.red : C.muted;
-              return (
-                <div key={sp.scenarioId} className="rounded-lg px-3 py-2 flex items-center gap-2"
-                  style={{ background: color + '11', border: `1px solid ${color}44` }}>
-                  <span className="text-sm font-black" style={{ color }}>
-                    {sp.completed ? '✓' : sp.failed ? '✗' : '—'}
-                  </span>
-                  <div className="flex flex-col gap-0.5 flex-1">
-                    <span className="text-[10px] font-semibold" style={{ color }}>{def?.name.ru ?? sp.scenarioId}</span>
-                    {sp.completed && def && (
-                      <span className="text-[8px]" style={{ color: '#7a9a7a' }}>→ {def.reward.ru}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Buttons */}
-      <div className="flex gap-3 pb-4">
-        {isVictory && !collected && (
-          <button onClick={() => { const r = applyRewards(); setLevelUp(r); setCollected(true); }}
-            style={{ borderRadius: 8, padding: '12px 28px', fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 16, background: 'rgba(127,175,106,0.18)', color: '#9ad27e', border: '2px solid #7faf6a', cursor: 'pointer' }}>
-            ✓ Забрать
-          </button>
-        )}
-        <button onClick={onExit}
-          style={{ borderRadius: 8, padding: '12px 28px', fontFamily: 'var(--font-dot, DotGothic16, sans-serif)', fontSize: 16, background: '#46341f', color: '#c39b4e', border: '2px solid #6e5430', cursor: 'pointer' }}>
-          ← Деревня
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export default function CombatOverlay({ currentPageId }: { currentPageId: string | null }) {
-  const { combatSession, combatTick, endCombat, selectPage } = useStudioStore(useShallow(s => ({
+export default function CombatOverlay() {
+  const { combatSession, combatTick, selectPage } = useStudioStore(useShallow(s => ({
     combatSession: s.combatSession,
     combatTick:    s.combatTick,
-    endCombat:     s.endCombat,
     selectPage:    s.selectPage,
   })));
 
@@ -1282,20 +710,17 @@ export default function CombatOverlay({ currentPageId }: { currentPageId: string
     return () => clearInterval(id);
   }, [combatSession?.status, combatSession?.id]);
 
-  const isCombatPage = currentPageId === 'combat_wave_select';
-  const hasSession   = combatSession !== null;
+  useEffect(() => {
+    if (combatSession?.status === 'victory' || combatSession?.status === 'defeat') {
+      selectPage('combat_results');
+    }
+  }, [combatSession?.status, selectPage]);
 
-  if (!isCombatPage && !hasSession) return null;
-
-  const handleExit = () => { endCombat(); selectPage('village'); };
+  if (!combatSession || combatSession.status !== 'active') return null;
 
   return (
     <div className="absolute inset-0 z-40 overflow-hidden">
-      {!hasSession && <WaveSelect />}
-      {hasSession && combatSession!.status === 'active' && <CombatHUD session={combatSession!} />}
-      {hasSession && (combatSession!.status === 'victory' || combatSession!.status === 'defeat') && (
-        <ResultsView session={combatSession!} onExit={handleExit} />
-      )}
+      <CombatHUD session={combatSession} />
     </div>
   );
 }

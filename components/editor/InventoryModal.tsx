@@ -15,6 +15,7 @@ import {
   getTotalDamage,
 } from '@/lib/store';
 import InventoryMannequin from './InventoryMannequin';
+import GameHUD from '../game/GameHUD';
 import { toast } from 'sonner';
 
 // ── Wood & Brass font styles ─────────────────────────────────────────────────
@@ -192,6 +193,7 @@ export default function InventoryModal({ onClose }: InventoryModalProps) {
       className="absolute inset-0 z-[100] flex flex-col overflow-hidden"
       style={{ background: '#241810', backgroundImage: WOOD_BG, color: '#ecdcc0' }}
     >
+      <GameHUD />
       {/* ── TITLE BAND ────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

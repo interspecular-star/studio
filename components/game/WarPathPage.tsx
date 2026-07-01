@@ -412,7 +412,6 @@ export default function WarPathPage() {
               const waveId = waves[0]?.id ?? 'wave_test_01';
               const diff: Difficulty = selWave === 'super' ? 'super_endless' : selMode === 'endless' ? 'hollywood' : 'stuntman';
               startCombat(waveId, diff);
-              executeAction({ type: 'goToPage', pageId: 'combat_wave_select' });
             }}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, padding: 14, background: 'linear-gradient(180deg,#e7d8b4,#cdb98a)', border: '1px solid #f0e3c0', borderRadius: 7, boxShadow: '0 3px 0 #8a6a36, 0 5px 14px rgba(0,0,0,0.4)', cursor: 'pointer' }}>
             <span style={{ fontSize: 19 }}>🎬</span>

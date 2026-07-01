@@ -25,7 +25,7 @@ import ShamanPage from '@/components/game/ShamanPage';
 import CavePage from '@/components/game/CavePage';
 import OfficePage from '@/components/game/OfficePage';
 import BureauPage from '@/components/game/BureauPage';
-import ManagedPagePreview from '@/components/editor/ManagedPagePreview';
+import CombatResultsPage from '@/components/game/CombatResultsPage';
 import NovelHUD from '@/components/editor/NovelHUD';
 
 export default function SlayStudio() {
@@ -85,7 +85,7 @@ export default function SlayStudio() {
   const selectedButton = currentPage?.buttons.find((b) => b.id === selectedButtonId) ?? null;
 
   // Pages that render their own full-screen UI (including their own HUD)
-  const MANAGED_PAGE_IDS = ['village', 'war_path', 'tavern_01', 'forge_01', 'shop_01', 'shaman_01', 'mine_01', 'office_01', 'bureau_01', 'combat_wave_select'];
+  const MANAGED_PAGE_IDS = ['village', 'war_path', 'combat_results', 'tavern_01', 'forge_01', 'shop_01', 'shaman_01', 'mine_01', 'office_01', 'bureau_01'];
 
   const shouldShowTopResourceBar = (): boolean => {
     if (currentPage?.showTopResourceBar === false) return false;
@@ -168,19 +168,20 @@ export default function SlayStudio() {
                 )}
                 <KonvaCanvas width={canvasWidth} height={canvasHeight} />
                 {/* Managed game screens — full-screen overlays */}
-                {selectedPageId === 'village'    && <VillagePage />}
-                {selectedPageId === 'war_path'   && <WarPathPage />}
-                {selectedPageId === 'tavern_01'  && <TavernPage />}
-                {selectedPageId === 'forge_01'   && <ForgePage />}
-                {selectedPageId === 'shop_01'    && <ShopPage />}
-                {selectedPageId === 'shaman_01'  && <ShamanPage />}
-                {selectedPageId === 'mine_01'    && <CavePage />}
-                {selectedPageId === 'office_01'  && <OfficePage />}
-                {selectedPageId === 'bureau_01'  && <BureauPage />}
+                {selectedPageId === 'village'        && <VillagePage />}
+                {selectedPageId === 'war_path'       && <WarPathPage />}
+                {selectedPageId === 'combat_results' && <CombatResultsPage />}
+                {selectedPageId === 'tavern_01'      && <TavernPage />}
+                {selectedPageId === 'forge_01'       && <ForgePage />}
+                {selectedPageId === 'shop_01'        && <ShopPage />}
+                {selectedPageId === 'shaman_01'      && <ShamanPage />}
+                {selectedPageId === 'mine_01'        && <CavePage />}
+                {selectedPageId === 'office_01'      && <OfficePage />}
+                {selectedPageId === 'bureau_01'      && <BureauPage />}
                 <NovelHUD />
                 {playtestState.isInventoryOpen && <InventoryModal onClose={() => {}} />}
                 {playtestState.itemRewardModal && <ItemRewardModal />}
-                <CombatOverlay currentPageId={selectedPageId} />
+                <CombatOverlay />
               </div>
             ) : (
               <CanvasWithRulers width={canvasWidth} height={canvasHeight}>
@@ -191,16 +192,17 @@ export default function SlayStudio() {
                       <TopResourceBar currentPage={currentPage} variables={variables} playtestState={playtestState} />
                     </div>
                   )}
-                  {/* Editor preview for managed pages */}
-                  {selectedPageId === 'village'   && <ManagedPagePreview pageId="village"   label="Площадь Табуреткино" />}
-                  {selectedPageId === 'war_path'  && <ManagedPagePreview pageId="war_path"  label="Тропа Войны" />}
-                  {selectedPageId === 'tavern_01' && <ManagedPagePreview pageId="tavern_01" label="Таверна «Пьяный Табурет»" />}
-                  {selectedPageId === 'forge_01'  && <ManagedPagePreview pageId="forge_01"  label="Кузница Агафьи" />}
-                  {selectedPageId === 'shop_01'   && <ManagedPagePreview pageId="shop_01"   label="Лавка Сэма" />}
-                  {selectedPageId === 'shaman_01' && <ManagedPagePreview pageId="shaman_01" label="Логово Зоси" />}
-                  {selectedPageId === 'mine_01'   && <ManagedPagePreview pageId="mine_01"   label="Пещера" />}
-                  {selectedPageId === 'office_01' && <ManagedPagePreview pageId="office_01" label="Контора Бурмила" />}
-                  {selectedPageId === 'bureau_01' && <ManagedPagePreview pageId="bureau_01" label="Бюро Ксении" />}
+                  {/* Editor previews — actual page components, pointer-events disabled */}
+                  {selectedPageId === 'village'        && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><VillagePage /></div>}
+                  {selectedPageId === 'war_path'       && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><WarPathPage /></div>}
+                  {selectedPageId === 'combat_results' && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><CombatResultsPage /></div>}
+                  {selectedPageId === 'tavern_01'      && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><TavernPage /></div>}
+                  {selectedPageId === 'forge_01'       && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><ForgePage /></div>}
+                  {selectedPageId === 'shop_01'        && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><ShopPage /></div>}
+                  {selectedPageId === 'shaman_01'      && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><ShamanPage /></div>}
+                  {selectedPageId === 'mine_01'        && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><CavePage /></div>}
+                  {selectedPageId === 'office_01'      && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><OfficePage /></div>}
+                  {selectedPageId === 'bureau_01'      && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><BureauPage /></div>}
                 </>
               </CanvasWithRulers>
             )}
