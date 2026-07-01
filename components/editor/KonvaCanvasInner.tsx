@@ -942,6 +942,11 @@ export default function KonvaCanvasInner({ width = 1280, height = 720 }: KonvaCa
           {/* Draggable Buttons */}
           {currentPage.buttons
             .filter((button) => {
+              // Dialogue memory: hide buttons marked as "hide after clicked" once used in playtest
+              if (isPlaytest && button.hideAfterClicked) {
+                const used: string[] = (playtestState as any).usedButtonIds ?? [];
+                if (used.includes(button.id)) return false;
+              }
               if (!button.visibleWhen) return true;
 
               // Live values in playtest, fallback to defaults in editor

@@ -8,8 +8,8 @@ export const createPagesSlice = (set: any, get: any) => ({
   selectPage: (id: string | null) =>
     set({ selectedPageId: id, selectedButtonId: null, selectedWidgetId: null, editorDialoguePreviewLine: null }),
 
-  addPage: (actId?: string | null) => {
-    const newPage = createDefaultPage(`page_${Date.now().toString(36)}`);
+  addPage: (actId?: string | null, overrides?: Partial<StudioPage>) => {
+    const newPage = { ...createDefaultPage(`page_${Date.now().toString(36)}`), ...overrides };
     set((s: any) => {
       const newPages = [...s.pages, newPage];
       if (actId) {

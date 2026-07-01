@@ -27,6 +27,7 @@ import OfficePage from '@/components/game/OfficePage';
 import BureauPage from '@/components/game/BureauPage';
 import CombatResultsPage from '@/components/game/CombatResultsPage';
 import NovelHUD from '@/components/editor/NovelHUD';
+import GlobalSearch from '@/components/editor/GlobalSearch';
 
 export default function SlayStudio() {
   const {
@@ -64,6 +65,7 @@ export default function SlayStudio() {
   const [langTab, setLangTab] = useState<'ru' | 'en'>('ru');
   const [editingPageId, setEditingPageId] = useState('');
   const [rightTab, setRightTab] = useState<'page' | 'world'>('page');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (currentPage) {
@@ -74,6 +76,7 @@ export default function SlayStudio() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); return; }
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
       if (e.key === 'w' || e.key === 'W') { e.preventDefault(); openWidgetLibrary(); }
@@ -209,6 +212,7 @@ export default function SlayStudio() {
 
             <WidgetLibrary />
           </div>
+          {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
         </div>
 
         {/* RIGHT: Inspector */}

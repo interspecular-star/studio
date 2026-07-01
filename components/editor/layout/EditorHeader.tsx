@@ -176,6 +176,17 @@ export default function EditorHeader() {
           )}
         </div>
 
+        {/* Global Search trigger */}
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'k', bubbles: true }))}
+          className="flex items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] px-3 py-1.5 text-xs text-[var(--studio-text-muted)] hover:text-[var(--studio-text-primary)] hover:border-[var(--studio-accent)]/60 transition-all"
+          title="Глобальный поиск (Ctrl+K)"
+        >
+          <span>🔍</span>
+          <span>Поиск…</span>
+          <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: 'var(--studio-bg-elevated)', border: '1px solid var(--studio-border)' }}>Ctrl K</kbd>
+        </button>
+
         {/* Mode Switch */}
         <div className="flex rounded-lg border border-[var(--studio-border)] bg-[var(--studio-bg-panel)] p-0.5">
           <button

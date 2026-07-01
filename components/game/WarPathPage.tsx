@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStudioStore } from '@/lib/store';
 import type { Difficulty } from '@/lib/types/combat';
+import { DEFAULT_INSTINCTS } from '@/lib/types/combat';
 import GameHUD from './GameHUD';
 
 // ── Static data ───────────────────────────────────────────────────────────────
@@ -30,13 +31,9 @@ const SCENARIOS = [
   { id: 'sc3', name: 'Комедия положений', effect: 'враги путаются · больше VHS' },
 ];
 
-const INSTINCTS = [
-  { id: 'in1', icon: '💢', name: 'Берсерк' },
-  { id: 'in2', icon: '🍀', name: 'Везучий' },
-  { id: 'in3', icon: '🧲', name: 'Жадина' },
-  { id: 'in4', icon: '🦅', name: 'Зоркий' },
-  { id: 'in5', icon: '🐌', name: 'Упрямый' },
-];
+const INSTINCT_ICONS: Record<string, string> = {
+  veteran: '🛡️', lucky: '🍀', stuntman: '💨', old_school: '⚡', hunter: '🎯', director: '🎬',
+};
 
 const POTIONS = [
   { id: 'p1', icon: '❤️', name: 'Зелье жизни', count: 5 },
@@ -92,7 +89,7 @@ export default function WarPathPage() {
   const [selMode, setSelMode]       = useState<'normal' | 'endless' | 'super'>('normal');
   const [skillsOn, setSkillsOn]     = useState<Record<string, boolean>>({ sk1: true, sk2: true, sk3: false, sk4: false });
   const [scenario, setScenario]     = useState('sc1');
-  const [instinctsOn, setInstinctsOn] = useState<Record<string, boolean>>({ in1: true, in3: true });
+  const [selectedInstinctId, setSelectedInstinctId] = useState<string | null>(DEFAULT_INSTINCTS[0]?.id ?? null);
   const [potionsOn, setPotionsOn]   = useState<Record<string, boolean>>({ p1: true, p2: true });
   const [tick, setTick]             = useState(0);
 
@@ -308,13 +305,13 @@ export default function WarPathPage() {
                 🐾 Инстинкты <span style={{ fontWeight: 400, color: '#6e5e44', fontSize: 10 }}>(пассивки забега)</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {INSTINCTS.map(i => {
-                  const on = !!instinctsOn[i.id];
+                {DEFAULT_INSTINCTS.map(inst => {
+                  const on = selectedInstinctId === inst.id;
                   return (
-                    <div key={i.id} onClick={() => setInstinctsOn(prev => ({ ...prev, [i.id]: !prev[i.id] }))}
+                    <div key={inst.id} onClick={() => setSelectedInstinctId(on ? null : inst.id)}
                       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 14, border: `1px solid ${on ? '#7faf6a' : '#3a2c18'}`, background: on ? 'rgba(127,175,106,0.13)' : '#1a120b' }}>
-                      <span style={{ fontSize: 13 }}>{i.icon}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: on ? '#a8d094' : '#a8916a' }}>{i.name}</span>
+                      <span style={{ fontSize: 13 }}>{INSTINCT_ICONS[inst.id] ?? '⚡'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: on ? '#a8d094' : '#a8916a' }}>{inst.name.ru}</span>
                     </div>
                   );
                 })}
@@ -409,9 +406,10 @@ export default function WarPathPage() {
           {/* START BUTTON */}
           <button
             onClick={() => {
-              const waveId = waves[0]?.id ?? 'wave_test_01';
+              const waveIdx = selWave === 'super' ? 0 : WAVES.findIndex(w => w.id === selWave);
+              const waveId = waves[Math.max(0, waveIdx)]?.id ?? waves[0]?.id ?? 'wave_test_01';
               const diff: Difficulty = selWave === 'super' ? 'super_endless' : selMode === 'endless' ? 'hollywood' : 'stuntman';
-              startCombat(waveId, diff);
+              startCombat(waveId, diff, selectedInstinctId ?? undefined);
             }}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, padding: 14, background: 'linear-gradient(180deg,#e7d8b4,#cdb98a)', border: '1px solid #f0e3c0', borderRadius: 7, boxShadow: '0 3px 0 #8a6a36, 0 5px 14px rgba(0,0,0,0.4)', cursor: 'pointer' }}>
             <span style={{ fontSize: 19 }}>🎬</span>

@@ -39,6 +39,7 @@ export type StudioButton = {
   action: ButtonAction;
   visibleWhen?: Condition;
   enabledWhen?: Condition;
+  hideAfterClicked?: boolean;
   image?: string;
   history?: Array<{
     layout: StudioButton['layout'];

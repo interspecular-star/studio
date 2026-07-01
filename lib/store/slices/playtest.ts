@@ -34,6 +34,7 @@ export const createPlaytestSlice = (set: any, get: any) => ({
         dialogueStarted: false,
         itemRewardModal: null,
         questProgress: {},
+        usedButtonIds: [],
       },
       snappingGuide: null,
     });
@@ -343,5 +344,13 @@ export const createPlaytestSlice = (set: any, get: any) => ({
 
     set((s: any) => ({ playtestState: { ...s.playtestState, variableValues: currentValues } }));
     get().savePlaytestProgress();
+  },
+
+  trackButtonClick: (buttonId: string) => {
+    set((s: any) => {
+      const used: string[] = s.playtestState.usedButtonIds ?? [];
+      if (used.includes(buttonId)) return s;
+      return { playtestState: { ...s.playtestState, usedButtonIds: [...used, buttonId] } };
+    });
   },
 });

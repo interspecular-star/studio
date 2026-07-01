@@ -218,6 +218,7 @@ export default function ButtonRenderer({
         if (!isEnabled) return;
         e.cancelBubble = true;
         if (isPlaytest) {
+          if (button.hideAfterClicked) useStudioStore.getState().trackButtonClick(button.id);
           useStudioStore.getState().executeAction(button.action);
         } else {
           handleButtonClick(button.id, e);
@@ -226,6 +227,7 @@ export default function ButtonRenderer({
       onTap={(e: any) => {
         if (!isEnabled) return;
         if (isPlaytest) {
+          if (button.hideAfterClicked) useStudioStore.getState().trackButtonClick(button.id);
           useStudioStore.getState().executeAction(button.action);
         } else {
           handleButtonClick(button.id, e);

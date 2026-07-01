@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useContext, createContext, useCallb
 import { Plus, Trash2, Lock, Unlock, Search, ChevronDown, ChevronRight, Copy, Pencil, Check, X } from 'lucide-react';
 import { useStudioStore, type StudioAct, type StudioPage } from '@/lib/store';
 import { toast } from 'sonner';
+import PageTemplateModal from './PageTemplateModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -233,9 +234,10 @@ type ActSectionProps = {
   actIdx: number;
   searchLower: string;
   pageMatchesSearch: (id: string) => boolean;
+  openTemplateModal: (actId: string | null) => void;
 };
 
-const ActSection = React.memo(function ActSection({ act, actIdx, searchLower, pageMatchesSearch }: ActSectionProps) {
+const ActSection = React.memo(function ActSection({ act, actIdx, searchLower, pageMatchesSearch, openTemplateModal }: ActSectionProps) {
   const updateAct = useStudioStore(s => s.updateAct);
   const deleteAct = useStudioStore(s => s.deleteAct);
   const duplicateAct = useStudioStore(s => s.duplicateAct);
@@ -384,7 +386,7 @@ const ActSection = React.memo(function ActSection({ act, actIdx, searchLower, pa
 
           {!deleteConfirm ? (
             <div className="flex items-center gap-0.5">
-              <button title="Добавить страницу" onClick={() => { addPage(act.id); toast.success('Страница создана'); }}
+              <button title="Добавить страницу" onClick={() => openTemplateModal(act.id)}
                 className="p-1 rounded text-[var(--studio-text-muted)] hover:text-[var(--studio-accent)] hover:bg-[var(--studio-bg-panel)]">
                 <Plus className="h-3 w-3" />
               </button>
@@ -463,6 +465,9 @@ export default function LeftSidebar() {
     addPage, duplicatePage, deletePage,
     addAct, renamePage, movePageToAct,
   } = useStudioStore();
+
+  // ── Template modal ──
+  const [templateModal, setTemplateModal] = useState<{ actId: string | null } | null>(null);
 
   // ── Search ──
   const [search, setSearch] = useState('');
@@ -563,6 +568,7 @@ export default function LeftSidebar() {
     && unassignedVisible.length === 0;
 
   return (
+    <>
     <DndContext.Provider value={dndCtx}>
       <EditContext.Provider value={editCtx}>
         <div className="panel flex w-72 flex-shrink-0 flex-col border-r overflow-hidden">
@@ -588,7 +594,7 @@ export default function LeftSidebar() {
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => { addPage(null); toast.success('Страница создана'); }}
+              onClick={() => setTemplateModal({ actId: null })}
               title="Новая страница (без акта)"
               className="flex items-center gap-1 rounded-md bg-[var(--studio-accent)] px-2 py-1 text-[10px] font-semibold text-[#1C1814] hover:bg-[var(--studio-accent-hover)]">
               + Стр.
@@ -622,6 +628,7 @@ export default function LeftSidebar() {
                 actIdx={actIdx}
                 searchLower={searchLower}
                 pageMatchesSearch={pageMatchesSearch}
+                openTemplateModal={(id) => setTemplateModal({ actId: id })}
               />
             ))}
 
@@ -676,5 +683,14 @@ export default function LeftSidebar() {
         </div>
       </EditContext.Provider>
     </DndContext.Provider>
+
+    {templateModal && (
+      <PageTemplateModal
+        actId={templateModal.actId}
+        onClose={() => setTemplateModal(null)}
+        onAdd={(actId, overrides) => { addPage(actId, overrides); toast.success('Страница создана'); }}
+      />
+    )}
+    </>
   );
 }

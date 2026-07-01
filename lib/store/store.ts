@@ -224,6 +224,7 @@ type StudioState = {
   // === Playtest State ===
   resetPlaytestState: () => void;
   executeAction: (action: ButtonAction) => void;
+  trackButtonClick: (buttonId: string) => void;
 
   // === Equipment ===
   equipItem: (itemId: string, targetSlot?: EquipmentSlot) => void;
@@ -320,7 +321,7 @@ type StudioState = {
   applyRewards: () => { leveledUp: boolean; newLevel: number };
   endCombat: () => void;
 
-  addPage: (actId?: string | null) => void;
+  addPage: (actId?: string | null, overrides?: Partial<StudioPage>) => void;
   duplicatePage: (id: string) => void;
   deletePage: (id: string) => void;
 
